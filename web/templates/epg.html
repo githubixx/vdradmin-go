@@ -1,0 +1,81 @@
+{{define "epg.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPG - VDRAdmin</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body>
+    <header>
+        <nav class="container">
+            <div class="nav-brand">
+                <h1>VDRAdmin</h1>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/">Home</a></li>
+                <li><a href="/epg">EPG</a></li>
+                <li><a href="/timers">Timers</a></li>
+                <li><a href="/recordings">Recordings</a></li>
+                <li><a href="/search">Search</a></li>
+            </ul>
+            {{if .User}}
+            <div class="nav-user">
+                <span>{{.User}}</span>
+                {{if eq .Role "admin"}}<span class="badge">Admin</span>{{end}}
+            </div>
+            {{end}}
+        </nav>
+    </header>
+
+    <main class="container">
+        <h2>Electronic Program Guide</h2>
+
+<div class="epg-list">
+    {{range .Events}}
+    <div class="epg-item">
+        <div class="epg-time">
+            <time datetime="{{.Start.Format "2006-01-02T15:04"}}">
+                {{.Start.Format "15:04"}}
+            </time>
+            <span class="epg-duration">{{.Duration.Minutes | printf "%.0f"}} min</span>
+        </div>
+        <div class="epg-content">
+            <div class="epg-header">
+                <h3>{{.Title}}</h3>
+                <span class="epg-channel">{{.ChannelName}}</span>
+            </div>
+            {{if .Subtitle}}
+            <p class="epg-subtitle">{{.Subtitle}}</p>
+            {{end}}
+            {{if .Description}}
+            <p class="epg-description">{{.Description}}</p>
+            {{end}}
+        </div>
+        {{if eq $.Role "admin"}}
+        <div class="epg-actions">
+            <button
+                hx-post="/timers/create?event_id={{.EventID}}"
+                hx-target="body"
+                class="btn btn-sm btn-primary">
+                Record
+            </button>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <p class="empty-state">No programs found</p>
+    {{end}}
+</div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; {{.Year}} vdradmin-go | <a href="https://github.com/githubixx/vdradmin-go">GitHub</a></p>
+        </div>
+    </footer>
+</body>
+</html>
+{{end}}

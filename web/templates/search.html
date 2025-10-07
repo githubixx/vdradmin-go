@@ -1,0 +1,92 @@
+{{define "search.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search - VDRAdmin</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body>
+    <header>
+        <nav class="container">
+            <div class="nav-brand">
+                <h1>VDRAdmin</h1>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/">Home</a></li>
+                <li><a href="/epg">EPG</a></li>
+                <li><a href="/timers">Timers</a></li>
+                <li><a href="/recordings">Recordings</a></li>
+                <li><a href="/search">Search</a></li>
+            </ul>
+            {{if .User}}
+            <div class="nav-user">
+                <span>{{.User}}</span>
+                {{if eq .Role "admin"}}<span class="badge">Admin</span>{{end}}
+            </div>
+            {{end}}
+        </nav>
+    </header>
+
+    <main class="container">
+        <h2>Search Programs</h2>
+
+        <form hx-get="/search" hx-target="#search-results" class="search-form">
+            <input
+                type="search"
+                name="q"
+                placeholder="Search for programs..."
+                value="{{.Query}}"
+                autofocus
+                class="search-input">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+
+        <div id="search-results">
+            {{if .Query}}
+            <h3>Results for "{{.Query}}"</h3>
+            <div class="epg-list">
+                {{range .Events}}
+                <div class="epg-item">
+                    <div class="epg-time">
+                        <time datetime="{{.Start.Format "2006-01-02T15:04"}}">
+                            {{.Start.Format "15:04"}}
+                        </time>
+                    </div>
+                    <div class="epg-content">
+                        <div class="epg-header">
+                            <h4>{{.Title}}</h4>
+                            <span class="epg-channel">{{.ChannelName}}</span>
+                        </div>
+                        {{if .Subtitle}}
+                        <p class="epg-subtitle">{{.Subtitle}}</p>
+                        {{end}}
+                    </div>
+                    {{if eq $.Role "admin"}}
+                    <div class="epg-actions">
+                        <button
+                            hx-post="/timers/create?event_id={{.EventID}}"
+                            class="btn btn-sm btn-primary">
+                            Record
+                        </button>
+                    </div>
+                    {{end}}
+                </div>
+                {{else}}
+                <p class="empty-state">No results found</p>
+                {{end}}
+            </div>
+            {{end}}
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; {{.Year}} vdradmin-go | <a href="https://github.com/githubixx/vdradmin-go">GitHub</a></p>
+        </div>
+    </footer>
+</body>
+</html>
+{{end}}
