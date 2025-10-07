@@ -1,0 +1,42 @@
+# vdradmin-go Configuration Example
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: 30s
+  write_timeout: 30s
+  max_header_bytes: 1048576  # 1 MB
+  tls:
+    enabled: false
+    cert_file: ""
+    key_file: ""
+
+vdr:
+  host: "localhost"
+  port: 6419  # Use 2001 for older VDR versions
+  timeout: 10s
+  video_dir: "/var/lib/video.00"
+  config_dir: "/etc/vdr"
+  reconnect_delay: 5s
+
+auth:
+  enabled: true
+  admin_user: "admin"
+  admin_pass: "changeme"
+  guest_enabled: false
+  guest_user: "guest"
+  guest_pass: "guest"
+  # Local networks that bypass authentication (CIDR notation)
+  local_nets:
+    - "192.168.1.0/24"
+    - "127.0.0.1/32"
+
+cache:
+  epg_expiry: 60m
+  recording_expiry: 5m
+
+timer:
+  default_priority: 50
+  default_lifetime: 99
+  default_margin_start: 2   # minutes
+  default_margin_end: 10    # minutes

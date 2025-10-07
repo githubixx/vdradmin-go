@@ -1,0 +1,83 @@
+{{define "timers.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timers - VDRAdmin</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body>
+    <header>
+        <nav class="container">
+            <div class="nav-brand">
+                <h1>VDRAdmin</h1>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/">Home</a></li>
+                <li><a href="/epg">EPG</a></li>
+                <li><a href="/timers">Timers</a></li>
+                <li><a href="/recordings">Recordings</a></li>
+                <li><a href="/search">Search</a></li>
+            </ul>
+            {{if .User}}
+            <div class="nav-user">
+                <span>{{.User}}</span>
+                {{if eq .Role "admin"}}<span class="badge">Admin</span>{{end}}
+            </div>
+            {{end}}
+        </nav>
+    </header>
+
+    <main class="container">
+        <h2>Recording Timers</h2>
+
+        <div class="timer-list">
+            {{range .Timers}}
+            <div class="timer-item {{if .Active}}active{{else}}inactive{{end}}">
+                <div class="timer-info">
+                    <h3>{{.Title}}</h3>
+                    <div class="timer-meta">
+                        <span class="timer-channel">{{.ChannelID}}</span>
+                        <span class="timer-time">
+                            {{.Start.Format "2006-01-02 15:04"}} - {{.Stop.Format "15:04"}}
+                        </span>
+                        <span class="timer-priority">Priority: {{.Priority}}</span>
+                        <span class="timer-lifetime">Lifetime: {{.Lifetime}} days</span>
+                    </div>
+                </div>
+                {{if eq $.Role "admin"}}
+                <div class="timer-actions">
+                    <button
+                        hx-post="/timers/toggle?id={{.ID}}"
+                        hx-swap="outerHTML"
+                        hx-target="closest .timer-item"
+                        class="btn btn-sm {{if .Active}}btn-secondary{{else}}btn-success{{end}}">
+                        {{if .Active}}Disable{{else}}Enable{{end}}
+                    </button>
+                    <button
+                        hx-delete="/timers?id={{.ID}}"
+                        hx-confirm="Are you sure you want to delete this timer?"
+                        hx-swap="outerHTML"
+                        hx-target="closest .timer-item"
+                        class="btn btn-sm btn-danger">
+                        Delete
+                    </button>
+                </div>
+                {{end}}
+            </div>
+            {{else}}
+            <p class="empty-state">No timers configured</p>
+            {{end}}
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; {{.Year}} vdradmin-go | <a href="https://github.com/githubixx/vdradmin-go">GitHub</a></p>
+        </div>
+    </footer>
+</body>
+</html>
+{{end}}

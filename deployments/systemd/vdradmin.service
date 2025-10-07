@@ -1,0 +1,27 @@
+[Unit]
+Description=vdradmin-go Web Interface
+After=network.target vdr.service
+Wants=vdr.service
+
+[Service]
+Type=simple
+User=vdr
+Group=vdr
+WorkingDirectory=/opt/vdradmin-go
+ExecStart=/opt/vdradmin-go/vdradmin --config /etc/vdradmin/config.yaml
+Restart=on-failure
+RestartSec=5s
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/vdradmin
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=512
+
+[Install]
+WantedBy=multi-user.target

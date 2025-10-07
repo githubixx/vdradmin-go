@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  vdradmin:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    container_name: vdradmin-go
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - vdr-recordings:/recordings:ro
+    environment:
+      - TZ=Europe/Berlin
+    restart: unless-stopped
+    networks:
+      - vdr-network
+
+  # Example VDR service (if running VDR in Docker)
+  # vdr:
+  #   image: vdr:latest
+  #   container_name: vdr
+  #   ports:
+  #     - "6419:6419"
+  #   volumes:
+  #     - vdr-config:/etc/vdr
+  #     - vdr-recordings:/var/lib/video.00
+  #   networks:
+  #     - vdr-network
+
+networks:
+  vdr-network:
+    driver: bridge
+
+volumes:
+  vdr-recordings:
+  vdr-config:
