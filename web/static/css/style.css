@@ -29,6 +29,176 @@ body {
     background-color: var(--bg-color);
 }
 
+/* Classic vdradmin-am-like start screen (scoped to home only) */
+body.legacy-home {
+    --legacy-accent: #6d96a9;
+    --legacy-bg-alt: #dee6ee;
+    --legacy-hover: #8cc1da;
+    background-color: #ffffff;
+    color: #000000;
+    font-family: Verdana, "Bitstream Vera Sans", Arial, Geneva, Helvetica, sans-serif;
+    line-height: 1.2;
+    margin: 3px;
+}
+
+.legacy-frame {
+    display: grid;
+    grid-template-columns: 155px 1fr;
+    gap: 0;
+    min-height: calc(100vh - 6px);
+}
+
+.legacy-nav {
+    padding: 0 3px;
+}
+
+.legacy-logo {
+    padding-top: 1em;
+    padding-bottom: 2em;
+    width: 150px;
+    text-align: center;
+}
+
+.legacy-logo a {
+    color: var(--legacy-accent);
+    font-weight: bold;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.legacy-nav-bar {
+    border: 1px solid var(--legacy-accent);
+    padding: 1em 0;
+}
+
+.legacy-navi {
+    font-size: 12px;
+    padding: 6px 0;
+    text-align: center;
+}
+
+.legacy-navi a,
+.legacy-navi a:visited,
+.legacy-navi a:active {
+    color: var(--legacy-accent);
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.legacy-navi:hover {
+    background-color: var(--legacy-bg-alt);
+}
+
+.legacy-search {
+    padding-top: 6px;
+    font-size: 12px;
+    text-align: center;
+}
+
+.legacy-search input[type="text"] {
+    width: 140px;
+    box-sizing: border-box;
+}
+
+.legacy-search input[type="submit"] {
+    margin-top: 4px;
+    font-size: 11px;
+}
+
+.legacy-user {
+    margin-top: 10px;
+    padding: 6px 8px;
+    text-align: center;
+    font-size: 11px;
+}
+
+.legacy-badge {
+    margin-left: 6px;
+    padding: 1px 6px;
+    border: 1px solid var(--legacy-accent);
+    font-size: 10px;
+}
+
+.legacy-main {
+    padding: 0 3px;
+}
+
+.legacy-heading {
+    margin-bottom: 6px;
+}
+
+.legacy-heading h2 {
+    margin: 0;
+    font-size: 11px;
+    font-weight: bold;
+    color: #000000;
+}
+
+.legacy-warning {
+    margin: 0 0 10px 0;
+    padding: 10px;
+    border: 1px solid var(--legacy-accent);
+    background-color: var(--legacy-bg-alt);
+    font-size: 11px;
+}
+
+.legacy-list {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.legacy-list th,
+.legacy-list td {
+    padding: 3px;
+    vertical-align: top;
+}
+
+.legacy-heading-row th {
+    background-color: var(--legacy-accent);
+    color: #ffffff;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.legacy-row:nth-child(odd) {
+    background-color: #ffffff;
+}
+
+.legacy-row:nth-child(even) {
+    background-color: var(--legacy-bg-alt);
+}
+
+.legacy-row:hover {
+    background-color: var(--legacy-hover);
+}
+
+.legacy-col-channel {
+    white-space: nowrap;
+    width: 25%;
+}
+
+.legacy-col-time {
+    white-space: nowrap;
+    width: 70px;
+}
+
+.legacy-subtitle {
+    font-weight: normal;
+    color: #000000;
+}
+
+.legacy-empty {
+    text-align: center;
+    padding: 10px;
+}
+
+.legacy-footer {
+    margin-top: 10px;
+    font-size: 11px;
+    color: #000000;
+}
+
 /* Layout */
 .container {
     max-width: 1200px;

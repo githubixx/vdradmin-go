@@ -1,0 +1,63 @@
+{{define "event.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>More Information - VDRAdmin</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="legacy-home">
+    <div class="legacy-main" aria-label="More information">
+        <div class="legacy-heading">
+            <h2>More Information</h2>
+        </div>
+
+        {{if .HomeError}}
+        <div class="legacy-warning">
+            <strong>VDR connection error:</strong> {{.HomeError}}
+        </div>
+        {{end}}
+
+        {{with .Event}}
+        <table class="legacy-list" role="table">
+            <tbody>
+                <tr class="legacy-row">
+                    <td class="legacy-col-channel"><strong>Channel</strong></td>
+                    <td class="legacy-col-title">{{.ChannelName}}</td>
+                </tr>
+                <tr class="legacy-row">
+                    <td class="legacy-col-channel"><strong>Start</strong></td>
+                    <td class="legacy-col-title">{{.Start.Format "2006-01-02 15:04"}}</td>
+                </tr>
+                <tr class="legacy-row">
+                    <td class="legacy-col-channel"><strong>End</strong></td>
+                    <td class="legacy-col-title">{{.Stop.Format "2006-01-02 15:04"}}</td>
+                </tr>
+                <tr class="legacy-row">
+                    <td class="legacy-col-channel"><strong>Title</strong></td>
+                    <td class="legacy-col-title">{{.Title}}</td>
+                </tr>
+                {{if .Subtitle}}
+                <tr class="legacy-row">
+                    <td class="legacy-col-channel"><strong>Subtitle</strong></td>
+                    <td class="legacy-col-title">{{.Subtitle}}</td>
+                </tr>
+                {{end}}
+                {{if .Description}}
+                <tr class="legacy-row">
+                    <td class="legacy-col-channel"><strong>Description</strong></td>
+                    <td class="legacy-col-title">{{.Description}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{end}}
+
+        <div class="legacy-footer">
+            <a href="#" onclick="window.close(); return false;">Close</a>
+        </div>
+    </div>
+</body>
+</html>
+{{end}}

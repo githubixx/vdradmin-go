@@ -17,6 +17,7 @@ type Channel struct {
 type EPGEvent struct {
 	EventID     int
 	ChannelID   string
+	ChannelNumber int
 	ChannelName string
 	Title       string
 	Subtitle    string

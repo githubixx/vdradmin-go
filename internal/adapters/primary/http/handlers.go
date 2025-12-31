@@ -49,7 +49,18 @@ func (h *Handler) SetTemplates(templates map[string]*template.Template) {
 
 // Home renders the home page
 func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
-	h.renderTemplate(w, r, "index.html", nil)
+	events, err := h.epgService.GetCurrentPrograms(r.Context())
+	data := map[string]any{}
+	if err != nil {
+		// Keep the UI reachable even if VDR/SVDRP is unavailable.
+		h.logger.Error("EPG fetch error on home", slog.Any("error", err))
+		data["HomeError"] = err.Error()
+		data["Events"] = []domain.EPGEvent{}
+	} else {
+		data["Events"] = events
+	}
+
+	h.renderTemplate(w, r, "index.html", data)
 }
 
 // EPGList shows EPG listing
@@ -71,6 +82,59 @@ func (h *Handler) EPGList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.renderTemplate(w, r, "epg.html", data)
+}
+
+// EventInfo renders a small popup page with detailed EPG information for a single event.
+func (h *Handler) EventInfo(w http.ResponseWriter, r *http.Request) {
+	eventID, _ := strconv.Atoi(r.URL.Query().Get("id"))
+	if eventID <= 0 {
+		http.Error(w, "Invalid event ID", http.StatusBadRequest)
+		return
+	}
+
+	channelID := r.URL.Query().Get("channel")
+
+	// Event IDs are not guaranteed to be globally unique across channels.
+	// Prefer a channel-scoped lookup when a channel id is provided.
+	var events []domain.EPGEvent
+	var err error
+	if channelID != "" {
+		events, err = h.epgService.GetEPG(r.Context(), channelID, time.Time{})
+	} else {
+		events, err = h.epgService.GetEPG(r.Context(), "", time.Time{})
+	}
+	if err != nil {
+		h.logger.Error("EPG fetch error for event", slog.Any("error", err), slog.Int("event_id", eventID))
+		handle := map[string]any{"HomeError": err.Error()}
+		h.renderTemplate(w, r, "event.html", handle)
+		return
+	}
+
+	var found *domain.EPGEvent
+	for i := range events {
+		if events[i].EventID != eventID {
+			continue
+		}
+		if channelID != "" {
+			if events[i].ChannelID == channelID {
+				found = &events[i]
+				break
+			}
+			continue
+		}
+		// Best-effort fallback when no channel id is provided.
+		found = &events[i]
+		break
+	}
+	if found == nil {
+		http.Error(w, "Event not found", http.StatusNotFound)
+		return
+	}
+
+	data := map[string]any{
+		"Event": found,
+	}
+	h.renderTemplate(w, r, "event.html", data)
 }
 
 // EPGSearch handles EPG search

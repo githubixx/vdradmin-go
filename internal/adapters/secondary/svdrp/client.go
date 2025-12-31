@@ -3,6 +3,7 @@ package svdrp
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -154,10 +155,56 @@ func (c *Client) GetEPG(ctx context.Context, channelID string, at time.Time) ([]
 
 	lines, err := c.readResponse()
 	if err != nil {
+		// Some channels simply have no EPG (e.g. no schedule). Treat as empty result.
+		if channelID != "" && isSVDRPNoSchedule(err) {
+			return []domain.EPGEvent{}, nil
+		}
+
+		// Some VDR versions don't support the optional timestamp argument.
+		// Example: "SVDRP error 501: Unknown option: <timestamp>"
+		if channelID != "" && !at.IsZero() && isSVDRPUnknownOption(err) {
+			// Retry without timestamp.
+			cmd = fmt.Sprintf("LSTE %s", channelID)
+			if err := c.sendCommand(cmd); err != nil {
+				return nil, err
+			}
+			lines, err = c.readResponse()
+			if err != nil {
+				if isSVDRPNoSchedule(err) {
+					return []domain.EPGEvent{}, nil
+				}
+				return nil, err
+			}
+			return parseEPGEvents(lines), nil
+		}
 		return nil, err
 	}
 
 	return parseEPGEvents(lines), nil
+}
+
+func isSVDRPUnknownOption(err error) bool {
+	if err == nil {
+		return false
+	}
+	var target error = err
+	if u := errors.Unwrap(err); u != nil {
+		target = u
+	}
+	msg := target.Error()
+	return strings.Contains(msg, "SVDRP error 501") || strings.Contains(msg, "Unknown option")
+}
+
+func isSVDRPNoSchedule(err error) bool {
+	if err == nil {
+		return false
+	}
+	var target error = err
+	if u := errors.Unwrap(err); u != nil {
+		target = u
+	}
+	msg := target.Error()
+	return strings.Contains(msg, "SVDRP error 550") || strings.Contains(msg, "No schedule found")
 }
 
 // GetTimers retrieves all timers
@@ -457,46 +504,142 @@ func (c *Client) closeConnection() {
 
 // parseChannel parses a channel line from LSTC
 func parseChannel(number int, line string) domain.Channel {
-	parts := strings.Split(line, " ")
-	if len(parts) < 1 {
+	chID, chNumber, chName, provider := parseSVDRPChannelHeader(strings.TrimSpace(line), number)
+	if chID == "" && chName == "" {
 		return domain.Channel{}
 	}
-
-	// Format: number name;provider:freq:params:source:...
-	channelData := strings.SplitN(parts[0], " ", 2)
-	id := channelData[0]
-
-	fields := strings.Split(id, ":")
-	name := fields[0]
-
-	// Separate name and provider
-	nameParts := strings.Split(name, ";")
-	channelName := nameParts[0]
-	provider := ""
-	if len(nameParts) > 1 {
-		provider = nameParts[1]
+	if chNumber == 0 {
+		chNumber = number
+	}
+	if chID == "" {
+		chID = strconv.Itoa(chNumber)
 	}
 
-	return domain.Channel{
-		ID:       id,
-		Number:   number,
-		Name:     channelName,
-		Provider: provider,
+	return domain.Channel{ID: chID, Number: chNumber, Name: chName, Provider: provider}
+}
+
+func parseSVDRPChannelHeader(text string, numberFallback int) (channelID string, channelNumber int, channelName string, provider string) {
+	if text == "" {
+		return "", 0, "", ""
 	}
+
+	parts := strings.SplitN(text, " ", 3)
+	first := strings.TrimSpace(parts[0])
+
+	// Cases we try to support:
+	// 1) "<num> <channels.conf line>"
+	// 2) "<num> <channel-id> <channels.conf line>"
+	// 3) "<channel-id> <channels.conf line>"
+
+	if n, err := strconv.Atoi(first); err == nil {
+		channelNumber = n
+		if len(parts) >= 2 {
+			rest := strings.TrimSpace(text[len(first):])
+			rest = strings.TrimSpace(rest)
+			// If the next token looks like a channel-id, prefer it.
+			r2 := strings.SplitN(rest, " ", 2)
+			if len(r2) >= 1 && looksLikeVDRChannelID(r2[0]) {
+				channelID = r2[0]
+				if len(r2) == 2 {
+					channelName, provider = parseChannelNameProvider(r2[1])
+				}
+			} else {
+				// Otherwise, derive ID from channels.conf-like content if possible.
+				channelID = deriveChannelIDFromChannelsConf(rest)
+				channelName, provider = parseChannelNameProvider(rest)
+				if channelID == "" {
+					channelID = first
+				}
+			}
+		}
+		return channelID, channelNumber, channelName, provider
+	}
+
+	// first isn't numeric, so treat it as channel id.
+	if looksLikeVDRChannelID(first) {
+		channelID = first
+		if len(parts) >= 2 {
+			rest := strings.TrimSpace(text[len(first):])
+			rest = strings.TrimSpace(rest)
+			channelName, provider = parseChannelNameProvider(rest)
+		}
+		return channelID, numberFallback, channelName, provider
+	}
+
+	// Fallback: treat as channels.conf line.
+	channelID = deriveChannelIDFromChannelsConf(text)
+	channelName, provider = parseChannelNameProvider(text)
+	return channelID, numberFallback, channelName, provider
+}
+
+func looksLikeVDRChannelID(s string) bool {
+	// Common VDR channel id form: S19.2E-1-1010-11150 (source-nid-tid-sid)
+	return strings.Contains(s, "-") && (strings.HasPrefix(s, "S") || strings.HasPrefix(s, "C") || strings.HasPrefix(s, "T") || strings.HasPrefix(s, "A"))
+}
+
+func parseChannelNameProvider(channelsConfLine string) (name string, provider string) {
+	nameProvider := strings.SplitN(channelsConfLine, ":", 2)[0]
+	nameParts := strings.SplitN(nameProvider, ";", 2)
+	name = strings.TrimSpace(nameParts[0])
+	if len(nameParts) == 2 {
+		provider = strings.TrimSpace(nameParts[1])
+	}
+	return name, provider
+}
+
+func deriveChannelIDFromChannelsConf(channelsConfLine string) string {
+	// channels.conf fields (common):
+	// 0: Name;Provider
+	// 1: Frequency
+	// 2: Parameters
+	// 3: Source
+	// ...
+	// 9:  SID
+	// 10: NID
+	// 11: TID
+	fields := strings.Split(channelsConfLine, ":")
+	if len(fields) < 12 {
+		return ""
+	}
+	source := strings.TrimSpace(fields[3])
+	sid := strings.TrimSpace(fields[9])
+	nid := strings.TrimSpace(fields[10])
+	tid := strings.TrimSpace(fields[11])
+	if source == "" || sid == "" || nid == "" || tid == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s-%s-%s-%s", source, nid, tid, sid)
 }
 
 // parseEPGEvents parses EPG events from LSTE response
 func parseEPGEvents(lines []string) []domain.EPGEvent {
 	events := make([]domain.EPGEvent, 0)
 	var currentEvent *domain.EPGEvent
+	currentChannelID := ""
+	currentChannelName := ""
+	currentChannelNumber := 0
 
 	for _, line := range lines {
+		if strings.HasPrefix(line, "C ") {
+			// Channel header line; applies to subsequent E-lines.
+			chID, chNum, chName, _ := parseSVDRPChannelHeader(strings.TrimSpace(line[2:]), 0)
+			currentChannelID = chID
+			currentChannelName = chName
+			currentChannelNumber = chNum
+			continue
+		}
+
 		if strings.HasPrefix(line, "E ") {
 			// New event
 			if currentEvent != nil {
 				events = append(events, *currentEvent)
 			}
 			currentEvent = parseEPGEventLine(line)
+			if currentEvent != nil {
+				currentEvent.ChannelID = currentChannelID
+				currentEvent.ChannelNumber = currentChannelNumber
+				currentEvent.ChannelName = currentChannelName
+			}
 		} else if currentEvent != nil {
 			// Additional event data (T, S, D, etc.)
 			if strings.HasPrefix(line, "T ") {

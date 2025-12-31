@@ -8,66 +8,84 @@
     <link rel="stylesheet" href="/static/css/style.css">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
-<body>
-    <header>
-        <nav class="container">
-            <div class="nav-brand">
-                <h1>VDRAdmin</h1>
+<body class="legacy-home">
+    <div class="legacy-frame">
+        <aside class="legacy-nav" aria-label="Navigation">
+            <div class="legacy-logo">
+                <a href="/" aria-label="VDRAdmin Home">VDRAdmin</a>
             </div>
-            <ul class="nav-links">
-                <li><a href="/">Home</a></li>
-                <li><a href="/epg">EPG</a></li>
-                <li><a href="/timers">Timers</a></li>
-                <li><a href="/recordings">Recordings</a></li>
-                <li><a href="/search">Search</a></li>
-            </ul>
-            {{if .User}}
-            <div class="nav-user">
-                <span>{{.User}}</span>
-                {{if eq .Role "admin"}}<span class="badge">Admin</span>{{end}}
+
+            <div class="legacy-nav-bar">
+                <div class="legacy-navi"><a href="/">What's On Now?</a></div>
+                <div class="legacy-navi"><a href="/epg">EPG</a></div>
+                <div class="legacy-navi"><a href="/timers">Timer</a></div>
+                <div class="legacy-navi"><a href="/recordings">Recordings</a></div>
+
+                <form action="/search" method="get" class="legacy-search">
+                    <input type="text" name="q" aria-label="Search" />
+                    <br />
+                    <input type="submit" value="Search" />
+                </form>
+
+                {{if .User}}
+                <div class="legacy-user">
+                    <span>{{.User}}</span>
+                    {{if eq .Role "admin"}}<span class="legacy-badge">Admin</span>{{end}}
+                </div>
+                {{end}}
+            </div>
+        </aside>
+
+        <main class="legacy-main" aria-label="Main content">
+            <div class="legacy-heading">
+                <h2>What's On Now?</h2>
+            </div>
+
+            {{if .HomeError}}
+            <div class="legacy-warning">
+                <strong>VDR connection error:</strong> {{.HomeError}}
             </div>
             {{end}}
-        </nav>
-    </header>
 
-    <main class="container">
-        <div class="hero">
-            <h2>Welcome to VDRAdmin</h2>
-            <p>Modern web interface for VDR (Video Disk Recorder)</p>
-        </div>
+            <table class="legacy-list" role="table">
+                <thead>
+                    <tr class="legacy-heading-row">
+                        <th scope="col">Channel</th>
+                        <th scope="col">Start</th>
+                        <th scope="col">End</th>
+                        <th scope="col">Title</th>
+                        <th scope="col">&nbsp;</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range $i, $e := .Events}}
+                    <tr class="legacy-row">
+                        <td class="legacy-col-channel">{{$e.ChannelName}}</td>
+                        <td class="legacy-col-time">{{$e.Start.Format "15:04"}}</td>
+                        <td class="legacy-col-time">{{$e.Stop.Format "15:04"}}</td>
+                        <td class="legacy-col-title">
+                            <strong>{{$e.Title}}</strong>
+                            {{if $e.Subtitle}}<br /><span class="legacy-subtitle">{{$e.Subtitle}}</span>{{end}}
+                        </td>
+                        <td class="legacy-col-time">
+                            {{if gt $e.EventID 0}}
+                            <a href="/event?channel={{$e.ChannelID}}&id={{$e.EventID}}" onclick="window.open(this.href,'vdradmin_moreinfo','width=560,height=420,scrollbars=yes,resizable=yes'); return false;">More Information</a>
+                            {{end}}
+                        </td>
+                    </tr>
+                    {{else}}
+                    <tr class="legacy-row">
+                        <td colspan="5" class="legacy-empty">No EPG data available</td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
 
-        <div class="grid">
-            <div class="card">
-                <h3>EPG</h3>
-                <p>Browse electronic program guide</p>
-                <a href="/epg" class="btn btn-primary">View EPG</a>
+            <div class="legacy-footer">
+                &copy; {{.Year}} vdradmin-go
             </div>
-
-            <div class="card">
-                <h3>Timers</h3>
-                <p>Manage recording timers</p>
-                <a href="/timers" class="btn btn-primary">View Timers</a>
-            </div>
-
-            <div class="card">
-                <h3>Recordings</h3>
-                <p>Browse and manage recordings</p>
-                <a href="/recordings" class="btn btn-primary">View Recordings</a>
-            </div>
-
-            <div class="card">
-                <h3>Search</h3>
-                <p>Search for programs</p>
-                <a href="/search" class="btn btn-primary">Search</a>
-            </div>
-        </div>
-    </main>
-
-    <footer>
-        <div class="container">
-            <p>&copy; {{.Year}} vdradmin-go | <a href="https://github.com/githubixx/vdradmin-go">GitHub</a></p>
-        </div>
-    </footer>
+        </main>
+    </div>
 </body>
 </html>
 {{end}}
