@@ -191,24 +191,6 @@ func (s *EPGService) GetCurrentPrograms(ctx context.Context) ([]domain.EPGEvent,
 	return currentPrograms, nil
 }
 
-func pickCurrentEvent(events []domain.EPGEvent, now time.Time) *domain.EPGEvent {
-	var best *domain.EPGEvent
-	for i := range events {
-		ev := &events[i]
-		if ev.Start.After(now) {
-			continue
-		}
-		if !ev.Stop.After(now) {
-			continue
-		}
-		// Pick the event with the latest start time.
-		if best == nil || best.Start.Before(ev.Start) {
-			best = ev
-		}
-	}
-	return best
-}
-
 // SearchEPG searches for programs matching criteria
 func (s *EPGService) SearchEPG(ctx context.Context, query string) ([]domain.EPGEvent, error) {
 	// Get all EPG data
