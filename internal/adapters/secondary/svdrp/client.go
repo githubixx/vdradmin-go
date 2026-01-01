@@ -3,6 +3,7 @@ package svdrp
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -154,10 +155,56 @@ func (c *Client) GetEPG(ctx context.Context, channelID string, at time.Time) ([]
 
 	lines, err := c.readResponse()
 	if err != nil {
+		// Some channels simply have no EPG (e.g. no schedule). Treat as empty result.
+		if channelID != "" && isSVDRPNoSchedule(err) {
+			return []domain.EPGEvent{}, nil
+		}
+
+		// Some VDR versions don't support the optional timestamp argument.
+		// Example: "SVDRP error 501: Unknown option: <timestamp>"
+		if channelID != "" && !at.IsZero() && isSVDRPUnknownOption(err) {
+			// Retry without timestamp.
+			cmd = fmt.Sprintf("LSTE %s", channelID)
+			if err := c.sendCommand(cmd); err != nil {
+				return nil, err
+			}
+			lines, err = c.readResponse()
+			if err != nil {
+				if isSVDRPNoSchedule(err) {
+					return []domain.EPGEvent{}, nil
+				}
+				return nil, err
+			}
+			return parseEPGEvents(lines), nil
+		}
 		return nil, err
 	}
 
 	return parseEPGEvents(lines), nil
+}
+
+func isSVDRPUnknownOption(err error) bool {
+	if err == nil {
+		return false
+	}
+	var target error = err
+	if u := errors.Unwrap(err); u != nil {
+		target = u
+	}
+	msg := target.Error()
+	return strings.Contains(msg, "SVDRP error 501") || strings.Contains(msg, "Unknown option")
+}
+
+func isSVDRPNoSchedule(err error) bool {
+	if err == nil {
+		return false
+	}
+	var target error = err
+	if u := errors.Unwrap(err); u != nil {
+		target = u
+	}
+	msg := target.Error()
+	return strings.Contains(msg, "SVDRP error 550") || strings.Contains(msg, "No schedule found")
 }
 
 // GetTimers retrieves all timers
@@ -457,46 +504,142 @@ func (c *Client) closeConnection() {
 
 // parseChannel parses a channel line from LSTC
 func parseChannel(number int, line string) domain.Channel {
-	parts := strings.Split(line, " ")
-	if len(parts) < 1 {
+	chID, chNumber, chName, provider := parseSVDRPChannelHeader(strings.TrimSpace(line), number)
+	if chID == "" && chName == "" {
 		return domain.Channel{}
 	}
-
-	// Format: number name;provider:freq:params:source:...
-	channelData := strings.SplitN(parts[0], " ", 2)
-	id := channelData[0]
-
-	fields := strings.Split(id, ":")
-	name := fields[0]
-
-	// Separate name and provider
-	nameParts := strings.Split(name, ";")
-	channelName := nameParts[0]
-	provider := ""
-	if len(nameParts) > 1 {
-		provider = nameParts[1]
+	if chNumber == 0 {
+		chNumber = number
+	}
+	if chID == "" {
+		chID = strconv.Itoa(chNumber)
 	}
 
-	return domain.Channel{
-		ID:       id,
-		Number:   number,
-		Name:     channelName,
-		Provider: provider,
+	return domain.Channel{ID: chID, Number: chNumber, Name: chName, Provider: provider}
+}
+
+func parseSVDRPChannelHeader(text string, numberFallback int) (channelID string, channelNumber int, channelName string, provider string) {
+	if text == "" {
+		return "", 0, "", ""
 	}
+
+	parts := strings.SplitN(text, " ", 3)
+	first := strings.TrimSpace(parts[0])
+
+	// Cases we try to support:
+	// 1) "<num> <channels.conf line>"
+	// 2) "<num> <channel-id> <channels.conf line>"
+	// 3) "<channel-id> <channels.conf line>"
+
+	if n, err := strconv.Atoi(first); err == nil {
+		channelNumber = n
+		if len(parts) >= 2 {
+			rest := strings.TrimSpace(text[len(first):])
+			rest = strings.TrimSpace(rest)
+			// If the next token looks like a channel-id, prefer it.
+			r2 := strings.SplitN(rest, " ", 2)
+			if len(r2) >= 1 && looksLikeVDRChannelID(r2[0]) {
+				channelID = r2[0]
+				if len(r2) == 2 {
+					channelName, provider = parseChannelNameProvider(r2[1])
+				}
+			} else {
+				// Otherwise, derive ID from channels.conf-like content if possible.
+				channelID = deriveChannelIDFromChannelsConf(rest)
+				channelName, provider = parseChannelNameProvider(rest)
+				if channelID == "" {
+					channelID = first
+				}
+			}
+		}
+		return channelID, channelNumber, channelName, provider
+	}
+
+	// first isn't numeric, so treat it as channel id.
+	if looksLikeVDRChannelID(first) {
+		channelID = first
+		if len(parts) >= 2 {
+			rest := strings.TrimSpace(text[len(first):])
+			rest = strings.TrimSpace(rest)
+			channelName, provider = parseChannelNameProvider(rest)
+		}
+		return channelID, numberFallback, channelName, provider
+	}
+
+	// Fallback: treat as channels.conf line.
+	channelID = deriveChannelIDFromChannelsConf(text)
+	channelName, provider = parseChannelNameProvider(text)
+	return channelID, numberFallback, channelName, provider
+}
+
+func looksLikeVDRChannelID(s string) bool {
+	// Common VDR channel id form: S19.2E-1-1010-11150 (source-nid-tid-sid)
+	return strings.Contains(s, "-") && (strings.HasPrefix(s, "S") || strings.HasPrefix(s, "C") || strings.HasPrefix(s, "T") || strings.HasPrefix(s, "A"))
+}
+
+func parseChannelNameProvider(channelsConfLine string) (name string, provider string) {
+	nameProvider := strings.SplitN(channelsConfLine, ":", 2)[0]
+	nameParts := strings.SplitN(nameProvider, ";", 2)
+	name = strings.TrimSpace(nameParts[0])
+	if len(nameParts) == 2 {
+		provider = strings.TrimSpace(nameParts[1])
+	}
+	return name, provider
+}
+
+func deriveChannelIDFromChannelsConf(channelsConfLine string) string {
+	// channels.conf fields (common):
+	// 0: Name;Provider
+	// 1: Frequency
+	// 2: Parameters
+	// 3: Source
+	// ...
+	// 9:  SID
+	// 10: NID
+	// 11: TID
+	fields := strings.Split(channelsConfLine, ":")
+	if len(fields) < 12 {
+		return ""
+	}
+	source := strings.TrimSpace(fields[3])
+	sid := strings.TrimSpace(fields[9])
+	nid := strings.TrimSpace(fields[10])
+	tid := strings.TrimSpace(fields[11])
+	if source == "" || sid == "" || nid == "" || tid == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s-%s-%s-%s", source, nid, tid, sid)
 }
 
 // parseEPGEvents parses EPG events from LSTE response
 func parseEPGEvents(lines []string) []domain.EPGEvent {
 	events := make([]domain.EPGEvent, 0)
 	var currentEvent *domain.EPGEvent
+	currentChannelID := ""
+	currentChannelName := ""
+	currentChannelNumber := 0
 
 	for _, line := range lines {
+		if strings.HasPrefix(line, "C ") {
+			// Channel header line; applies to subsequent E-lines.
+			chID, chNum, chName, _ := parseSVDRPChannelHeader(strings.TrimSpace(line[2:]), 0)
+			currentChannelID = chID
+			currentChannelName = chName
+			currentChannelNumber = chNum
+			continue
+		}
+
 		if strings.HasPrefix(line, "E ") {
 			// New event
 			if currentEvent != nil {
 				events = append(events, *currentEvent)
 			}
 			currentEvent = parseEPGEventLine(line)
+			if currentEvent != nil {
+				currentEvent.ChannelID = currentChannelID
+				currentEvent.ChannelNumber = currentChannelNumber
+				currentEvent.ChannelName = currentChannelName
+			}
 		} else if currentEvent != nil {
 			// Additional event data (T, S, D, etc.)
 			if strings.HasPrefix(line, "T ") {
@@ -548,7 +691,7 @@ func parseTimer(line string) (domain.Timer, error) {
 	}
 
 	timerID, _ := strconv.Atoi(parts[0])
-	fields := strings.Split(parts[1], ":")
+	fields := strings.SplitN(parts[1], ":", 9)
 
 	if len(fields) < 8 {
 		return domain.Timer{}, fmt.Errorf("insufficient timer fields")
@@ -558,14 +701,111 @@ func parseTimer(line string) (domain.Timer, error) {
 	priority, _ := strconv.Atoi(fields[5])
 	lifetime, _ := strconv.Atoi(fields[6])
 
+	day := parseTimerDay(fields[2])
+	startClock := parseTimerClock(fields[3])
+	stopClock := parseTimerClock(fields[4])
+
+	var startTime time.Time
+	var stopTime time.Time
+	if !day.IsZero() && startClock >= 0 {
+		startTime = time.Date(day.Year(), day.Month(), day.Day(), startClock/60, startClock%60, 0, 0, day.Location())
+	}
+	if !day.IsZero() && stopClock >= 0 {
+		stopTime = time.Date(day.Year(), day.Month(), day.Day(), stopClock/60, stopClock%60, 0, 0, day.Location())
+		if !startTime.IsZero() && stopTime.Before(startTime) {
+			stopTime = stopTime.Add(24 * time.Hour)
+		}
+	}
+
+	title := fields[7]
+	aux := ""
+	if len(fields) >= 9 {
+		aux = fields[8]
+	}
+
 	return domain.Timer{
 		ID:        timerID,
 		Active:    active,
 		ChannelID: fields[1],
+		Day:       day,
+		Start:     startTime,
+		Stop:      stopTime,
 		Priority:  priority,
 		Lifetime:  lifetime,
-		Title:     fields[7],
+		Title:     title,
+		Aux:       aux,
 	}, nil
+}
+
+func parseTimerDay(daySpec string) time.Time {
+	daySpec = strings.TrimSpace(daySpec)
+	if daySpec == "" {
+		return time.Time{}
+	}
+
+	// One-time timer date.
+	if t, err := time.ParseInLocation("2006-01-02", daySpec, time.Local); err == nil {
+		return t
+	}
+	if t, err := time.ParseInLocation("20060102", daySpec, time.Local); err == nil {
+		return t
+	}
+
+	// Recurring timer: weekday mask like MTWTFSS (with '-' for disabled days).
+	if len(daySpec) >= 7 {
+		allowed := make(map[time.Weekday]bool, 7)
+		letters := daySpec
+		if len(letters) > 7 {
+			letters = letters[:7]
+		}
+		// VDR uses MTWTFSS => Monday..Sunday.
+		for i, ch := range letters {
+			if ch == '-' {
+				continue
+			}
+			wd := time.Weekday((i + int(time.Monday)) % 7)
+			allowed[wd] = true
+		}
+
+		// Find next matching day (today included).
+		now := time.Now()
+		base := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		for i := 0; i < 14; i++ {
+			d := base.AddDate(0, 0, i)
+			if allowed[d.Weekday()] {
+				return d
+			}
+		}
+	}
+
+	return time.Time{}
+}
+
+// parseTimerClock returns minutes since midnight for a HHMM or HH:MM clock.
+// Returns -1 if parsing fails.
+func parseTimerClock(clock string) int {
+	clock = strings.TrimSpace(clock)
+	if clock == "" {
+		return -1
+	}
+	if strings.Contains(clock, ":") {
+		if t, err := time.Parse("15:04", clock); err == nil {
+			return t.Hour()*60 + t.Minute()
+		}
+		return -1
+	}
+	if len(clock) != 4 {
+		return -1
+	}
+	hh, err1 := strconv.Atoi(clock[:2])
+	mm, err2 := strconv.Atoi(clock[2:])
+	if err1 != nil || err2 != nil {
+		return -1
+	}
+	if hh < 0 || hh > 23 || mm < 0 || mm > 59 {
+		return -1
+	}
+	return hh*60 + mm
 }
 
 // formatTimer formats a timer for SVDRP commands
@@ -575,16 +815,45 @@ func formatTimer(timer *domain.Timer) string {
 		active = "1"
 	}
 
-	// Simplified format - full implementation would handle day/time formatting
-	return fmt.Sprintf("%s:%s:MTWTFSS:%s:%s:%d:%d:%s",
+	// SVDRP timer format:
+	// active:channel:day:start:stop:priority:lifetime:file:aux
+	// IMPORTANT: Using a weekday mask (e.g. MTWTFSS) creates a repeating timer.
+	// For "Record" actions from EPG we want a one-time timer for the selected date.
+
+	day := timer.Day
+	if day.IsZero() {
+		day = timer.Start
+	}
+	if day.IsZero() {
+		day = time.Now()
+	}
+	daySpec := day.In(time.Local).Format("2006-01-02")
+
+	startClock := timer.Start.In(time.Local).Format("1504")
+	stopClock := timer.Stop.In(time.Local).Format("1504")
+
+	file := sanitizeTimerField(timer.Title)
+	aux := sanitizeTimerField(timer.Aux)
+
+	return fmt.Sprintf("%s:%s:%s:%s:%s:%d:%d:%s:%s",
 		active,
 		timer.ChannelID,
-		timer.Start.Format("1504"),
-		timer.Stop.Format("1504"),
+		daySpec,
+		startClock,
+		stopClock,
 		timer.Priority,
 		timer.Lifetime,
-		timer.Title,
+		file,
+		aux,
 	)
+}
+
+func sanitizeTimerField(s string) string {
+	s = strings.ReplaceAll(s, "\r", " ")
+	s = strings.ReplaceAll(s, "\n", " ")
+	// Fields are ':' separated in SVDRP timer strings.
+	s = strings.ReplaceAll(s, ":", "|")
+	return strings.TrimSpace(s)
 }
 
 // parseRecording parses a recording from LSTR response

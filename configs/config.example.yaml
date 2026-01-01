@@ -40,3 +40,7 @@ timer:
   default_lifetime: 99
   default_margin_start: 2   # minutes
   default_margin_end: 10    # minutes
+
+ui:
+  # Default theme: system (auto), light, or dark
+  theme: system

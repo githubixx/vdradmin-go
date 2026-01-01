@@ -6,13 +6,13 @@ Modern rewrite of [vdradmin-am](http://andreas.vdr-developer.org/vdradmin-am/ind
 
 This code can't even be considered an ALPHA Version! **If you run it and it destroys your computer, deletes your videos or something like that, it's YOUR problem!** ;-) **Test it only** with a test [VDR](https://tvdr.de/) instance!
 
-This code was mainly generated with Claude Code. I just wanted to see how far I can get converting the quite dated code base of [vdradmin-am](http://andreas.vdr-developer.org/vdradmin-am/index.html) to Go and more recent technologies.
+This code was mainly generated with Claude Code and GPT-5.2. I just wanted to see how far I can get converting the quite dated code base of [vdradmin-am](http://andreas.vdr-developer.org/vdradmin-am/index.html) to Go and more recent technologies.
 
 For now the code compiles and it displays something. That's it! **DO NOT expect to get something close to vdradmin-am!!!**
 
-## Main screen
+## Screenshots
 
-![Alt text](screenshots/vdradmin-go_home.png)
+![Alt text](screenshots/vdradmin-go_channels.png)
 
 ## Goals
 
@@ -28,23 +28,24 @@ For now the code compiles and it displays something. That's it! **DO NOT expect 
 
 ```plain
 vdradmin-go/
+├── build/                   # Build output (make build)
 ├── cmd/
-│   └── vdradmin/          # Application entry point
+│   └── vdradmin/            # Application entry point
 ├── internal/
-│   ├── domain/            # Core business logic (entities, value objects)
-│   ├── ports/             # Interfaces (primary & secondary ports)
-│   ├── adapters/          # Implementations
-│   │   ├── primary/       # Incoming (HTTP handlers, CLI)
-│   │   └── secondary/     # Outgoing (SVDRP client, file system)
-│   ├── application/       # Use cases, services
-│   └── infrastructure/    # Cross-cutting concerns (logging, config)
+│   ├── domain/              # Core business logic (entities, value objects)
+│   ├── ports/               # Interfaces (primary & secondary ports)
+│   ├── adapters/            # Implementations
+│   │   ├── primary/http/    # Incoming HTTP server, handlers, middleware
+│   │   └── secondary/svdrp/ # Outgoing VDR integration (SVDRP client)
+│   ├── application/         # Use cases, services
+│   └── infrastructure/      # Cross-cutting concerns (logging, config)
 ├── web/
-│   ├── templates/         # HTML templates
-│   ├── static/            # CSS, minimal JS
-│   └── assets/            # Images, fonts
-├── configs/               # Configuration files
-├── deployments/           # Docker, k8s manifests
-└── docs/                  # Documentation
+│   ├── templates/           # HTML templates
+│   └── static/              # CSS + minimal JS
+├── configs/                 # Configuration files
+├── deployments/             # Docker + systemd service
+├── docs/                    # Documentation (see docs/ARCHITECTURE.md)
+└── screenshots/             # UI screenshots
 ```
 
 ## Technology Stack

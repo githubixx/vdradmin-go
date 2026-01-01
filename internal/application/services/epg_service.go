@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -15,6 +17,16 @@ type EPGService struct {
 	cache       map[string]*epgCache
 	cacheMu     sync.RWMutex
 	cacheExpiry time.Duration
+
+	currentMu        sync.RWMutex
+	currentPrograms  []domain.EPGEvent
+	currentExpiresAt time.Time
+	currentExpiry    time.Duration
+
+	channelsMu        sync.RWMutex
+	channelsCache     []domain.Channel
+	channelsExpiresAt time.Time
+	channelsExpiry    time.Duration
 }
 
 type epgCache struct {
@@ -28,7 +40,39 @@ func NewEPGService(vdrClient ports.VDRClient, cacheExpiry time.Duration) *EPGSer
 		vdrClient:   vdrClient,
 		cache:       make(map[string]*epgCache),
 		cacheExpiry: cacheExpiry,
+		// Keep "What's On Now?" snappy; refresh frequently but cheaply.
+		currentExpiry:  15 * time.Second,
+		channelsExpiry: 5 * time.Minute,
 	}
+}
+
+// GetChannels returns the channels list in channels.conf order (as reported by VDR).
+func (s *EPGService) GetChannels(ctx context.Context) ([]domain.Channel, error) {
+	return s.getChannelsCached(ctx)
+}
+
+func (s *EPGService) getChannelsCached(ctx context.Context) ([]domain.Channel, error) {
+	now := time.Now()
+	s.channelsMu.RLock()
+	if now.Before(s.channelsExpiresAt) && s.channelsCache != nil {
+		cached := make([]domain.Channel, len(s.channelsCache))
+		copy(cached, s.channelsCache)
+		s.channelsMu.RUnlock()
+		return cached, nil
+	}
+	s.channelsMu.RUnlock()
+
+	chs, err := s.vdrClient.GetChannels(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	s.channelsMu.Lock()
+	s.channelsCache = chs
+	s.channelsExpiresAt = now.Add(s.channelsExpiry)
+	s.channelsMu.Unlock()
+
+	return chs, nil
 }
 
 // GetEPG retrieves EPG data with caching
@@ -62,7 +106,89 @@ func (s *EPGService) GetEPG(ctx context.Context, channelID string, at time.Time)
 
 // GetCurrentPrograms returns what's currently playing on all channels
 func (s *EPGService) GetCurrentPrograms(ctx context.Context) ([]domain.EPGEvent, error) {
-	return s.GetEPG(ctx, "", time.Now())
+	now := time.Now()
+
+	// Fast path: serve cached summary.
+	s.currentMu.RLock()
+	if now.Before(s.currentExpiresAt) && s.currentPrograms != nil {
+		cached := make([]domain.EPGEvent, len(s.currentPrograms))
+		copy(cached, s.currentPrograms)
+		s.currentMu.RUnlock()
+		return cached, nil
+	}
+	s.currentMu.RUnlock()
+
+	// Slow path: fetch EPG once and derive the currently-running event per channel.
+	// Using one SVDRP request is significantly faster than calling LSTE per channel.
+	events, err := s.vdrClient.GetEPG(ctx, "", time.Time{})
+	if err != nil {
+		return nil, err
+	}
+
+	byChannel := make(map[string]domain.EPGEvent)
+	for i := range events {
+		ev := events[i]
+		if ev.ChannelID == "" {
+			continue
+		}
+		if ev.Start.After(now) || !ev.Stop.After(now) {
+			continue
+		}
+		prev, ok := byChannel[ev.ChannelID]
+		if !ok || prev.Start.Before(ev.Start) {
+			byChannel[ev.ChannelID] = ev
+		}
+	}
+
+	currentPrograms := make([]domain.EPGEvent, 0, len(byChannel))
+	for _, ev := range byChannel {
+		currentPrograms = append(currentPrograms, ev)
+	}
+
+	// Ensure channels.conf order: if the EPG payload doesn't include a numeric channel number,
+	// map the channel id back to the LSTC order.
+	channels, err := s.getChannelsCached(ctx)
+	if err == nil {
+		numByID := make(map[string]int, len(channels))
+		nameByID := make(map[string]string, len(channels))
+		for _, ch := range channels {
+			numByID[ch.ID] = ch.Number
+			nameByID[ch.ID] = ch.Name
+		}
+		for i := range currentPrograms {
+			if currentPrograms[i].ChannelNumber == 0 {
+				currentPrograms[i].ChannelNumber = numByID[currentPrograms[i].ChannelID]
+			}
+			if currentPrograms[i].ChannelName == "" {
+				currentPrograms[i].ChannelName = nameByID[currentPrograms[i].ChannelID]
+			}
+		}
+	}
+
+	sort.SliceStable(currentPrograms, func(i, j int) bool {
+		ni := currentPrograms[i].ChannelNumber
+		nj := currentPrograms[j].ChannelNumber
+		if ni != 0 && nj != 0 && ni != nj {
+			return ni < nj
+		}
+		// Fallback: try numeric channel id if present
+		idI, _ := strconv.Atoi(currentPrograms[i].ChannelID)
+		idJ, _ := strconv.Atoi(currentPrograms[j].ChannelID)
+		if idI != 0 && idJ != 0 && idI != idJ {
+			return idI < idJ
+		}
+		if currentPrograms[i].ChannelName != currentPrograms[j].ChannelName {
+			return currentPrograms[i].ChannelName < currentPrograms[j].ChannelName
+		}
+		return currentPrograms[i].Start.Before(currentPrograms[j].Start)
+	})
+
+	s.currentMu.Lock()
+	s.currentPrograms = currentPrograms
+	s.currentExpiresAt = time.Now().Add(s.currentExpiry)
+	s.currentMu.Unlock()
+
+	return currentPrograms, nil
 }
 
 // SearchEPG searches for programs matching criteria
@@ -97,7 +223,13 @@ func (s *EPGService) InvalidateCache() {
 
 func (s *EPGService) getCacheKey(channelID string, at time.Time) string {
 	if at.IsZero() {
-		return "all"
+		if channelID == "" {
+			return "all"
+		}
+		return channelID + "_all"
+	}
+	if channelID == "" {
+		return "all_" + at.Format("2006010215")
 	}
 	return channelID + "_" + at.Format("2006010215")
 }

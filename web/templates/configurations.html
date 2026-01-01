@@ -1,12 +1,12 @@
-{{define "epg.html"}}
+{{define "configurations.html"}}
 <!DOCTYPE html>
 <html lang="en" {{if eq .ThemeMode "dark"}}data-theme="dark"{{else if eq .ThemeMode "light"}}data-theme="light"{{end}} data-theme-default="{{.ThemeDefault}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EPG - VDRAdmin-go</title>
+    <title>Configurations - VDRAdmin-go</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="/static/js/theme.js" defer></script>
 </head>
 <body>
     <header>
@@ -23,53 +23,36 @@
                 <li><a href="/search" {{if eq .Path "/search"}}class="active" aria-current="page"{{end}}>Search</a></li>
                 <li><a href="/configurations" {{if eq .Path "/configurations"}}class="active" aria-current="page"{{end}}>Configurations</a></li>
             </ul>
-            {{if .User}}
-            <div class="nav-user">
-                <span>{{.User}}</span>
-                {{if eq .Role "admin"}}<span class="badge">Admin</span>{{end}}
+
+            <div class="nav-right">
+                {{if .User}}
+                <div class="nav-user">
+                    <span>{{.User}}</span>
+                    {{if eq .Role "admin"}}<span class="badge">Admin</span>{{end}}
+                </div>
+                {{end}}
             </div>
-            {{end}}
         </nav>
     </header>
 
     <main class="container">
 
-<div class="epg-list">
-    {{range .Events}}
-    <div class="epg-item">
-        <div class="epg-time">
-            <time datetime="{{.Start.Format "2006-01-02T15:04"}}">
-                {{.Start.Format "15:04"}}
-            </time>
-            <span class="epg-duration">{{.Duration.Minutes | printf "%.0f"}} min</span>
-        </div>
-        <div class="epg-content">
-            <div class="epg-header">
-                <h3>{{.Title}}</h3>
-                <span class="epg-channel">{{.ChannelName}}</span>
+        <div class="toolbar">
+            <div class="sort-options">
+                <strong>Theme</strong>
+                <label>
+                    <input type="radio" name="theme" value="system"> System
+                </label>
+                <label>
+                    <input type="radio" name="theme" value="light"> Light
+                </label>
+                <label>
+                    <input type="radio" name="theme" value="dark"> Dark
+                </label>
             </div>
-            {{if .Subtitle}}
-            <p class="epg-subtitle">{{.Subtitle}}</p>
-            {{end}}
-            {{if .Description}}
-            <p class="epg-description">{{.Description}}</p>
-            {{end}}
         </div>
-        {{if eq $.Role "admin"}}
-        <div class="epg-actions">
-            <button
-                hx-post="/timers/create?channel={{.ChannelID}}&event_id={{.EventID}}"
-                hx-target="body"
-                class="btn btn-sm btn-primary">
-                Record
-            </button>
-        </div>
-        {{end}}
-    </div>
-    {{else}}
-    <p class="empty-state">No programs found</p>
-    {{end}}
-</div>
+
+        <p class="empty-state">Changes apply immediately.</p>
     </main>
 
     <footer>

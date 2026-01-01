@@ -1,12 +1,11 @@
-{{define "recordings.html"}}
+{{define "playing.html"}}
 <!DOCTYPE html>
 <html lang="en" {{if eq .ThemeMode "dark"}}data-theme="dark"{{else if eq .ThemeMode "light"}}data-theme="light"{{end}} data-theme-default="{{.ThemeDefault}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Recordings - VDRAdmin-go</title>
+    <title>Playing Today - VDRAdmin-go</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
 <body>
     <header>
@@ -33,51 +32,52 @@
     </header>
 
     <main class="container">
-
         <div class="toolbar">
-            <div class="sort-options">
-                <label for="sort">Sort by:</label>
-                <select id="sort" hx-get="/recordings" hx-trigger="change" hx-target="main .container" hx-include="this">
-                    <option value="date" {{if eq .Sort "date"}}selected{{end}}>Date</option>
-                    <option value="name" {{if eq .Sort "name"}}selected{{end}}>Name</option>
-                    <option value="length" {{if eq .Sort "length"}}selected{{end}}>Length</option>
-                </select>
-            </div>
+            <strong>{{.Day.Format "Mon 2006-01-02"}}</strong>
+            <a class="btn btn-secondary" href="/playing?day={{.PrevDay}}">Previous day</a>
+            <a class="btn btn-secondary" href="/playing?day={{.NextDay}}">Next day</a>
         </div>
 
-        <div class="recording-list">
-            {{range .Recordings}}
-            <div class="recording-item">
-                <div class="recording-info">
-                    <h3>{{.Title}}</h3>
-                    {{if .Subtitle}}
-                    <p class="recording-subtitle">{{.Subtitle}}</p>
-                    {{end}}
-                    <div class="recording-meta">
-                        <span class="recording-date">{{.Date.Format "2006-01-02 15:04"}}</span>
-                        <span class="recording-channel">{{.Channel}}</span>
-                        {{if gt .Length 0}}
-                        <span class="recording-length">{{.Length.Minutes | printf "%.0f"}} min</span>
-                        {{end}}
+        {{if .HomeError}}
+        <div class="toolbar">
+            <strong>VDR connection error:</strong> {{.HomeError}}
+        </div>
+        {{end}}
+
+        {{range .ChannelGroups}}
+        <div class="channels-day">{{.Channel.Name}}</div>
+        <div class="epg-list">
+            {{range .Events}}
+            <div class="epg-item">
+                <div class="epg-time">
+                    <time datetime="{{.Start.Format "2006-01-02T15:04"}}">{{.Start.Format "15:04"}}-{{.Stop.Format "15:04"}}</time>
+                </div>
+                <div class="epg-content">
+                    <div class="epg-header">
+                        <h3 class="channels-title">{{.Title}}</h3>
                     </div>
+                    {{if .Subtitle}}
+                    <p class="epg-subtitle">{{.Subtitle}}</p>
+                    {{end}}
                 </div>
-                {{if eq $.Role "admin"}}
-                <div class="recording-actions">
-                    <button
-                        hx-delete="/recordings?path={{.Path}}"
-                        hx-confirm="Are you sure you want to delete this recording?"
-                        hx-swap="outerHTML"
-                        hx-target="closest .recording-item"
-                        class="btn btn-sm btn-danger">
-                        Delete
-                    </button>
+                <div class="epg-actions">
+                    {{if gt .EventID 0}}
+                    <a class="btn btn-sm btn-secondary" href="/event?channel={{.ChannelID}}&id={{.EventID}}" onclick="window.open(this.href,'vdradmin_moreinfo','width=560,height=420,scrollbars=yes,resizable=yes'); return false;">More information</a>
+                    {{end}}
+                    {{if eq $.Role "admin"}}
+                    <form method="post" action="/timers/create" class="inline-form">
+                        <input type="hidden" name="event_id" value="{{.EventID}}" />
+                        <input type="hidden" name="channel" value="{{.ChannelID}}" />
+                        <button type="submit" class="btn btn-sm btn-primary">Record</button>
+                    </form>
+                    {{end}}
                 </div>
-                {{end}}
             </div>
-            {{else}}
-            <p class="empty-state">No recordings found</p>
             {{end}}
         </div>
+        {{else}}
+        <p class="empty-state">No programs found</p>
+        {{end}}
     </main>
 
     <footer>

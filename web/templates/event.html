@@ -1,0 +1,49 @@
+{{define "event.html"}}
+<!DOCTYPE html>
+<html lang="en" {{if eq .ThemeMode "dark"}}data-theme="dark"{{else if eq .ThemeMode "light"}}data-theme="light"{{end}} data-theme-default="{{.ThemeDefault}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>More Information - VDRAdmin-go</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="event-popup">
+    <main class="container" aria-label="More information">
+        {{if .HomeError}}
+        <div class="toolbar">
+            <strong>VDR connection error:</strong> {{.HomeError}}
+        </div>
+        {{end}}
+
+        {{with .Event}}
+        <div class="epg-list">
+            <div class="epg-item">
+                <div class="epg-time">
+                    <time datetime="{{.Start.Format "2006-01-02T15:04"}}">{{.Start.Format "2006-01-02 15:04"}}</time>
+                    <span class="epg-duration">to {{.Stop.Format "15:04"}}</span>
+                </div>
+                <div class="epg-content">
+                    <div class="epg-header">
+                        <h3>{{.Title}}</h3>
+                        <span class="epg-channel">{{.ChannelName}}</span>
+                    </div>
+                    {{if .Subtitle}}
+                    <p class="epg-subtitle">{{.Subtitle}}</p>
+                    {{end}}
+                    {{if .Description}}
+                    <p class="epg-description">{{.Description}}</p>
+                    {{end}}
+                </div>
+                <div class="epg-actions">
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="window.close();">Close</button>
+                </div>
+            </div>
+        </div>
+        {{else}}
+        <p class="empty-state">No event data available</p>
+        {{end}}
+    </main>
+
+</body>
+</html>
+{{end}}

@@ -1,10 +1,10 @@
 {{define "search.html"}}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" {{if eq .ThemeMode "dark"}}data-theme="dark"{{else if eq .ThemeMode "light"}}data-theme="light"{{end}} data-theme-default="{{.ThemeDefault}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Search - VDRAdmin</title>
+    <title>Search - VDRAdmin-go</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
@@ -12,14 +12,16 @@
     <header>
         <nav class="container">
             <div class="nav-brand">
-                <h1>VDRAdmin</h1>
+                <h1>VDRAdmin-go</h1>
             </div>
             <ul class="nav-links">
-                <li><a href="/">Home</a></li>
-                <li><a href="/epg">EPG</a></li>
-                <li><a href="/timers">Timers</a></li>
-                <li><a href="/recordings">Recordings</a></li>
-                <li><a href="/search">Search</a></li>
+                <li><a href="/" {{if eq .Path "/"}}class="active" aria-current="page"{{end}}>Home</a></li>
+                <li><a href="/channels" {{if eq .Path "/channels"}}class="active" aria-current="page"{{end}}>Channels</a></li>
+                <li><a href="/playing" {{if eq .Path "/playing"}}class="active" aria-current="page"{{end}}>Playing Today</a></li>
+                <li><a href="/timers" {{if eq .Path "/timers"}}class="active" aria-current="page"{{end}}>Timers</a></li>
+                <li><a href="/recordings" {{if eq .Path "/recordings"}}class="active" aria-current="page"{{end}}>Recordings</a></li>
+                <li><a href="/search" {{if eq .Path "/search"}}class="active" aria-current="page"{{end}}>Search</a></li>
+                <li><a href="/configurations" {{if eq .Path "/configurations"}}class="active" aria-current="page"{{end}}>Configurations</a></li>
             </ul>
             {{if .User}}
             <div class="nav-user">
@@ -31,7 +33,6 @@
     </header>
 
     <main class="container">
-        <h2>Search Programs</h2>
 
         <form hx-get="/search" hx-target="#search-results" class="search-form">
             <input
@@ -67,7 +68,7 @@
                     {{if eq $.Role "admin"}}
                     <div class="epg-actions">
                         <button
-                            hx-post="/timers/create?event_id={{.EventID}}"
+                            hx-post="/timers/create?channel={{.ChannelID}}&event_id={{.EventID}}"
                             class="btn btn-sm btn-primary">
                             Record
                         </button>

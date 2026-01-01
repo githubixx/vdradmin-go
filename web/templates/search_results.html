@@ -1,0 +1,36 @@
+{{define "search_results.html"}}
+{{if .Query}}
+<h3>Results for "{{.Query}}"</h3>
+<div class="epg-list">
+    {{range .Events}}
+    <div class="epg-item">
+        <div class="epg-time">
+            <time datetime="{{.Start.Format "2006-01-02T15:04"}}">
+                {{.Start.Format "15:04"}}
+            </time>
+        </div>
+        <div class="epg-content">
+            <div class="epg-header">
+                <h4>{{.Title}}</h4>
+                <span class="epg-channel">{{.ChannelName}}</span>
+            </div>
+            {{if .Subtitle}}
+            <p class="epg-subtitle">{{.Subtitle}}</p>
+            {{end}}
+        </div>
+        {{if eq $.Role "admin"}}
+        <div class="epg-actions">
+            <button
+                hx-post="/timers/create?channel={{.ChannelID}}&event_id={{.EventID}}"
+                class="btn btn-sm btn-primary">
+                Record
+            </button>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <p class="empty-state">No results found</p>
+    {{end}}
+</div>
+{{end}}
+{{end}}
