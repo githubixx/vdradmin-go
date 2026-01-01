@@ -10,9 +10,9 @@ This code was mainly generated with Claude Code and GPT-5.2. I just wanted to se
 
 For now the code compiles and it displays something. That's it! **DO NOT expect to get something close to vdradmin-am!!!**
 
-## Main screen
+## Screenshots
 
-![Alt text](screenshots/vdradmin-go_home.png)
+![Alt text](screenshots/vdradmin-go_channels.png)
 
 ## Goals
 
