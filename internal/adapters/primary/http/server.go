@@ -80,6 +80,9 @@ func SetupRoutes(handler *Handler, authCfg *config.AuthConfig, logger *slog.Logg
 
 	// Public routes
 	mux.Handle("GET /", chain(handler.Home, commonMiddleware...))
+	mux.Handle("GET /channels", chain(handler.Channels, commonMiddleware...))
+	mux.Handle("GET /configurations", chain(handler.Configurations, commonMiddleware...))
+	mux.Handle("GET /playing", chain(handler.PlayingToday, commonMiddleware...))
 	mux.Handle("GET /epg", chain(handler.EPGList, commonMiddleware...))
 	mux.Handle("GET /event", chain(handler.EventInfo, commonMiddleware...))
 	mux.Handle("GET /search", chain(handler.EPGSearch, commonMiddleware...))

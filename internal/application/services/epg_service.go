@@ -46,6 +46,11 @@ func NewEPGService(vdrClient ports.VDRClient, cacheExpiry time.Duration) *EPGSer
 	}
 }
 
+// GetChannels returns the channels list in channels.conf order (as reported by VDR).
+func (s *EPGService) GetChannels(ctx context.Context) ([]domain.Channel, error) {
+	return s.getChannelsCached(ctx)
+}
+
 func (s *EPGService) getChannelsCached(ctx context.Context) ([]domain.Channel, error) {
 	now := time.Now()
 	s.channelsMu.RLock()

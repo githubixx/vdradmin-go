@@ -691,7 +691,7 @@ func parseTimer(line string) (domain.Timer, error) {
 	}
 
 	timerID, _ := strconv.Atoi(parts[0])
-	fields := strings.Split(parts[1], ":")
+	fields := strings.SplitN(parts[1], ":", 9)
 
 	if len(fields) < 8 {
 		return domain.Timer{}, fmt.Errorf("insufficient timer fields")
@@ -701,14 +701,111 @@ func parseTimer(line string) (domain.Timer, error) {
 	priority, _ := strconv.Atoi(fields[5])
 	lifetime, _ := strconv.Atoi(fields[6])
 
+	day := parseTimerDay(fields[2])
+	startClock := parseTimerClock(fields[3])
+	stopClock := parseTimerClock(fields[4])
+
+	var startTime time.Time
+	var stopTime time.Time
+	if !day.IsZero() && startClock >= 0 {
+		startTime = time.Date(day.Year(), day.Month(), day.Day(), startClock/60, startClock%60, 0, 0, day.Location())
+	}
+	if !day.IsZero() && stopClock >= 0 {
+		stopTime = time.Date(day.Year(), day.Month(), day.Day(), stopClock/60, stopClock%60, 0, 0, day.Location())
+		if !startTime.IsZero() && stopTime.Before(startTime) {
+			stopTime = stopTime.Add(24 * time.Hour)
+		}
+	}
+
+	title := fields[7]
+	aux := ""
+	if len(fields) >= 9 {
+		aux = fields[8]
+	}
+
 	return domain.Timer{
 		ID:        timerID,
 		Active:    active,
 		ChannelID: fields[1],
+		Day:       day,
+		Start:     startTime,
+		Stop:      stopTime,
 		Priority:  priority,
 		Lifetime:  lifetime,
-		Title:     fields[7],
+		Title:     title,
+		Aux:       aux,
 	}, nil
+}
+
+func parseTimerDay(daySpec string) time.Time {
+	daySpec = strings.TrimSpace(daySpec)
+	if daySpec == "" {
+		return time.Time{}
+	}
+
+	// One-time timer date.
+	if t, err := time.ParseInLocation("2006-01-02", daySpec, time.Local); err == nil {
+		return t
+	}
+	if t, err := time.ParseInLocation("20060102", daySpec, time.Local); err == nil {
+		return t
+	}
+
+	// Recurring timer: weekday mask like MTWTFSS (with '-' for disabled days).
+	if len(daySpec) >= 7 {
+		allowed := make(map[time.Weekday]bool, 7)
+		letters := daySpec
+		if len(letters) > 7 {
+			letters = letters[:7]
+		}
+		// VDR uses MTWTFSS => Monday..Sunday.
+		for i, ch := range letters {
+			if ch == '-' {
+				continue
+			}
+			wd := time.Weekday((i + int(time.Monday)) % 7)
+			allowed[wd] = true
+		}
+
+		// Find next matching day (today included).
+		now := time.Now()
+		base := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		for i := 0; i < 14; i++ {
+			d := base.AddDate(0, 0, i)
+			if allowed[d.Weekday()] {
+				return d
+			}
+		}
+	}
+
+	return time.Time{}
+}
+
+// parseTimerClock returns minutes since midnight for a HHMM or HH:MM clock.
+// Returns -1 if parsing fails.
+func parseTimerClock(clock string) int {
+	clock = strings.TrimSpace(clock)
+	if clock == "" {
+		return -1
+	}
+	if strings.Contains(clock, ":") {
+		if t, err := time.Parse("15:04", clock); err == nil {
+			return t.Hour()*60 + t.Minute()
+		}
+		return -1
+	}
+	if len(clock) != 4 {
+		return -1
+	}
+	hh, err1 := strconv.Atoi(clock[:2])
+	mm, err2 := strconv.Atoi(clock[2:])
+	if err1 != nil || err2 != nil {
+		return -1
+	}
+	if hh < 0 || hh > 23 || mm < 0 || mm > 59 {
+		return -1
+	}
+	return hh*60 + mm
 }
 
 // formatTimer formats a timer for SVDRP commands
@@ -718,16 +815,45 @@ func formatTimer(timer *domain.Timer) string {
 		active = "1"
 	}
 
-	// Simplified format - full implementation would handle day/time formatting
-	return fmt.Sprintf("%s:%s:MTWTFSS:%s:%s:%d:%d:%s",
+	// SVDRP timer format:
+	// active:channel:day:start:stop:priority:lifetime:file:aux
+	// IMPORTANT: Using a weekday mask (e.g. MTWTFSS) creates a repeating timer.
+	// For "Record" actions from EPG we want a one-time timer for the selected date.
+
+	day := timer.Day
+	if day.IsZero() {
+		day = timer.Start
+	}
+	if day.IsZero() {
+		day = time.Now()
+	}
+	daySpec := day.In(time.Local).Format("2006-01-02")
+
+	startClock := timer.Start.In(time.Local).Format("1504")
+	stopClock := timer.Stop.In(time.Local).Format("1504")
+
+	file := sanitizeTimerField(timer.Title)
+	aux := sanitizeTimerField(timer.Aux)
+
+	return fmt.Sprintf("%s:%s:%s:%s:%s:%d:%d:%s:%s",
 		active,
 		timer.ChannelID,
-		timer.Start.Format("1504"),
-		timer.Stop.Format("1504"),
+		daySpec,
+		startClock,
+		stopClock,
 		timer.Priority,
 		timer.Lifetime,
-		timer.Title,
+		file,
+		aux,
 	)
+}
+
+func sanitizeTimerField(s string) string {
+	s = strings.ReplaceAll(s, "\r", " ")
+	s = strings.ReplaceAll(s, "\n", " ")
+	// Fields are ':' separated in SVDRP timer strings.
+	s = strings.ReplaceAll(s, ":", "|")
+	return strings.TrimSpace(s)
 }
 
 // parseRecording parses a recording from LSTR response

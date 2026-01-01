@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Config represents the application configuration
@@ -15,6 +15,13 @@ type Config struct {
 	Auth   AuthConfig   `yaml:"auth"`
 	Cache  CacheConfig  `yaml:"cache"`
 	Timer  TimerConfig  `yaml:"timer"`
+	UI     UIConfig     `yaml:"ui"`
+}
+
+// UIConfig contains user interface settings
+type UIConfig struct {
+	// Theme controls the default theme: "system" (default), "light", or "dark".
+	Theme string `yaml:"theme"`
 }
 
 // ServerConfig contains HTTP server settings
@@ -105,6 +112,9 @@ func Load(path string) (*Config, error) {
 			DefaultMarginStart: 2,
 			DefaultMarginEnd:   10,
 		},
+		UI: UIConfig{
+			Theme: "system",
+		},
 	}
 
 	// If config file exists, load it
@@ -168,6 +178,13 @@ func (c *Config) Validate() error {
 
 	if c.Timer.DefaultLifetime < 0 || c.Timer.DefaultLifetime > 99 {
 		return fmt.Errorf("invalid default lifetime: %d (must be 0-99)", c.Timer.DefaultLifetime)
+	}
+
+	switch c.UI.Theme {
+	case "", "system", "light", "dark":
+		// ok
+	default:
+		return fmt.Errorf("invalid ui.theme: %q (must be system, light, or dark)", c.UI.Theme)
 	}
 
 	return nil

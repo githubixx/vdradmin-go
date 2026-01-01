@@ -1,12 +1,11 @@
-{{define "index.html"}}
+{{define "channels.html"}}
 <!DOCTYPE html>
 <html lang="en" {{if eq .ThemeMode "dark"}}data-theme="dark"{{else if eq .ThemeMode "light"}}data-theme="light"{{end}} data-theme-default="{{.ThemeDefault}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home - VDRAdmin-go</title>
+    <title>Channels - VDRAdmin-go</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
 <body>
     <header>
@@ -34,12 +33,25 @@
 
     <main class="container">
 
+        <div class="toolbar channels-selector">
+            <form action="/channels" method="get" class="nav-channel-form">
+                <label for="channel" class="nav-channel-label">Channel</label>
+                <select id="channel" name="channel" onchange="this.form.submit()">
+                    {{range .Channels}}
+                    <option value="{{.ID}}" {{if eq $.SelectedChannel .ID}}selected{{end}}>{{.Name}}</option>
+                    {{end}}
+                </select>
+            </form>
+        </div>
+
         {{if .HomeError}}
         <div class="toolbar">
             <strong>VDR connection error:</strong> {{.HomeError}}
         </div>
         {{end}}
 
+        {{range .DayGroups}}
+        <div class="channels-day">{{.Day.Format "Mon 2006-01-02"}}</div>
         <div class="epg-list">
             {{range .Events}}
             <div class="epg-item">
@@ -48,23 +60,33 @@
                 </div>
                 <div class="epg-content">
                     <div class="epg-header">
-                        <h3>{{.Title}}</h3>
-                        <span class="epg-channel">{{.ChannelName}}</span>
+                        <h3 class="channels-title">{{.Title}}</h3>
                     </div>
                     {{if .Subtitle}}
                     <p class="epg-subtitle">{{.Subtitle}}</p>
+                    {{end}}
+                    {{if .Description}}
+                    <p class="epg-description">{{.Description}}</p>
                     {{end}}
                 </div>
                 <div class="epg-actions">
                     {{if gt .EventID 0}}
                     <a class="btn btn-sm btn-secondary" href="/event?channel={{.ChannelID}}&id={{.EventID}}" onclick="window.open(this.href,'vdradmin_moreinfo','width=560,height=420,scrollbars=yes,resizable=yes'); return false;">More information</a>
                     {{end}}
+                    {{if eq $.Role "admin"}}
+                    <form method="post" action="/timers/create" class="inline-form">
+                        <input type="hidden" name="event_id" value="{{.EventID}}" />
+                        <input type="hidden" name="channel" value="{{.ChannelID}}" />
+                        <button type="submit" class="btn btn-sm btn-primary">Record</button>
+                    </form>
+                    {{end}}
                 </div>
             </div>
-            {{else}}
-            <p class="empty-state">No EPG data available</p>
             {{end}}
         </div>
+        {{else}}
+        <p class="empty-state">No programs found</p>
+        {{end}}
     </main>
 
     <footer>
