@@ -28,23 +28,24 @@ For now the code compiles and it displays something. That's it! **DO NOT expect 
 
 ```plain
 vdradmin-go/
+├── build/                   # Build output (make build)
 ├── cmd/
-│   └── vdradmin/          # Application entry point
+│   └── vdradmin/            # Application entry point
 ├── internal/
-│   ├── domain/            # Core business logic (entities, value objects)
-│   ├── ports/             # Interfaces (primary & secondary ports)
-│   ├── adapters/          # Implementations
-│   │   ├── primary/       # Incoming (HTTP handlers, CLI)
-│   │   └── secondary/     # Outgoing (SVDRP client, file system)
-│   ├── application/       # Use cases, services
-│   └── infrastructure/    # Cross-cutting concerns (logging, config)
+│   ├── domain/              # Core business logic (entities, value objects)
+│   ├── ports/               # Interfaces (primary & secondary ports)
+│   ├── adapters/            # Implementations
+│   │   ├── primary/http/    # Incoming HTTP server, handlers, middleware
+│   │   └── secondary/svdrp/ # Outgoing VDR integration (SVDRP client)
+│   ├── application/         # Use cases, services
+│   └── infrastructure/      # Cross-cutting concerns (logging, config)
 ├── web/
-│   ├── templates/         # HTML templates
-│   ├── static/            # CSS, minimal JS
-│   └── assets/            # Images, fonts
-├── configs/               # Configuration files
-├── deployments/           # Docker, k8s manifests
-└── docs/                  # Documentation
+│   ├── templates/           # HTML templates
+│   └── static/              # CSS + minimal JS
+├── configs/                 # Configuration files
+├── deployments/             # Docker + systemd service
+├── docs/                    # Documentation (see docs/ARCHITECTURE.md)
+└── screenshots/             # UI screenshots
 ```
 
 ## Technology Stack

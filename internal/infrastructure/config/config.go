@@ -70,8 +70,8 @@ type CacheConfig struct {
 
 // TimerConfig contains default timer settings
 type TimerConfig struct {
-	DefaultPriority   int `yaml:"default_priority"`
-	DefaultLifetime   int `yaml:"default_lifetime"`
+	DefaultPriority    int `yaml:"default_priority"`
+	DefaultLifetime    int `yaml:"default_lifetime"`
 	DefaultMarginStart int `yaml:"default_margin_start"`
 	DefaultMarginEnd   int `yaml:"default_margin_end"`
 }
@@ -107,8 +107,8 @@ func Load(path string) (*Config, error) {
 			RecordingExpiry: 5 * time.Minute,
 		},
 		Timer: TimerConfig{
-			DefaultPriority:   50,
-			DefaultLifetime:   99,
+			DefaultPriority:    50,
+			DefaultLifetime:    99,
 			DefaultMarginStart: 2,
 			DefaultMarginEnd:   10,
 		},

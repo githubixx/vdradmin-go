@@ -41,7 +41,7 @@ func NewEPGService(vdrClient ports.VDRClient, cacheExpiry time.Duration) *EPGSer
 		cache:       make(map[string]*epgCache),
 		cacheExpiry: cacheExpiry,
 		// Keep "What's On Now?" snappy; refresh frequently but cheaply.
-		currentExpiry: 15 * time.Second,
+		currentExpiry:  15 * time.Second,
 		channelsExpiry: 5 * time.Minute,
 	}
 }

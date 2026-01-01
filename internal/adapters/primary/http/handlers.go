@@ -306,7 +306,7 @@ func (h *Handler) EPGSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := map[string]any{
-		"Query": query,
+		"Query":  query,
 		"Events": events,
 	}
 
@@ -521,7 +521,7 @@ func (h *Handler) RecordingList(w http.ResponseWriter, r *http.Request) {
 
 	data := map[string]any{
 		"Recordings": recordings,
-		"Sort": sortBy,
+		"Sort":       sortBy,
 	}
 
 	h.renderTemplate(w, r, "recordings.html", data)

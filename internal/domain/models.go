@@ -15,19 +15,19 @@ type Channel struct {
 
 // EPGEvent represents an electronic program guide entry
 type EPGEvent struct {
-	EventID     int
-	ChannelID   string
+	EventID       int
+	ChannelID     string
 	ChannelNumber int
-	ChannelName string
-	Title       string
-	Subtitle    string
-	Description string
-	Start       time.Time
-	Stop        time.Time
-	Duration    time.Duration
-	VPS         *time.Time
-	Video       VideoInfo
-	Audio       []AudioInfo
+	ChannelName   string
+	Title         string
+	Subtitle      string
+	Description   string
+	Start         time.Time
+	Stop          time.Time
+	Duration      time.Duration
+	VPS           *time.Time
+	Video         VideoInfo
+	Audio         []AudioInfo
 }
 
 // VideoInfo contains video stream information
