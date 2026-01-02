@@ -34,8 +34,8 @@
     <main class="container">
         <div class="toolbar">
             <strong>{{.Day.Format "Mon 2006-01-02"}}</strong>
-            <a class="btn btn-secondary" href="/playing?day={{.PrevDay}}">Previous day</a>
-            <a class="btn btn-secondary" href="/playing?day={{.NextDay}}">Next day</a>
+            <a class="btn btn-secondary btn-menu" href="/playing?day={{.PrevDay}}">Previous day</a>
+            <a class="btn btn-secondary btn-menu" href="/playing?day={{.NextDay}}">Next day</a>
         </div>
 
         {{if .HomeError}}
