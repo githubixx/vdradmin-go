@@ -90,6 +90,8 @@ func SetupRoutes(handler *Handler, authCfg *config.AuthConfig, logger *slog.Logg
 	mux.Handle("GET /recordings", chain(handler.RecordingList, commonMiddleware...))
 
 	// Admin-only routes (write operations)
+	mux.Handle("POST /configurations/apply", chain(handler.ConfigurationsApply, adminMiddleware...))
+	mux.Handle("POST /configurations/save", chain(handler.ConfigurationsSave, adminMiddleware...))
 	mux.Handle("POST /timers/create", chain(handler.TimerCreate, adminMiddleware...))
 	mux.Handle("POST /timers/toggle", chain(handler.TimerToggle, adminMiddleware...))
 	mux.Handle("DELETE /timers", chain(handler.TimerDelete, adminMiddleware...))

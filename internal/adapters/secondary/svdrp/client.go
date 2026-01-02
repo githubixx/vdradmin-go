@@ -19,7 +19,7 @@ import (
 )
 
 var recordingPathTimestampRe = regexp.MustCompile(`\b(\d{4}-\d{2}-\d{2})\.(\d{2})\.(\d{2})\.(\d{2})\b`)
-var recordingListLeadingDateTimeRe = regexp.MustCompile(`^\s*(\d{4}-\d{2}-\d{2})\s+(\d{2}):(\d{2})\b`) 
+var recordingListLeadingDateTimeRe = regexp.MustCompile(`^\s*(\d{4}-\d{2}-\d{2})\s+(\d{2}):(\d{2})\b`)
 var recordingShortDateRe = regexp.MustCompile(`^\d{2}\.\d{2}\.\d{2}$`)
 var recordingClockRe = regexp.MustCompile(`^\d{2}:\d{2}$`)
 var recordingLengthRe = regexp.MustCompile(`^\d+:\d{2}\*?$`)
@@ -37,6 +37,26 @@ type Client struct {
 	mu   sync.Mutex
 	conn net.Conn
 	rw   *bufio.ReadWriter
+}
+
+// UpdateConnection updates the target host/port/timeout and forces a reconnect.
+// It is safe to call concurrently.
+func (c *Client) UpdateConnection(host string, port int, timeout time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if host != "" {
+		c.host = host
+	}
+	if port > 0 {
+		c.port = port
+	}
+	if timeout > 0 {
+		c.timeout = timeout
+	}
+
+	// Force reconnect with updated parameters.
+	c.closeConnectionLocked()
 }
 
 // NewClient creates a new SVDRP client.

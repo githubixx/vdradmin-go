@@ -19,6 +19,16 @@ type RecordingService struct {
 	cacheTime   time.Time
 }
 
+// SetCacheExpiry updates the recordings cache expiry.
+// If expiry <= 0, caching is disabled.
+func (s *RecordingService) SetCacheExpiry(expiry time.Duration) {
+	s.cacheMu.Lock()
+	s.cacheExpiry = expiry
+	s.cache = nil
+	s.cacheTime = time.Time{}
+	s.cacheMu.Unlock()
+}
+
 // NewRecordingService creates a new recording service
 func NewRecordingService(vdrClient ports.VDRClient, cacheExpiry time.Duration) *RecordingService {
 	return &RecordingService{
