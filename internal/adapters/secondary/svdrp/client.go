@@ -5,10 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/githubixx/vdradmin-go/internal/domain"
@@ -101,86 +103,82 @@ func (c *Client) Ping(ctx context.Context) error {
 
 // GetChannels retrieves all channels
 func (c *Client) GetChannels(ctx context.Context) ([]domain.Channel, error) {
-	if err := c.ensureConnected(ctx); err != nil {
-		return nil, err
-	}
+	return withRetry(ctx, c, func() ([]domain.Channel, error) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
+		if err := c.sendCommand("LSTC"); err != nil {
+			return nil, err
+		}
 
-	if err := c.sendCommand("LSTC"); err != nil {
-		return nil, err
-	}
+		lines, err := c.readResponse()
+		if err != nil {
+			return nil, err
+		}
 
-	lines, err := c.readResponse()
-	if err != nil {
-		return nil, err
-	}
+		channels := make([]domain.Channel, 0, len(lines))
+		for i, line := range lines {
+			channel := parseChannel(i+1, line)
+			channels = append(channels, channel)
+		}
 
-	channels := make([]domain.Channel, 0, len(lines))
-	for i, line := range lines {
-		channel := parseChannel(i+1, line)
-		channels = append(channels, channel)
-	}
-
-	return channels, nil
+		return channels, nil
+	})
 }
 
 // GetEPG retrieves EPG data
 func (c *Client) GetEPG(ctx context.Context, channelID string, at time.Time) ([]domain.EPGEvent, error) {
-	if err := c.ensureConnected(ctx); err != nil {
-		return nil, err
-	}
+	return withRetry(ctx, c, func() ([]domain.EPGEvent, error) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	cmd := "LSTE"
-	if channelID != "" {
-		if !at.IsZero() {
-			cmd = fmt.Sprintf("LSTE %s %d", channelID, at.Unix())
-		} else {
-			cmd = fmt.Sprintf("LSTE %s", channelID)
-		}
-	} else if !at.IsZero() {
-		// For all channels at a specific time, need to use different approach
-		// LSTE with just timestamp may not work as expected in all VDR versions
-		// For now, just get all EPG data
-		cmd = "LSTE"
-	}
-
-	if err := c.sendCommand(cmd); err != nil {
-		return nil, err
-	}
-
-	lines, err := c.readResponse()
-	if err != nil {
-		// Some channels simply have no EPG (e.g. no schedule). Treat as empty result.
-		if channelID != "" && isSVDRPNoSchedule(err) {
-			return []domain.EPGEvent{}, nil
-		}
-
-		// Some VDR versions don't support the optional timestamp argument.
-		// Example: "SVDRP error 501: Unknown option: <timestamp>"
-		if channelID != "" && !at.IsZero() && isSVDRPUnknownOption(err) {
-			// Retry without timestamp.
-			cmd = fmt.Sprintf("LSTE %s", channelID)
-			if err := c.sendCommand(cmd); err != nil {
-				return nil, err
+		cmd := "LSTE"
+		if channelID != "" {
+			if !at.IsZero() {
+				cmd = fmt.Sprintf("LSTE %s %d", channelID, at.Unix())
+			} else {
+				cmd = fmt.Sprintf("LSTE %s", channelID)
 			}
-			lines, err = c.readResponse()
-			if err != nil {
-				if isSVDRPNoSchedule(err) {
-					return []domain.EPGEvent{}, nil
+		} else if !at.IsZero() {
+			// For all channels at a specific time, need to use different approach
+			// LSTE with just timestamp may not work as expected in all VDR versions
+			// For now, just get all EPG data
+			cmd = "LSTE"
+		}
+
+		if err := c.sendCommand(cmd); err != nil {
+			return nil, err
+		}
+
+		lines, err := c.readResponse()
+		if err != nil {
+			// Some channels simply have no EPG (e.g. no schedule). Treat as empty result.
+			if channelID != "" && isSVDRPNoSchedule(err) {
+				return []domain.EPGEvent{}, nil
+			}
+
+			// Some VDR versions don't support the optional timestamp argument.
+			// Example: "SVDRP error 501: Unknown option: <timestamp>"
+			if channelID != "" && !at.IsZero() && isSVDRPUnknownOption(err) {
+				// Retry without timestamp.
+				cmd = fmt.Sprintf("LSTE %s", channelID)
+				if err := c.sendCommand(cmd); err != nil {
+					return nil, err
 				}
-				return nil, err
+				lines, err = c.readResponse()
+				if err != nil {
+					if isSVDRPNoSchedule(err) {
+						return []domain.EPGEvent{}, nil
+					}
+					return nil, err
+				}
+				return parseEPGEvents(lines), nil
 			}
-			return parseEPGEvents(lines), nil
+			return nil, err
 		}
-		return nil, err
-	}
 
-	return parseEPGEvents(lines), nil
+		return parseEPGEvents(lines), nil
+	})
 }
 
 func isSVDRPUnknownOption(err error) bool {
@@ -209,7 +207,7 @@ func isSVDRPNoSchedule(err error) bool {
 
 // GetTimers retrieves all timers
 func (c *Client) GetTimers(ctx context.Context) ([]domain.Timer, error) {
-	return c.withRetry(ctx, func() ([]domain.Timer, error) {
+	return withRetry(ctx, c, func() ([]domain.Timer, error) {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 
@@ -401,26 +399,78 @@ func (c *Client) ensureConnected(ctx context.Context) error {
 	return nil
 }
 
-// withRetry executes a function with automatic reconnection on connection errors
-func (c *Client) withRetry(ctx context.Context, fn func() ([]domain.Timer, error)) ([]domain.Timer, error) {
-	// Ensure connection before first try
-	if err := c.ensureConnected(ctx); err != nil {
-		return nil, err
+// withRetry executes a function with exponential backoff and reconnection on transient connection errors.
+// It is intentionally conservative and only retries errors that look like broken sockets (e.g. broken pipe, EOF).
+func withRetry[T any](ctx context.Context, c *Client, fn func() (T, error)) (T, error) {
+	var zero T
+
+	const maxAttempts = 3
+	backoff := 60 * time.Millisecond
+	var lastErr error
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if err := c.ensureConnected(ctx); err != nil {
+			return zero, err
+		}
+
+		result, err := fn()
+		if err == nil {
+			return result, nil
+		}
+		lastErr = err
+
+		if !isTransientConnErr(err) || attempt == maxAttempts {
+			return zero, err
+		}
+
+		// Force reconnection before next try.
+		c.mu.Lock()
+		c.closeConnection()
+		c.mu.Unlock()
+
+		t := time.NewTimer(backoff)
+		select {
+		case <-ctx.Done():
+			t.Stop()
+			return zero, ctx.Err()
+		case <-t.C:
+		}
+
+		// Exponential backoff with a reasonable cap.
+		backoff *= 2
+		if backoff > 600*time.Millisecond {
+			backoff = 600 * time.Millisecond
+		}
 	}
 
-	// First attempt
-	result, err := fn()
+	return zero, lastErr
+}
+
+func isTransientConnErr(err error) bool {
 	if err == nil {
-		return result, nil
+		return false
 	}
 
-	// If connection error, try to reconnect once
-	if err := c.ensureConnected(ctx); err != nil {
-		return nil, err
+	// Common transient socket failures.
+	if errors.Is(err, domain.ErrConnection) || errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
+		return true
+	}
+	if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ECONNABORTED) {
+		return true
 	}
 
-	// Retry once
-	return fn()
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		if netErr.Timeout() || netErr.Temporary() {
+			return true
+		}
+	}
+
+	// Fallback string checks (platform-specific wording).
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "broken pipe") ||
+		strings.Contains(msg, "connection reset") ||
+		strings.Contains(msg, "use of closed network connection")
 }
 
 // sendCommand sends a command to VDR
