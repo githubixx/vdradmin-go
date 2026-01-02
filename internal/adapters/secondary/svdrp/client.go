@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,6 +17,12 @@ import (
 
 	"github.com/githubixx/vdradmin-go/internal/domain"
 )
+
+var recordingPathTimestampRe = regexp.MustCompile(`\b(\d{4}-\d{2}-\d{2})\.(\d{2})\.(\d{2})\.(\d{2})\b`)
+var recordingListLeadingDateTimeRe = regexp.MustCompile(`^\s*(\d{4}-\d{2}-\d{2})\s+(\d{2}):(\d{2})\b`) 
+var recordingShortDateRe = regexp.MustCompile(`^\d{2}\.\d{2}\.\d{2}$`)
+var recordingClockRe = regexp.MustCompile(`^\d{2}:\d{2}$`)
+var recordingLengthRe = regexp.MustCompile(`^\d+:\d{2}\*?$`)
 
 // Returned when we failed while writing/flushing the command to the socket.
 // Retrying after this is usually safe because the command likely didn't reach VDR.
@@ -263,6 +271,20 @@ func (c *Client) GetRecordings(ctx context.Context) ([]domain.Recording, error) 
 		c.mu.Lock()
 		defer c.mu.Unlock()
 
+		// If recordings were removed directly on disk (outside VDR), VDR may still
+		// have a stale in-memory list. Best-effort trigger a rescan/update.
+		// Not all VDR versions expose this via SVDRP, so ignore protocol errors.
+		if err := c.sendCommandLocked("UPDR"); err == nil {
+			if _, err := c.readResponseLocked(); err != nil {
+				if isTransientConnErr(err) {
+					return nil, err
+				}
+				// Ignore SVDRP protocol errors (e.g. unknown/unsupported command).
+			}
+		} else if isTransientConnErr(err) {
+			return nil, err
+		}
+
 		if err := c.sendCommandLocked("LSTR"); err != nil {
 			return nil, err
 		}
@@ -276,12 +298,50 @@ func (c *Client) GetRecordings(ctx context.Context) ([]domain.Recording, error) 
 		for _, line := range lines {
 			r, err := parseRecording(line)
 			if err == nil {
+				// Resolve the actual recording directory from VDR and filter out
+				// entries that no longer exist on disk (e.g. deleted out-of-band).
+				dirPath, err := c.getRecordingDirPathLocked(r.Path)
+				if err != nil {
+					if isTransientConnErr(err) {
+						return nil, err
+					}
+					// If we can't resolve a path (protocol error), keep the entry.
+					recordings = append(recordings, r)
+					continue
+				}
+				if dirPath != "" {
+					if _, statErr := os.Stat(dirPath); statErr != nil {
+						if os.IsNotExist(statErr) {
+							continue
+						}
+						// Permission/mount issues: don't hide recordings we can't verify.
+					}
+				}
 				recordings = append(recordings, r)
 			}
 		}
 
 		return recordings, nil
 	})
+}
+
+func (c *Client) getRecordingDirPathLocked(id string) (string, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return "", nil
+	}
+
+	if err := c.sendCommandLocked(fmt.Sprintf("LSTR %s path", id)); err != nil {
+		return "", err
+	}
+	lines, err := c.readResponseLocked()
+	if err != nil {
+		return "", err
+	}
+	if len(lines) == 0 {
+		return "", nil
+	}
+	return strings.TrimSpace(lines[0]), nil
 }
 
 // DeleteRecording deletes a recording.
@@ -836,17 +896,132 @@ func sanitizeTimerField(s string) string {
 }
 
 func parseRecording(line string) (domain.Recording, error) {
-	parts := strings.SplitN(line, " ", 2)
-	if len(parts) != 2 {
+	line = strings.TrimSpace(line)
+	if line == "" {
 		return domain.Recording{}, fmt.Errorf("invalid recording format")
 	}
 
-	path := parts[0]
-	info := strings.Split(parts[1], "~")
-	title := ""
-	if len(info) > 0 {
-		title = info[0]
+	fields := strings.Fields(line)
+	if len(fields) < 2 {
+		return domain.Recording{}, fmt.Errorf("invalid recording format")
 	}
 
-	return domain.Recording{Path: path, Title: title}, nil
+	// VDR 2.7.x `LSTR` format example (after SVDRP prefix stripping):
+	//   "1 02.04.21 15:03 0:22* Title" or "30 08.08.19 22:23 1:37* Folder~Title~Subtitle"
+	// Where the first field is the recording index used by `DELR`.
+	if _, err := strconv.Atoi(fields[0]); err == nil && len(fields) >= 5 &&
+		recordingShortDateRe.MatchString(fields[1]) && recordingClockRe.MatchString(fields[2]) && recordingLengthRe.MatchString(fields[3]) {
+		idx := fields[0]
+		stamp := fields[1] + " " + fields[2]
+		rec := domain.Recording{Path: idx}
+		if t, err := time.ParseInLocation("02.01.06 15:04", stamp, time.Local); err == nil {
+			rec.Date = t
+		}
+		rec.Length = parseRecordingLength(fields[3])
+
+		metaText := strings.Join(fields[4:], " ")
+		applyRecordingMeta(&rec, metaText)
+		return rec, nil
+	}
+
+	// Legacy/other variants we’ve seen:
+	//   "<id> <path> <meta...>" or "<path> <meta...>"
+	path := ""
+	infoText := ""
+	if _, err := strconv.Atoi(fields[0]); err == nil {
+		path = fields[1]
+		if len(fields) > 2 {
+			infoText = strings.Join(fields[2:], " ")
+		}
+	} else {
+		path = fields[0]
+		infoText = strings.Join(fields[1:], " ")
+	}
+
+	rec := domain.Recording{Path: path}
+	rec.Date = parseRecordingDateFromPath(path)
+	if rec.Date.IsZero() {
+		rec.Date = parseRecordingDateFromMeta(infoText)
+	}
+	applyRecordingMeta(&rec, infoText)
+	return rec, nil
+}
+
+func parseRecordingLength(token string) time.Duration {
+	token = strings.TrimSpace(token)
+	token = strings.TrimSuffix(token, "*")
+	parts := strings.Split(token, ":")
+	if len(parts) != 2 {
+		return 0
+	}
+	hours, err1 := strconv.Atoi(parts[0])
+	mins, err2 := strconv.Atoi(parts[1])
+	if err1 != nil || err2 != nil {
+		return 0
+	}
+	if hours < 0 || mins < 0 || mins > 59 {
+		return 0
+	}
+	return time.Duration(hours)*time.Hour + time.Duration(mins)*time.Minute
+}
+
+func applyRecordingMeta(rec *domain.Recording, metaText string) {
+	metaText = strings.TrimSpace(metaText)
+	if metaText == "" {
+		return
+	}
+
+	// Metadata is often "folder/channel~title~subtitle~description..." (may contain spaces).
+	info := strings.Split(metaText, "~")
+	for i := range info {
+		info[i] = strings.TrimSpace(info[i])
+	}
+	if len(info) == 1 {
+		rec.Title = info[0]
+		return
+	}
+
+	// If there are multiple fields, VDR often prefixes with a folder/channel grouping.
+	rec.Channel = info[0]
+	if len(info) > 1 {
+		rec.Title = info[1]
+	}
+	if len(info) > 2 {
+		rec.Subtitle = info[2]
+	}
+	if len(info) > 3 {
+		rec.Description = strings.Join(info[3:], "~")
+	}
+}
+
+func parseRecordingDateFromPath(path string) time.Time {
+	// VDR recordings commonly contain a timestamp segment like:
+	// 2025-01-02.20.15.50-0.rec
+	m := recordingPathTimestampRe.FindStringSubmatch(path)
+	if len(m) != 5 {
+		return time.Time{}
+	}
+	stamp := fmt.Sprintf("%s.%s.%s.%s", m[1], m[2], m[3], m[4])
+	// Interpret as local time for display consistency.
+	if t, err := time.ParseInLocation("2006-01-02.15.04.05", stamp, time.Local); err == nil {
+		return t
+	}
+	return time.Time{}
+}
+
+func parseRecordingDateFromMeta(meta string) time.Time {
+	meta = strings.TrimSpace(meta)
+	if meta == "" {
+		return time.Time{}
+	}
+	// Example: "2025-01-02 20:15~Title..." or "2025-01-02 20:15 Title..."
+	m := recordingListLeadingDateTimeRe.FindStringSubmatch(meta)
+	if len(m) != 4 {
+		return time.Time{}
+	}
+	stamp := fmt.Sprintf("%s %s:%s", m[1], m[2], m[3])
+	if t, err := time.ParseInLocation("2006-01-02 15:04", stamp, time.Local); err == nil {
+		return t
+	}
+	return time.Time{}
 }

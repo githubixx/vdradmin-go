@@ -37,7 +37,7 @@
         <div class="toolbar">
             <div class="sort-options">
                 <label for="sort">Sort by:</label>
-                <select id="sort" hx-get="/recordings" hx-trigger="change" hx-target="main .container" hx-include="this">
+                <select id="sort" name="sort" hx-get="/recordings" hx-trigger="change" hx-target=".recording-list" hx-select=".recording-list" hx-swap="outerHTML" hx-include="this">
                     <option value="date" {{if eq .Sort "date"}}selected{{end}}>Date</option>
                     <option value="name" {{if eq .Sort "name"}}selected{{end}}>Name</option>
                     <option value="length" {{if eq .Sort "length"}}selected{{end}}>Length</option>

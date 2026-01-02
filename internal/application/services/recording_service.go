@@ -29,6 +29,11 @@ func NewRecordingService(vdrClient ports.VDRClient, cacheExpiry time.Duration) *
 
 // GetAllRecordings retrieves all recordings with caching
 func (s *RecordingService) GetAllRecordings(ctx context.Context) ([]domain.Recording, error) {
+	// If caching is disabled, always fetch fresh data.
+	if s.cacheExpiry <= 0 {
+		return s.vdrClient.GetRecordings(ctx)
+	}
+
 	// Check cache
 	s.cacheMu.RLock()
 	if time.Now().Before(s.cacheTime.Add(s.cacheExpiry)) && len(s.cache) > 0 {
@@ -100,21 +105,34 @@ func (s *RecordingService) SortRecordings(recordings []domain.Recording, sortBy 
 
 	switch sortBy {
 	case "name":
-		sort.Slice(sorted, func(i, j int) bool {
-			return sorted[i].Title < sorted[j].Title
+		sort.SliceStable(sorted, func(i, j int) bool {
+			if sorted[i].Title != sorted[j].Title {
+				return sorted[i].Title < sorted[j].Title
+			}
+			return sorted[i].Path < sorted[j].Path
 		})
 	case "date":
-		sort.Slice(sorted, func(i, j int) bool {
-			return sorted[i].Date.After(sorted[j].Date)
+		// Newest -> oldest
+		sort.SliceStable(sorted, func(i, j int) bool {
+			if !sorted[i].Date.Equal(sorted[j].Date) {
+				return sorted[i].Date.After(sorted[j].Date)
+			}
+			return sorted[i].Path < sorted[j].Path
 		})
 	case "length":
-		sort.Slice(sorted, func(i, j int) bool {
-			return sorted[i].Length > sorted[j].Length
+		sort.SliceStable(sorted, func(i, j int) bool {
+			if sorted[i].Length != sorted[j].Length {
+				return sorted[i].Length > sorted[j].Length
+			}
+			return sorted[i].Path < sorted[j].Path
 		})
 	default:
-		// Default to date
-		sort.Slice(sorted, func(i, j int) bool {
-			return sorted[i].Date.After(sorted[j].Date)
+		// Default to date (newest -> oldest)
+		sort.SliceStable(sorted, func(i, j int) bool {
+			if !sorted[i].Date.Equal(sorted[j].Date) {
+				return sorted[i].Date.After(sorted[j].Date)
+			}
+			return sorted[i].Path < sorted[j].Path
 		})
 	}
 

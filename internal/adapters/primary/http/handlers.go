@@ -515,9 +515,10 @@ func (h *Handler) RecordingList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sortBy := r.URL.Query().Get("sort")
-	if sortBy != "" {
-		recordings = h.recordingService.SortRecordings(recordings, sortBy)
+	if sortBy == "" {
+		sortBy = "date"
 	}
+	recordings = h.recordingService.SortRecordings(recordings, sortBy)
 
 	data := map[string]any{
 		"Recordings": recordings,

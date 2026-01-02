@@ -33,7 +33,8 @@ auth:
 
 cache:
   epg_expiry: 60m
-  recording_expiry: 5m
+  # Set to 0s to disable caching and always reflect current recording list.
+  recording_expiry: 0s
 
 timer:
   default_priority: 50
