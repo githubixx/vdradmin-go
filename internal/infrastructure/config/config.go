@@ -104,7 +104,7 @@ func Load(path string) (*Config, error) {
 		},
 		Cache: CacheConfig{
 			EPGExpiry:       60 * time.Minute,
-			RecordingExpiry: 5 * time.Minute,
+			RecordingExpiry: 0,
 		},
 		Timer: TimerConfig{
 			DefaultPriority:    50,

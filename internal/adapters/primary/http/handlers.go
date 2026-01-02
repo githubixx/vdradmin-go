@@ -1,15 +1,20 @@
 package http
 
 import (
+	"fmt"
 	"html/template"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/githubixx/vdradmin-go/internal/application/services"
 	"github.com/githubixx/vdradmin-go/internal/domain"
+	"github.com/githubixx/vdradmin-go/internal/infrastructure/config"
+	"github.com/githubixx/vdradmin-go/internal/ports"
 )
 
 // Handler handles HTTP requests
@@ -17,6 +22,9 @@ type Handler struct {
 	logger           *slog.Logger
 	templates        *template.Template
 	templateMap      map[string]*template.Template
+	cfg              *config.Config
+	configPath       string
+	vdrClient        ports.VDRClient
 	epgService       *services.EPGService
 	timerService     *services.TimerService
 	recordingService *services.RecordingService
@@ -37,12 +45,27 @@ func NewHandler(
 		logger:           logger,
 		templates:        templates,
 		templateMap:      make(map[string]*template.Template),
+		cfg:              nil,
+		configPath:       "",
+		vdrClient:        nil,
 		epgService:       epgService,
 		timerService:     timerService,
 		recordingService: recordingService,
 		autoTimerService: autoTimerService,
 		uiThemeDefault:   "system",
 	}
+}
+
+// SetConfig wires the runtime configuration pointer and file path.
+// The pointer must be the same one used to build the middleware/routes.
+func (h *Handler) SetConfig(cfg *config.Config, configPath string) {
+	h.cfg = cfg
+	h.configPath = configPath
+}
+
+// SetVDRClient provides the VDR client so we can apply VDR connection changes immediately.
+func (h *Handler) SetVDRClient(client ports.VDRClient) {
+	h.vdrClient = client
 }
 
 // SetUIThemeDefault configures the default theme mode (system/light/dark).
@@ -74,6 +97,11 @@ func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
 type channelsDayGroup struct {
 	Day    time.Time
 	Events []domain.EPGEvent
+}
+
+type channelsDayOption struct {
+	Value string
+	Label string
 }
 
 type playingChannelGroup struct {
@@ -113,21 +141,52 @@ func (h *Handler) Channels(w http.ResponseWriter, r *http.Request) {
 	}
 	data["SelectedChannel"] = selected
 
+	loc := time.Now().Location()
+	dayStart, err := parseDayParam(r, loc)
+	if err != nil {
+		h.logger.Error("invalid day parameter", slog.Any("error", err))
+		dayStart = time.Now().In(loc)
+		dayStart = time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), 0, 0, 0, 0, loc)
+	}
+	dayEnd := dayStart.Add(24 * time.Hour)
+	data["SelectedDay"] = dayStart.Format("2006-01-02")
+
 	var events []domain.EPGEvent
+	daysByValue := map[string]time.Time{}
+	// Always include selected day in the dropdown.
+	daysByValue[dayStart.Format("2006-01-02")] = dayStart
 	if selected != "" {
 		ev, err := h.epgService.GetEPG(r.Context(), selected, time.Now())
 		if err != nil {
 			h.logger.Error("EPG fetch error on channels", slog.Any("error", err), slog.String("channel", selected))
 			data["HomeError"] = err.Error()
 		} else {
-			now := time.Now()
+			now := time.Now().In(loc)
 			for i := range ev {
-				if ev[i].Stop.After(now) {
+				// Build day dropdown from available EPG entries.
+				d := time.Date(ev[i].Start.In(loc).Year(), ev[i].Start.In(loc).Month(), ev[i].Start.In(loc).Day(), 0, 0, 0, 0, loc)
+				daysByValue[d.Format("2006-01-02")] = d
+
+				// Filter to the selected day.
+				if ev[i].Start.Before(dayEnd) && ev[i].Stop.After(dayStart) {
+					// Keep today's view compact by hiding already-finished programs.
+					if dayStart.Equal(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)) {
+						if !ev[i].Stop.After(now) {
+							continue
+						}
+					}
 					events = append(events, ev[i])
 				}
 			}
 		}
 	}
+
+	dayOptions := make([]channelsDayOption, 0, len(daysByValue))
+	for _, d := range daysByValue {
+		dayOptions = append(dayOptions, channelsDayOption{Value: d.Format("2006-01-02"), Label: d.Format("Mon 2006-01-02")})
+	}
+	sort.SliceStable(dayOptions, func(i, j int) bool { return dayOptions[i].Value < dayOptions[j].Value })
+	data["Days"] = dayOptions
 
 	sort.SliceStable(events, func(i, j int) bool {
 		if !events[i].Start.Equal(events[j].Start) {
@@ -136,18 +195,12 @@ func (h *Handler) Channels(w http.ResponseWriter, r *http.Request) {
 		return events[i].EventID < events[j].EventID
 	})
 
-	// Group by day, starting with current day.
-	groups := make([]channelsDayGroup, 0)
-	var currentDay time.Time
-	for i := range events {
-		day := time.Date(events[i].Start.Year(), events[i].Start.Month(), events[i].Start.Day(), 0, 0, 0, 0, events[i].Start.Location())
-		if currentDay.IsZero() || !day.Equal(currentDay) {
-			currentDay = day
-			groups = append(groups, channelsDayGroup{Day: day})
-		}
-		groups[len(groups)-1].Events = append(groups[len(groups)-1].Events, events[i])
+	// Single selected-day group.
+	if len(events) > 0 {
+		data["DayGroups"] = []channelsDayGroup{{Day: dayStart, Events: events}}
+	} else {
+		data["DayGroups"] = []channelsDayGroup{}
 	}
-	data["DayGroups"] = groups
 
 	h.renderTemplate(w, r, "channels.html", data)
 }
@@ -156,7 +209,337 @@ func (h *Handler) Channels(w http.ResponseWriter, r *http.Request) {
 // For now it only allows switching between system/light/dark theme.
 func (h *Handler) Configurations(w http.ResponseWriter, r *http.Request) {
 	data := map[string]any{}
+	if h.cfg != nil {
+		data["Config"] = h.cfg
+	}
+	if msg := strings.TrimSpace(r.URL.Query().Get("msg")); msg != "" {
+		data["Message"] = msg
+	}
+	if errMsg := strings.TrimSpace(r.URL.Query().Get("err")); errMsg != "" {
+		data["Error"] = errMsg
+	}
 	h.renderTemplate(w, r, "configurations.html", data)
+}
+
+// ConfigurationsApply applies configuration changes without persisting them.
+func (h *Handler) ConfigurationsApply(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.cfg == nil {
+		http.Error(w, "Configuration not available", http.StatusInternalServerError)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form", http.StatusBadRequest)
+		return
+	}
+
+	updated, err := h.buildConfigFromForm(r.PostForm)
+	if err != nil {
+		h.renderTemplate(w, r, "configurations.html", map[string]any{
+			"Config": h.cfg,
+			"Error":  err.Error(),
+		})
+		return
+	}
+
+	if err := h.applyRuntimeConfig(updated); err != nil {
+		h.renderTemplate(w, r, "configurations.html", map[string]any{
+			"Config": h.cfg,
+			"Error":  err.Error(),
+		})
+		return
+	}
+
+	setThemeCookie(w, updated.UI.Theme)
+
+	http.Redirect(w, r, "/configurations?msg="+url.QueryEscape("Applied configuration (not saved)."), http.StatusSeeOther)
+}
+
+// ConfigurationsSave persists configuration changes to the config file and applies them.
+func (h *Handler) ConfigurationsSave(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.cfg == nil {
+		http.Error(w, "Configuration not available", http.StatusInternalServerError)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form", http.StatusBadRequest)
+		return
+	}
+
+	updated, err := h.buildConfigFromForm(r.PostForm)
+	if err != nil {
+		h.renderTemplate(w, r, "configurations.html", map[string]any{
+			"Config": h.cfg,
+			"Error":  err.Error(),
+		})
+		return
+	}
+
+	restartRequired := serverRestartRequired(h.cfg.Server, updated.Server)
+
+	// Persist
+	if strings.TrimSpace(h.configPath) == "" {
+		h.renderTemplate(w, r, "configurations.html", map[string]any{
+			"Config": h.cfg,
+			"Error":  "No config path configured; cannot save.",
+		})
+		return
+	}
+	if err := updated.Save(h.configPath); err != nil {
+		h.renderTemplate(w, r, "configurations.html", map[string]any{
+			"Config": h.cfg,
+			"Error":  err.Error(),
+		})
+		return
+	}
+
+	if err := h.applyRuntimeConfig(updated); err != nil {
+		h.renderTemplate(w, r, "configurations.html", map[string]any{
+			"Config": h.cfg,
+			"Error":  err.Error(),
+		})
+		return
+	}
+
+	setThemeCookie(w, updated.UI.Theme)
+
+	msg := "Saved and applied configuration."
+	if restartRequired {
+		msg = "Saved and applied configuration (requires daemon restart)."
+	}
+	http.Redirect(w, r, "/configurations?msg="+url.QueryEscape(msg), http.StatusSeeOther)
+}
+
+func serverRestartRequired(oldCfg config.ServerConfig, newCfg config.ServerConfig) bool {
+	if oldCfg.Host != newCfg.Host || oldCfg.Port != newCfg.Port {
+		return true
+	}
+	if oldCfg.ReadTimeout != newCfg.ReadTimeout || oldCfg.WriteTimeout != newCfg.WriteTimeout {
+		return true
+	}
+	if oldCfg.MaxHeaderBytes != newCfg.MaxHeaderBytes {
+		return true
+	}
+	if oldCfg.TLS.Enabled != newCfg.TLS.Enabled {
+		return true
+	}
+	if oldCfg.TLS.CertFile != newCfg.TLS.CertFile || oldCfg.TLS.KeyFile != newCfg.TLS.KeyFile {
+		return true
+	}
+	return false
+}
+
+func (h *Handler) buildConfigFromForm(form url.Values) (*config.Config, error) {
+	// Start from current config and apply supported fields.
+	updated := *h.cfg
+
+	// Server
+	if v := strings.TrimSpace(form.Get("server_host")); v != "" {
+		updated.Server.Host = v
+	}
+	if v := strings.TrimSpace(form.Get("server_port")); v != "" {
+		p, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid server port")
+		}
+		updated.Server.Port = p
+	}
+	if v := strings.TrimSpace(form.Get("server_read_timeout")); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid server read timeout")
+		}
+		updated.Server.ReadTimeout = d
+	}
+	if v := strings.TrimSpace(form.Get("server_write_timeout")); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid server write timeout")
+		}
+		updated.Server.WriteTimeout = d
+	}
+	if v := strings.TrimSpace(form.Get("server_max_header_bytes")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid server max header bytes")
+		}
+		updated.Server.MaxHeaderBytes = n
+	}
+
+	updated.Server.TLS.Enabled = form.Get("server_tls_enabled") == "on"
+	if v := strings.TrimSpace(form.Get("server_tls_cert_file")); v != "" {
+		updated.Server.TLS.CertFile = v
+	}
+	if v := strings.TrimSpace(form.Get("server_tls_key_file")); v != "" {
+		updated.Server.TLS.KeyFile = v
+	}
+
+	// UI theme default
+	if v := strings.TrimSpace(form.Get("ui_theme")); v != "" {
+		updated.UI.Theme = v
+	}
+
+	// VDR connection
+	if v := strings.TrimSpace(form.Get("vdr_host")); v != "" {
+		updated.VDR.Host = v
+	}
+	if v := strings.TrimSpace(form.Get("vdr_port")); v != "" {
+		p, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid vdr port")
+		}
+		updated.VDR.Port = p
+	}
+	if v := strings.TrimSpace(form.Get("vdr_timeout")); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid vdr timeout")
+		}
+		updated.VDR.Timeout = d
+	}
+	if v := strings.TrimSpace(form.Get("vdr_video_dir")); v != "" {
+		updated.VDR.VideoDir = v
+	}
+	if v := strings.TrimSpace(form.Get("vdr_config_dir")); v != "" {
+		updated.VDR.ConfigDir = v
+	}
+	if v := strings.TrimSpace(form.Get("vdr_reconnect_delay")); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid vdr reconnect delay")
+		}
+		updated.VDR.ReconnectDelay = d
+	}
+
+	// Cache
+	if v := strings.TrimSpace(form.Get("cache_epg_expiry")); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid epg cache expiry")
+		}
+		updated.Cache.EPGExpiry = d
+	}
+	if v := strings.TrimSpace(form.Get("cache_recording_expiry")); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid recording cache expiry")
+		}
+		updated.Cache.RecordingExpiry = d
+	}
+
+	// Auth
+	updated.Auth.Enabled = form.Get("auth_enabled") == "on"
+	if v := strings.TrimSpace(form.Get("auth_admin_user")); v != "" {
+		updated.Auth.AdminUser = v
+	}
+	if v := strings.TrimSpace(form.Get("auth_admin_pass")); v != "" {
+		updated.Auth.AdminPass = v
+	}
+	updated.Auth.GuestEnabled = form.Get("auth_guest_enabled") == "on"
+	if v := strings.TrimSpace(form.Get("auth_guest_user")); v != "" {
+		updated.Auth.GuestUser = v
+	}
+	if v := strings.TrimSpace(form.Get("auth_guest_pass")); v != "" {
+		updated.Auth.GuestPass = v
+	}
+	updated.Auth.LocalNets = parseLines(form.Get("auth_local_nets"))
+
+	// Timer defaults
+	if v := strings.TrimSpace(form.Get("timer_default_priority")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid default priority")
+		}
+		updated.Timer.DefaultPriority = n
+	}
+	if v := strings.TrimSpace(form.Get("timer_default_lifetime")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid default lifetime")
+		}
+		updated.Timer.DefaultLifetime = n
+	}
+	if v := strings.TrimSpace(form.Get("timer_default_margin_start")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid default margin start")
+		}
+		updated.Timer.DefaultMarginStart = n
+	}
+	if v := strings.TrimSpace(form.Get("timer_default_margin_end")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid default margin end")
+		}
+		updated.Timer.DefaultMarginEnd = n
+	}
+
+	if err := updated.Validate(); err != nil {
+		return nil, err
+	}
+
+	return &updated, nil
+}
+
+func setThemeCookie(w http.ResponseWriter, theme string) {
+	theme = normalizeTheme(strings.TrimSpace(theme))
+	// Persist explicit mode (including system) for a long time.
+	http.SetCookie(w, &http.Cookie{
+		Name:     "theme",
+		Value:    url.QueryEscape(theme),
+		Path:     "/",
+		MaxAge:   60 * 60 * 24 * 365,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func parseLines(raw string) []string {
+	raw = strings.ReplaceAll(raw, ",", "\n")
+	parts := strings.Split(raw, "\n")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+func (h *Handler) applyRuntimeConfig(updated *config.Config) error {
+	// Update the shared config pointer in-place (middleware keeps working).
+	*h.cfg = *updated
+
+	// Apply pieces that can take effect immediately.
+	h.SetUIThemeDefault(h.cfg.UI.Theme)
+	if h.epgService != nil {
+		h.epgService.SetCacheExpiry(h.cfg.Cache.EPGExpiry)
+	}
+	if h.recordingService != nil {
+		h.recordingService.SetCacheExpiry(h.cfg.Cache.RecordingExpiry)
+	}
+
+	// Update SVDRP connection settings (best-effort).
+	if h.vdrClient != nil {
+		if u, ok := h.vdrClient.(interface {
+			UpdateConnection(host string, port int, timeout time.Duration)
+		}); ok {
+			u.UpdateConnection(h.cfg.VDR.Host, h.cfg.VDR.Port, h.cfg.VDR.Timeout)
+		}
+	}
+
+	// Server host/port/timeouts can't be changed without restarting the process.
+	return nil
 }
 
 // PlayingToday shows what each channel plays for a single day.
@@ -515,9 +898,10 @@ func (h *Handler) RecordingList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sortBy := r.URL.Query().Get("sort")
-	if sortBy != "" {
-		recordings = h.recordingService.SortRecordings(recordings, sortBy)
+	if sortBy == "" {
+		sortBy = "date"
 	}
+	recordings = h.recordingService.SortRecordings(recordings, sortBy)
 
 	data := map[string]any{
 		"Recordings": recordings,

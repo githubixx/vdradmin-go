@@ -37,22 +37,158 @@
 
     <main class="container">
 
+        {{if .Message}}
         <div class="toolbar">
-            <div class="sort-options">
-                <strong>Theme</strong>
-                <label>
-                    <input type="radio" name="theme" value="system"> System
-                </label>
-                <label>
-                    <input type="radio" name="theme" value="light"> Light
-                </label>
-                <label>
-                    <input type="radio" name="theme" value="dark"> Dark
-                </label>
-            </div>
+            <p><strong>{{.Message}}</strong></p>
         </div>
+        {{end}}
+        {{if .Error}}
+        <div class="toolbar">
+            <p><strong>Error:</strong> {{.Error}}</p>
+        </div>
+        {{end}}
 
-        <p class="empty-state">Changes apply immediately.</p>
+        {{if eq .Role "admin"}}
+        <form method="post">
+            <div class="toolbar">
+                <div class="sort-options" style="justify-content: flex-end; width: 100%;">
+                    <button type="submit" formaction="/configurations/apply" class="btn btn-secondary">Apply</button>
+                    <button type="submit" formaction="/configurations/save" class="btn btn-primary">Save</button>
+                </div>
+                <p class="empty-state" style="padding: 0.75rem 0 0 0; text-align: left;">
+                    Apply changes immediately. Save also writes to the config file.
+                </p>
+            </div>
+
+            <div class="toolbar">
+                <h3>Server</h3>
+                <div class="config-grid">
+                    <label for="server_host">Host</label>
+                    <input id="server_host" name="server_host" type="text" value="{{if .Config}}{{.Config.Server.Host}}{{end}}">
+
+                    <label for="server_port">Port</label>
+                    <input id="server_port" name="server_port" type="number" value="{{if .Config}}{{.Config.Server.Port}}{{end}}">
+
+                    <label for="server_read_timeout">Read timeout</label>
+                    <input id="server_read_timeout" name="server_read_timeout" type="text" value="{{if .Config}}{{.Config.Server.ReadTimeout}}{{end}}">
+
+                    <label for="server_write_timeout">Write timeout</label>
+                    <input id="server_write_timeout" name="server_write_timeout" type="text" value="{{if .Config}}{{.Config.Server.WriteTimeout}}{{end}}">
+
+                    <label for="server_max_header_bytes">Max header bytes</label>
+                    <input id="server_max_header_bytes" name="server_max_header_bytes" type="number" value="{{if .Config}}{{.Config.Server.MaxHeaderBytes}}{{end}}">
+
+                    <label for="server_tls_enabled">TLS enabled</label>
+                    <input id="server_tls_enabled" name="server_tls_enabled" type="checkbox" {{if and .Config .Config.Server.TLS.Enabled}}checked{{end}}>
+
+                    <label for="server_tls_cert_file">TLS cert file</label>
+                    <input id="server_tls_cert_file" name="server_tls_cert_file" type="text" value="{{if .Config}}{{.Config.Server.TLS.CertFile}}{{end}}">
+
+                    <label for="server_tls_key_file">TLS key file</label>
+                    <input id="server_tls_key_file" name="server_tls_key_file" type="text" value="{{if .Config}}{{.Config.Server.TLS.KeyFile}}{{end}}">
+                </div>
+            </div>
+
+            <div class="toolbar">
+                <h3>UI Defaults</h3>
+                <div class="config-grid">
+                    <label for="ui_theme">Default theme</label>
+                    <select id="ui_theme" name="ui_theme">
+                        <option value="system" {{if and .Config (eq .Config.UI.Theme "system")}}selected{{end}}>System</option>
+                        <option value="light" {{if and .Config (eq .Config.UI.Theme "light")}}selected{{end}}>Light</option>
+                        <option value="dark" {{if and .Config (eq .Config.UI.Theme "dark")}}selected{{end}}>Dark</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="toolbar">
+                <h3>VDR</h3>
+                <div class="config-grid">
+                    <label for="vdr_host">Host</label>
+                    <input id="vdr_host" name="vdr_host" type="text" value="{{if .Config}}{{.Config.VDR.Host}}{{end}}">
+
+                    <label for="vdr_port">Port</label>
+                    <input id="vdr_port" name="vdr_port" type="number" value="{{if .Config}}{{.Config.VDR.Port}}{{end}}">
+
+                    <label for="vdr_timeout">Timeout</label>
+                    <input id="vdr_timeout" name="vdr_timeout" type="text" value="{{if .Config}}{{.Config.VDR.Timeout}}{{end}}">
+
+                    <label for="vdr_video_dir">Video dir</label>
+                    <input id="vdr_video_dir" name="vdr_video_dir" type="text" value="{{if .Config}}{{.Config.VDR.VideoDir}}{{end}}">
+
+                    <label for="vdr_config_dir">Config dir</label>
+                    <input id="vdr_config_dir" name="vdr_config_dir" type="text" value="{{if .Config}}{{.Config.VDR.ConfigDir}}{{end}}">
+
+                    <label for="vdr_reconnect_delay">Reconnect delay</label>
+                    <input id="vdr_reconnect_delay" name="vdr_reconnect_delay" type="text" value="{{if .Config}}{{.Config.VDR.ReconnectDelay}}{{end}}">
+                </div>
+            </div>
+
+            <div class="toolbar">
+                <h3>Authentication</h3>
+                <div class="config-grid">
+                    <label for="auth_enabled">Enabled</label>
+                    <input id="auth_enabled" name="auth_enabled" type="checkbox" {{if and .Config .Config.Auth.Enabled}}checked{{end}}>
+
+                    <label for="auth_admin_user">Admin user</label>
+                    <input id="auth_admin_user" name="auth_admin_user" type="text" value="{{if .Config}}{{.Config.Auth.AdminUser}}{{end}}">
+
+                    <label for="auth_admin_pass">Admin password</label>
+                    <input id="auth_admin_pass" name="auth_admin_pass" type="password" placeholder="(leave empty to keep current)">
+
+                    <label for="auth_guest_enabled">Guest enabled</label>
+                    <input id="auth_guest_enabled" name="auth_guest_enabled" type="checkbox" {{if and .Config .Config.Auth.GuestEnabled}}checked{{end}}>
+
+                    <label for="auth_guest_user">Guest user</label>
+                    <input id="auth_guest_user" name="auth_guest_user" type="text" value="{{if .Config}}{{.Config.Auth.GuestUser}}{{end}}">
+
+                    <label for="auth_guest_pass">Guest password</label>
+                    <input id="auth_guest_pass" name="auth_guest_pass" type="password" placeholder="(leave empty to keep current)">
+
+                    <label for="auth_local_nets">Local nets (one per line)</label>
+                    <textarea id="auth_local_nets" name="auth_local_nets" rows="3">{{if .Config}}{{range .Config.Auth.LocalNets}}{{.}}
+{{end}}{{end}}</textarea>
+                </div>
+            </div>
+
+            <div class="toolbar">
+                <h3>Cache</h3>
+                <div class="config-grid">
+                    <label for="cache_epg_expiry">EPG expiry</label>
+                    <input id="cache_epg_expiry" name="cache_epg_expiry" type="text" value="{{if .Config}}{{.Config.Cache.EPGExpiry}}{{end}}">
+
+                    <label for="cache_recording_expiry">Recording expiry</label>
+                    <input id="cache_recording_expiry" name="cache_recording_expiry" type="text" value="{{if .Config}}{{.Config.Cache.RecordingExpiry}}{{end}}">
+                </div>
+            </div>
+
+            <div class="toolbar">
+                <h3>Timer Defaults</h3>
+                <div class="config-grid">
+                    <label for="timer_default_priority">Priority</label>
+                    <input id="timer_default_priority" name="timer_default_priority" type="number" value="{{if .Config}}{{.Config.Timer.DefaultPriority}}{{end}}">
+
+                    <label for="timer_default_lifetime">Lifetime</label>
+                    <input id="timer_default_lifetime" name="timer_default_lifetime" type="number" value="{{if .Config}}{{.Config.Timer.DefaultLifetime}}{{end}}">
+
+                    <label for="timer_default_margin_start">Margin start (min)</label>
+                    <input id="timer_default_margin_start" name="timer_default_margin_start" type="number" value="{{if .Config}}{{.Config.Timer.DefaultMarginStart}}{{end}}">
+
+                    <label for="timer_default_margin_end">Margin end (min)</label>
+                    <input id="timer_default_margin_end" name="timer_default_margin_end" type="number" value="{{if .Config}}{{.Config.Timer.DefaultMarginEnd}}{{end}}">
+                </div>
+            </div>
+
+            <div class="toolbar">
+                <div class="sort-options" style="justify-content: flex-end; width: 100%;">
+                    <button type="submit" formaction="/configurations/apply" class="btn btn-secondary">Apply</button>
+                    <button type="submit" formaction="/configurations/save" class="btn btn-primary">Save</button>
+                </div>
+            </div>
+        </form>
+        {{else}}
+        <p class="empty-state">Admin access required to edit configuration.</p>
+        {{end}}
     </main>
 
     <footer>

@@ -29,6 +29,13 @@ type EPGService struct {
 	channelsExpiry    time.Duration
 }
 
+// SetCacheExpiry updates the EPG cache expiry used for GetEPG.
+func (s *EPGService) SetCacheExpiry(expiry time.Duration) {
+	s.cacheMu.Lock()
+	s.cacheExpiry = expiry
+	s.cacheMu.Unlock()
+}
+
 type epgCache struct {
 	events    []domain.EPGEvent
 	expiresAt time.Time
