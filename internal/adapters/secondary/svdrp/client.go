@@ -16,7 +16,11 @@ import (
 	"github.com/githubixx/vdradmin-go/internal/domain"
 )
 
-// Client implements the SVDRP protocol for VDR communication
+// Returned when we failed while writing/flushing the command to the socket.
+// Retrying after this is usually safe because the command likely didn't reach VDR.
+var errSVDRPSendFailed = errors.New("svdrp send failed")
+
+// Client implements the SVDRP protocol for VDR communication.
 type Client struct {
 	host    string
 	port    int
@@ -27,22 +31,18 @@ type Client struct {
 	rw   *bufio.ReadWriter
 }
 
-// NewClient creates a new SVDRP client
+// NewClient creates a new SVDRP client.
 func NewClient(host string, port int, timeout time.Duration) *Client {
-	return &Client{
-		host:    host,
-		port:    port,
-		timeout: timeout,
-	}
+	return &Client{host: host, port: port, timeout: timeout}
 }
 
-// Connect establishes a connection to VDR
+// Connect establishes a connection to VDR.
 func (c *Client) Connect(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if c.conn != nil {
-		return nil // already connected
+		return nil
 	}
 
 	dialer := &net.Dialer{Timeout: c.timeout}
@@ -54,17 +54,16 @@ func (c *Client) Connect(ctx context.Context) error {
 	c.conn = conn
 	c.rw = bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 
-	// Read welcome message
-	if _, err := c.readResponse(); err != nil {
-		c.conn.Close()
-		c.conn = nil
+	// Read welcome message.
+	if _, err := c.readResponseLocked(); err != nil {
+		c.closeConnectionLocked()
 		return fmt.Errorf("failed to read welcome: %w", err)
 	}
 
 	return nil
 }
 
-// Close closes the connection
+// Close closes the connection.
 func (c *Client) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -73,9 +72,9 @@ func (c *Client) Close() error {
 		return nil
 	}
 
-	// Send QUIT command (ignore errors if connection is broken)
-	c.rw.WriteString("QUIT\r\n")
-	c.rw.Flush()
+	// Best-effort QUIT (ignore errors on broken connections).
+	_, _ = c.rw.WriteString("QUIT\r\n")
+	_ = c.rw.Flush()
 
 	err := c.conn.Close()
 	c.conn = nil
@@ -83,50 +82,46 @@ func (c *Client) Close() error {
 	return err
 }
 
-// Ping checks if VDR is reachable
+// Ping checks if VDR is reachable.
 func (c *Client) Ping(ctx context.Context) error {
-	if err := c.ensureConnected(ctx); err != nil {
-		return err
-	}
+	_, err := withRetry(ctx, c, func() (struct{}, error) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	// Send a simple command to check connectivity
-	if err := c.sendCommand("STAT disk"); err != nil {
-		return err
-	}
-
-	_, err := c.readResponse()
+		if err := c.sendCommandLocked("STAT disk"); err != nil {
+			return struct{}{}, err
+		}
+		_, err := c.readResponseLocked()
+		return struct{}{}, err
+	})
 	return err
 }
 
-// GetChannels retrieves all channels
+// GetChannels retrieves all channels.
 func (c *Client) GetChannels(ctx context.Context) ([]domain.Channel, error) {
 	return withRetry(ctx, c, func() ([]domain.Channel, error) {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 
-		if err := c.sendCommand("LSTC"); err != nil {
+		if err := c.sendCommandLocked("LSTC"); err != nil {
 			return nil, err
 		}
 
-		lines, err := c.readResponse()
+		lines, err := c.readResponseLocked()
 		if err != nil {
 			return nil, err
 		}
 
 		channels := make([]domain.Channel, 0, len(lines))
 		for i, line := range lines {
-			channel := parseChannel(i+1, line)
-			channels = append(channels, channel)
+			ch := parseChannel(i+1, line)
+			channels = append(channels, ch)
 		}
-
 		return channels, nil
 	})
 }
 
-// GetEPG retrieves EPG data
+// GetEPG retrieves EPG data.
 func (c *Client) GetEPG(ctx context.Context, channelID string, at time.Time) ([]domain.EPGEvent, error) {
 	return withRetry(ctx, c, func() ([]domain.EPGEvent, error) {
 		c.mu.Lock()
@@ -139,33 +134,26 @@ func (c *Client) GetEPG(ctx context.Context, channelID string, at time.Time) ([]
 			} else {
 				cmd = fmt.Sprintf("LSTE %s", channelID)
 			}
-		} else if !at.IsZero() {
-			// For all channels at a specific time, need to use different approach
-			// LSTE with just timestamp may not work as expected in all VDR versions
-			// For now, just get all EPG data
-			cmd = "LSTE"
 		}
 
-		if err := c.sendCommand(cmd); err != nil {
+		if err := c.sendCommandLocked(cmd); err != nil {
 			return nil, err
 		}
 
-		lines, err := c.readResponse()
+		lines, err := c.readResponseLocked()
 		if err != nil {
-			// Some channels simply have no EPG (e.g. no schedule). Treat as empty result.
+			// Some channels simply have no EPG (e.g. no schedule). Treat as empty.
 			if channelID != "" && isSVDRPNoSchedule(err) {
 				return []domain.EPGEvent{}, nil
 			}
 
 			// Some VDR versions don't support the optional timestamp argument.
-			// Example: "SVDRP error 501: Unknown option: <timestamp>"
 			if channelID != "" && !at.IsZero() && isSVDRPUnknownOption(err) {
-				// Retry without timestamp.
 				cmd = fmt.Sprintf("LSTE %s", channelID)
-				if err := c.sendCommand(cmd); err != nil {
+				if err := c.sendCommandLocked(cmd); err != nil {
 					return nil, err
 				}
-				lines, err = c.readResponse()
+				lines, err = c.readResponseLocked()
 				if err != nil {
 					if isSVDRPNoSchedule(err) {
 						return []domain.EPGEvent{}, nil
@@ -174,6 +162,7 @@ func (c *Client) GetEPG(ctx context.Context, channelID string, at time.Time) ([]
 				}
 				return parseEPGEvents(lines), nil
 			}
+
 			return nil, err
 		}
 
@@ -185,46 +174,38 @@ func isSVDRPUnknownOption(err error) bool {
 	if err == nil {
 		return false
 	}
-	var target error = err
-	if u := errors.Unwrap(err); u != nil {
-		target = u
-	}
-	msg := target.Error()
-	return strings.Contains(msg, "SVDRP error 501") || strings.Contains(msg, "Unknown option")
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "svdrp error 501") || strings.Contains(msg, "unknown option")
 }
 
 func isSVDRPNoSchedule(err error) bool {
 	if err == nil {
 		return false
 	}
-	var target error = err
-	if u := errors.Unwrap(err); u != nil {
-		target = u
-	}
-	msg := target.Error()
-	return strings.Contains(msg, "SVDRP error 550") || strings.Contains(msg, "No schedule found")
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "svdrp error 550") || strings.Contains(msg, "no schedule")
 }
 
-// GetTimers retrieves all timers
+// GetTimers retrieves all timers.
 func (c *Client) GetTimers(ctx context.Context) ([]domain.Timer, error) {
 	return withRetry(ctx, c, func() ([]domain.Timer, error) {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 
-		if err := c.sendCommand("LSTT"); err != nil {
+		if err := c.sendCommandLocked("LSTT"); err != nil {
 			return nil, err
 		}
 
-		lines, err := c.readResponse()
+		lines, err := c.readResponseLocked()
 		if err != nil {
 			return nil, err
 		}
 
 		timers := make([]domain.Timer, 0, len(lines))
 		for _, line := range lines {
-			timer, err := parseTimer(line)
+			t, err := parseTimer(line)
 			if err == nil {
-				timers = append(timers, timer)
+				timers = append(timers, t)
 			}
 		}
 
@@ -232,170 +213,143 @@ func (c *Client) GetTimers(ctx context.Context) ([]domain.Timer, error) {
 	})
 }
 
-// CreateTimer creates a new timer
+// CreateTimer creates a new timer.
 func (c *Client) CreateTimer(ctx context.Context, timer *domain.Timer) error {
-	if err := c.ensureConnected(ctx); err != nil {
-		return err
-	}
+	return withRetryWrite(ctx, c, func() error {
+		c.mu.Lock()
+		defer c.mu.Unlock()
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	timerStr := formatTimer(timer)
-	if err := c.sendCommand(fmt.Sprintf("NEWT %s", timerStr)); err != nil {
-		return err
-	}
-
-	_, err := c.readResponse()
-	return err
-}
-
-// UpdateTimer updates an existing timer
-func (c *Client) UpdateTimer(ctx context.Context, timer *domain.Timer) error {
-	if err := c.ensureConnected(ctx); err != nil {
-		return err
-	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	timerStr := formatTimer(timer)
-	if err := c.sendCommand(fmt.Sprintf("MODT %d %s", timer.ID, timerStr)); err != nil {
-		return err
-	}
-
-	_, err := c.readResponse()
-	return err
-}
-
-// DeleteTimer deletes a timer
-func (c *Client) DeleteTimer(ctx context.Context, timerID int) error {
-	if err := c.ensureConnected(ctx); err != nil {
-		return err
-	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if err := c.sendCommand(fmt.Sprintf("DELT %d", timerID)); err != nil {
-		return err
-	}
-
-	_, err := c.readResponse()
-	return err
-}
-
-// GetRecordings retrieves all recordings
-func (c *Client) GetRecordings(ctx context.Context) ([]domain.Recording, error) {
-	if err := c.ensureConnected(ctx); err != nil {
-		return nil, err
-	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if err := c.sendCommand("LSTR"); err != nil {
-		return nil, err
-	}
-
-	lines, err := c.readResponse()
-	if err != nil {
-		return nil, err
-	}
-
-	recordings := make([]domain.Recording, 0, len(lines))
-	for _, line := range lines {
-		recording, err := parseRecording(line)
-		if err == nil {
-			recordings = append(recordings, recording)
+		timerStr := formatTimer(timer)
+		if err := c.sendCommandLocked(fmt.Sprintf("NEWT %s", timerStr)); err != nil {
+			return err
 		}
-	}
-
-	return recordings, nil
+		_, err := c.readResponseLocked()
+		return err
+	})
 }
 
-// DeleteRecording deletes a recording
+// UpdateTimer updates an existing timer.
+func (c *Client) UpdateTimer(ctx context.Context, timer *domain.Timer) error {
+	return withRetryWrite(ctx, c, func() error {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+
+		timerStr := formatTimer(timer)
+		if err := c.sendCommandLocked(fmt.Sprintf("MODT %d %s", timer.ID, timerStr)); err != nil {
+			return err
+		}
+		_, err := c.readResponseLocked()
+		return err
+	})
+}
+
+// DeleteTimer deletes a timer.
+func (c *Client) DeleteTimer(ctx context.Context, timerID int) error {
+	return withRetryWrite(ctx, c, func() error {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+
+		if err := c.sendCommandLocked(fmt.Sprintf("DELT %d", timerID)); err != nil {
+			return err
+		}
+		_, err := c.readResponseLocked()
+		return err
+	})
+}
+
+// GetRecordings retrieves all recordings.
+func (c *Client) GetRecordings(ctx context.Context) ([]domain.Recording, error) {
+	return withRetry(ctx, c, func() ([]domain.Recording, error) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+
+		if err := c.sendCommandLocked("LSTR"); err != nil {
+			return nil, err
+		}
+
+		lines, err := c.readResponseLocked()
+		if err != nil {
+			return nil, err
+		}
+
+		recordings := make([]domain.Recording, 0, len(lines))
+		for _, line := range lines {
+			r, err := parseRecording(line)
+			if err == nil {
+				recordings = append(recordings, r)
+			}
+		}
+
+		return recordings, nil
+	})
+}
+
+// DeleteRecording deletes a recording.
 func (c *Client) DeleteRecording(ctx context.Context, path string) error {
-	if err := c.ensureConnected(ctx); err != nil {
+	return withRetryWrite(ctx, c, func() error {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+
+		if err := c.sendCommandLocked(fmt.Sprintf("DELR %s", path)); err != nil {
+			return err
+		}
+		_, err := c.readResponseLocked()
 		return err
-	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if err := c.sendCommand(fmt.Sprintf("DELR %s", path)); err != nil {
-		return err
-	}
-
-	_, err := c.readResponse()
-	return err
+	})
 }
 
-// GetCurrentChannel returns the current channel
+// GetCurrentChannel returns the current channel.
 func (c *Client) GetCurrentChannel(ctx context.Context) (string, error) {
-	if err := c.ensureConnected(ctx); err != nil {
-		return "", err
-	}
+	return withRetry(ctx, c, func() (string, error) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if err := c.sendCommand("CHAN"); err != nil {
-		return "", err
-	}
-
-	lines, err := c.readResponse()
-	if err != nil || len(lines) == 0 {
-		return "", err
-	}
-
-	return strings.TrimSpace(lines[0]), nil
+		if err := c.sendCommandLocked("CHAN"); err != nil {
+			return "", err
+		}
+		lines, err := c.readResponseLocked()
+		if err != nil || len(lines) == 0 {
+			return "", err
+		}
+		return strings.TrimSpace(lines[0]), nil
+	})
 }
 
-// SetCurrentChannel switches to a channel
+// SetCurrentChannel switches to a channel.
 func (c *Client) SetCurrentChannel(ctx context.Context, channelID string) error {
-	if err := c.ensureConnected(ctx); err != nil {
+	return withRetryWrite(ctx, c, func() error {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+
+		if err := c.sendCommandLocked(fmt.Sprintf("CHAN %s", channelID)); err != nil {
+			return err
+		}
+		_, err := c.readResponseLocked()
 		return err
-	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if err := c.sendCommand(fmt.Sprintf("CHAN %s", channelID)); err != nil {
-		return err
-	}
-
-	_, err := c.readResponse()
-	return err
+	})
 }
 
-// SendKey sends a remote control key
+// SendKey sends a remote control key.
 func (c *Client) SendKey(ctx context.Context, key string) error {
-	if err := c.ensureConnected(ctx); err != nil {
+	return withRetryWrite(ctx, c, func() error {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+
+		if err := c.sendCommandLocked(fmt.Sprintf("HITK %s", key)); err != nil {
+			return err
+		}
+		_, err := c.readResponseLocked()
 		return err
-	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if err := c.sendCommand(fmt.Sprintf("HITK %s", key)); err != nil {
-		return err
-	}
-
-	_, err := c.readResponse()
-	return err
+	})
 }
 
-// ensureConnected ensures the connection is established
 func (c *Client) ensureConnected(ctx context.Context) error {
 	c.mu.Lock()
 	connected := c.conn != nil
 	c.mu.Unlock()
-
 	if !connected {
 		return c.Connect(ctx)
 	}
-
 	return nil
 }
 
@@ -425,7 +379,7 @@ func withRetry[T any](ctx context.Context, c *Client, fn func() (T, error)) (T, 
 
 		// Force reconnection before next try.
 		c.mu.Lock()
-		c.closeConnection()
+		c.closeConnectionLocked()
 		c.mu.Unlock()
 
 		t := time.NewTimer(backoff)
@@ -436,7 +390,6 @@ func withRetry[T any](ctx context.Context, c *Client, fn func() (T, error)) (T, 
 		case <-t.C:
 		}
 
-		// Exponential backoff with a reasonable cap.
 		backoff *= 2
 		if backoff > 600*time.Millisecond {
 			backoff = 600 * time.Millisecond
@@ -446,12 +399,53 @@ func withRetry[T any](ctx context.Context, c *Client, fn func() (T, error)) (T, 
 	return zero, lastErr
 }
 
+// withRetryWrite retries only when sending the SVDRP command failed.
+// This avoids retrying non-idempotent operations after an unknown server-side execution.
+func withRetryWrite(ctx context.Context, c *Client, fn func() error) error {
+	const maxAttempts = 3
+	backoff := 60 * time.Millisecond
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if err := c.ensureConnected(ctx); err != nil {
+			return err
+		}
+
+		err := fn()
+		if err == nil {
+			return nil
+		}
+
+		// Only retry if the send itself failed (broken pipe during write/flush).
+		if !isTransientConnErr(err) || !errors.Is(err, errSVDRPSendFailed) || attempt == maxAttempts {
+			return err
+		}
+
+		c.mu.Lock()
+		c.closeConnectionLocked()
+		c.mu.Unlock()
+
+		t := time.NewTimer(backoff)
+		select {
+		case <-ctx.Done():
+			t.Stop()
+			return ctx.Err()
+		case <-t.C:
+		}
+
+		backoff *= 2
+		if backoff > 600*time.Millisecond {
+			backoff = 600 * time.Millisecond
+		}
+	}
+
+	return domain.ErrConnection
+}
+
 func isTransientConnErr(err error) bool {
 	if err == nil {
 		return false
 	}
 
-	// Common transient socket failures.
 	if errors.Is(err, domain.ErrConnection) || errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
 		return true
 	}
@@ -466,46 +460,42 @@ func isTransientConnErr(err error) bool {
 		}
 	}
 
-	// Fallback string checks (platform-specific wording).
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "broken pipe") ||
 		strings.Contains(msg, "connection reset") ||
 		strings.Contains(msg, "use of closed network connection")
 }
 
-// sendCommand sends a command to VDR
-func (c *Client) sendCommand(cmd string) error {
+func (c *Client) sendCommandLocked(cmd string) error {
 	if c.conn == nil {
 		return domain.ErrConnection
 	}
 
+	_ = c.conn.SetWriteDeadline(time.Now().Add(c.timeout))
+
 	if _, err := c.rw.WriteString(cmd + "\r\n"); err != nil {
-		// Connection broken, close it
-		c.closeConnection()
-		return err
+		c.closeConnectionLocked()
+		return fmt.Errorf("%w: %w", errSVDRPSendFailed, err)
 	}
-
 	if err := c.rw.Flush(); err != nil {
-		// Connection broken, close it
-		c.closeConnection()
-		return err
+		c.closeConnectionLocked()
+		return fmt.Errorf("%w: %w", errSVDRPSendFailed, err)
 	}
-
 	return nil
 }
 
-// readResponse reads a response from VDR
-func (c *Client) readResponse() ([]string, error) {
+func (c *Client) readResponseLocked() ([]string, error) {
 	if c.conn == nil {
 		return nil, domain.ErrConnection
 	}
+
+	_ = c.conn.SetReadDeadline(time.Now().Add(c.timeout))
 
 	var lines []string
 	for {
 		line, err := c.rw.ReadString('\n')
 		if err != nil {
-			// Connection broken, close it
-			c.closeConnection()
+			c.closeConnectionLocked()
 			return nil, err
 		}
 
@@ -514,26 +504,24 @@ func (c *Client) readResponse() ([]string, error) {
 			continue
 		}
 
-		// Parse response code
 		code, err := strconv.Atoi(line[0:3])
 		if err != nil {
 			continue
 		}
 
-		// Check for error codes
 		if code >= 400 {
-			return nil, fmt.Errorf("SVDRP error %d: %s", code, line[4:])
+			return nil, fmt.Errorf("SVDRP error %d: %s", code, strings.TrimSpace(line[4:]))
 		}
 
-		// Check if this is a continuation line (-)
-		if len(line) > 3 && line[3] == '-' {
+		// Continuation line.
+		if line[3] == '-' {
 			if len(line) > 4 {
 				lines = append(lines, line[4:])
 			}
 			continue
 		}
 
-		// This is the last line (space after code)
+		// Final line.
 		if len(line) > 4 {
 			lines = append(lines, line[4:])
 		}
@@ -543,16 +531,14 @@ func (c *Client) readResponse() ([]string, error) {
 	return lines, nil
 }
 
-// closeConnection closes the connection without locking (must be called with lock held)
-func (c *Client) closeConnection() {
+func (c *Client) closeConnectionLocked() {
 	if c.conn != nil {
-		c.conn.Close()
+		_ = c.conn.Close()
 		c.conn = nil
 		c.rw = nil
 	}
 }
 
-// parseChannel parses a channel line from LSTC
 func parseChannel(number int, line string) domain.Channel {
 	chID, chNumber, chName, provider := parseSVDRPChannelHeader(strings.TrimSpace(line), number)
 	if chID == "" && chName == "" {
@@ -564,7 +550,6 @@ func parseChannel(number int, line string) domain.Channel {
 	if chID == "" {
 		chID = strconv.Itoa(chNumber)
 	}
-
 	return domain.Channel{ID: chID, Number: chNumber, Name: chName, Provider: provider}
 }
 
@@ -586,7 +571,6 @@ func parseSVDRPChannelHeader(text string, numberFallback int) (channelID string,
 		if len(parts) >= 2 {
 			rest := strings.TrimSpace(text[len(first):])
 			rest = strings.TrimSpace(rest)
-			// If the next token looks like a channel-id, prefer it.
 			r2 := strings.SplitN(rest, " ", 2)
 			if len(r2) >= 1 && looksLikeVDRChannelID(r2[0]) {
 				channelID = r2[0]
@@ -594,7 +578,6 @@ func parseSVDRPChannelHeader(text string, numberFallback int) (channelID string,
 					channelName, provider = parseChannelNameProvider(r2[1])
 				}
 			} else {
-				// Otherwise, derive ID from channels.conf-like content if possible.
 				channelID = deriveChannelIDFromChannelsConf(rest)
 				channelName, provider = parseChannelNameProvider(rest)
 				if channelID == "" {
@@ -605,7 +588,6 @@ func parseSVDRPChannelHeader(text string, numberFallback int) (channelID string,
 		return channelID, channelNumber, channelName, provider
 	}
 
-	// first isn't numeric, so treat it as channel id.
 	if looksLikeVDRChannelID(first) {
 		channelID = first
 		if len(parts) >= 2 {
@@ -616,14 +598,12 @@ func parseSVDRPChannelHeader(text string, numberFallback int) (channelID string,
 		return channelID, numberFallback, channelName, provider
 	}
 
-	// Fallback: treat as channels.conf line.
 	channelID = deriveChannelIDFromChannelsConf(text)
 	channelName, provider = parseChannelNameProvider(text)
 	return channelID, numberFallback, channelName, provider
 }
 
 func looksLikeVDRChannelID(s string) bool {
-	// Common VDR channel id form: S19.2E-1-1010-11150 (source-nid-tid-sid)
 	return strings.Contains(s, "-") && (strings.HasPrefix(s, "S") || strings.HasPrefix(s, "C") || strings.HasPrefix(s, "T") || strings.HasPrefix(s, "A"))
 }
 
@@ -638,15 +618,6 @@ func parseChannelNameProvider(channelsConfLine string) (name string, provider st
 }
 
 func deriveChannelIDFromChannelsConf(channelsConfLine string) string {
-	// channels.conf fields (common):
-	// 0: Name;Provider
-	// 1: Frequency
-	// 2: Parameters
-	// 3: Source
-	// ...
-	// 9:  SID
-	// 10: NID
-	// 11: TID
 	fields := strings.Split(channelsConfLine, ":")
 	if len(fields) < 12 {
 		return ""
@@ -661,7 +632,6 @@ func deriveChannelIDFromChannelsConf(channelsConfLine string) string {
 	return fmt.Sprintf("%s-%s-%s-%s", source, nid, tid, sid)
 }
 
-// parseEPGEvents parses EPG events from LSTE response
 func parseEPGEvents(lines []string) []domain.EPGEvent {
 	events := make([]domain.EPGEvent, 0)
 	var currentEvent *domain.EPGEvent
@@ -671,7 +641,6 @@ func parseEPGEvents(lines []string) []domain.EPGEvent {
 
 	for _, line := range lines {
 		if strings.HasPrefix(line, "C ") {
-			// Channel header line; applies to subsequent E-lines.
 			chID, chNum, chName, _ := parseSVDRPChannelHeader(strings.TrimSpace(line[2:]), 0)
 			currentChannelID = chID
 			currentChannelName = chName
@@ -680,7 +649,6 @@ func parseEPGEvents(lines []string) []domain.EPGEvent {
 		}
 
 		if strings.HasPrefix(line, "E ") {
-			// New event
 			if currentEvent != nil {
 				events = append(events, *currentEvent)
 			}
@@ -690,15 +658,18 @@ func parseEPGEvents(lines []string) []domain.EPGEvent {
 				currentEvent.ChannelNumber = currentChannelNumber
 				currentEvent.ChannelName = currentChannelName
 			}
-		} else if currentEvent != nil {
-			// Additional event data (T, S, D, etc.)
-			if strings.HasPrefix(line, "T ") {
-				currentEvent.Title = line[2:]
-			} else if strings.HasPrefix(line, "S ") {
-				currentEvent.Subtitle = line[2:]
-			} else if strings.HasPrefix(line, "D ") {
-				currentEvent.Description += line[2:] + "\n"
-			}
+			continue
+		}
+
+		if currentEvent == nil {
+			continue
+		}
+		if strings.HasPrefix(line, "T ") {
+			currentEvent.Title = line[2:]
+		} else if strings.HasPrefix(line, "S ") {
+			currentEvent.Subtitle = line[2:]
+		} else if strings.HasPrefix(line, "D ") {
+			currentEvent.Description += line[2:] + "\n"
 		}
 	}
 
@@ -709,9 +680,7 @@ func parseEPGEvents(lines []string) []domain.EPGEvent {
 	return events
 }
 
-// parseEPGEventLine parses an EPG event line
 func parseEPGEventLine(line string) *domain.EPGEvent {
-	// Format: E eventID startTime duration [tableID] [version]
 	parts := strings.Fields(line[2:])
 	if len(parts) < 3 {
 		return nil
@@ -724,17 +693,10 @@ func parseEPGEventLine(line string) *domain.EPGEvent {
 	start := time.Unix(startUnix, 0)
 	dur := time.Duration(duration) * time.Second
 
-	return &domain.EPGEvent{
-		EventID:  eventID,
-		Start:    start,
-		Stop:     start.Add(dur),
-		Duration: dur,
-	}
+	return &domain.EPGEvent{EventID: eventID, Start: start, Stop: start.Add(dur), Duration: dur}
 }
 
-// parseTimer parses a timer from LSTT response
 func parseTimer(line string) (domain.Timer, error) {
-	// Format: ID active:channel:day:start:stop:priority:lifetime:title:aux
 	parts := strings.SplitN(line, " ", 2)
 	if len(parts) != 2 {
 		return domain.Timer{}, fmt.Errorf("invalid timer format")
@@ -742,7 +704,6 @@ func parseTimer(line string) (domain.Timer, error) {
 
 	timerID, _ := strconv.Atoi(parts[0])
 	fields := strings.SplitN(parts[1], ":", 9)
-
 	if len(fields) < 8 {
 		return domain.Timer{}, fmt.Errorf("insufficient timer fields")
 	}
@@ -793,7 +754,6 @@ func parseTimerDay(daySpec string) time.Time {
 		return time.Time{}
 	}
 
-	// One-time timer date.
 	if t, err := time.ParseInLocation("2006-01-02", daySpec, time.Local); err == nil {
 		return t
 	}
@@ -801,38 +761,9 @@ func parseTimerDay(daySpec string) time.Time {
 		return t
 	}
 
-	// Recurring timer: weekday mask like MTWTFSS (with '-' for disabled days).
-	if len(daySpec) >= 7 {
-		allowed := make(map[time.Weekday]bool, 7)
-		letters := daySpec
-		if len(letters) > 7 {
-			letters = letters[:7]
-		}
-		// VDR uses MTWTFSS => Monday..Sunday.
-		for i, ch := range letters {
-			if ch == '-' {
-				continue
-			}
-			wd := time.Weekday((i + int(time.Monday)) % 7)
-			allowed[wd] = true
-		}
-
-		// Find next matching day (today included).
-		now := time.Now()
-		base := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-		for i := 0; i < 14; i++ {
-			d := base.AddDate(0, 0, i)
-			if allowed[d.Weekday()] {
-				return d
-			}
-		}
-	}
-
 	return time.Time{}
 }
 
-// parseTimerClock returns minutes since midnight for a HHMM or HH:MM clock.
-// Returns -1 if parsing fails.
 func parseTimerClock(clock string) int {
 	clock = strings.TrimSpace(clock)
 	if clock == "" {
@@ -858,7 +789,6 @@ func parseTimerClock(clock string) int {
 	return hh*60 + mm
 }
 
-// formatTimer formats a timer for SVDRP commands
 func formatTimer(timer *domain.Timer) string {
 	active := "0"
 	if timer.Active {
@@ -901,14 +831,11 @@ func formatTimer(timer *domain.Timer) string {
 func sanitizeTimerField(s string) string {
 	s = strings.ReplaceAll(s, "\r", " ")
 	s = strings.ReplaceAll(s, "\n", " ")
-	// Fields are ':' separated in SVDRP timer strings.
 	s = strings.ReplaceAll(s, ":", "|")
 	return strings.TrimSpace(s)
 }
 
-// parseRecording parses a recording from LSTR response
 func parseRecording(line string) (domain.Recording, error) {
-	// Format: ID date time~title~description
 	parts := strings.SplitN(line, " ", 2)
 	if len(parts) != 2 {
 		return domain.Recording{}, fmt.Errorf("invalid recording format")
@@ -916,14 +843,10 @@ func parseRecording(line string) (domain.Recording, error) {
 
 	path := parts[0]
 	info := strings.Split(parts[1], "~")
-
 	title := ""
 	if len(info) > 0 {
 		title = info[0]
 	}
 
-	return domain.Recording{
-		Path:  path,
-		Title: title,
-	}, nil
+	return domain.Recording{Path: path, Title: title}, nil
 }
