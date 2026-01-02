@@ -142,7 +142,16 @@ func (c *Client) GetChannels(ctx context.Context) ([]domain.Channel, error) {
 
 		channels := make([]domain.Channel, 0, len(lines))
 		for i, line := range lines {
+			trim := strings.TrimSpace(line)
+			parts := strings.Fields(trim)
+			if len(parts) == 2 && (parts[1] == "channels" || parts[1] == "channel") {
+				continue
+			}
+
 			ch := parseChannel(i+1, line)
+			if ch.ID == "" && ch.Name == "" {
+				continue
+			}
 			channels = append(channels, ch)
 		}
 		return channels, nil
