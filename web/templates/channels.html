@@ -35,12 +35,23 @@
 
         <div class="toolbar channels-selector">
             <form action="/channels" method="get" class="nav-channel-form">
-                <label for="channel" class="nav-channel-label">Channel</label>
-                <select id="channel" name="channel" onchange="this.form.submit()">
-                    {{range .Channels}}
-                    <option value="{{.ID}}" {{if eq $.SelectedChannel .ID}}selected{{end}}>{{.Name}}</option>
-                    {{end}}
-                </select>
+                <div class="nav-select">
+                    <label for="channel" class="nav-channel-label">Channel</label>
+                    <select id="channel" name="channel" onchange="this.form.submit()">
+                        {{range .Channels}}
+                        <option value="{{.ID}}" {{if eq $.SelectedChannel .ID}}selected{{end}}>{{.Name}}</option>
+                        {{end}}
+                    </select>
+                </div>
+
+                <div class="nav-select">
+                    <label for="day" class="nav-channel-label">Day</label>
+                    <select id="day" name="day" onchange="this.form.submit()">
+                        {{range .Days}}
+                        <option value="{{.Value}}" {{if eq $.SelectedDay .Value}}selected{{end}}>{{.Label}}</option>
+                        {{end}}
+                    </select>
+                </div>
             </form>
         </div>
 

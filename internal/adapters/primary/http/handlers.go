@@ -99,6 +99,11 @@ type channelsDayGroup struct {
 	Events []domain.EPGEvent
 }
 
+type channelsDayOption struct {
+	Value string
+	Label string
+}
+
 type playingChannelGroup struct {
 	Channel domain.Channel
 	Events  []domain.EPGEvent
@@ -136,21 +141,52 @@ func (h *Handler) Channels(w http.ResponseWriter, r *http.Request) {
 	}
 	data["SelectedChannel"] = selected
 
+	loc := time.Now().Location()
+	dayStart, err := parseDayParam(r, loc)
+	if err != nil {
+		h.logger.Error("invalid day parameter", slog.Any("error", err))
+		dayStart = time.Now().In(loc)
+		dayStart = time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), 0, 0, 0, 0, loc)
+	}
+	dayEnd := dayStart.Add(24 * time.Hour)
+	data["SelectedDay"] = dayStart.Format("2006-01-02")
+
 	var events []domain.EPGEvent
+	daysByValue := map[string]time.Time{}
+	// Always include selected day in the dropdown.
+	daysByValue[dayStart.Format("2006-01-02")] = dayStart
 	if selected != "" {
 		ev, err := h.epgService.GetEPG(r.Context(), selected, time.Now())
 		if err != nil {
 			h.logger.Error("EPG fetch error on channels", slog.Any("error", err), slog.String("channel", selected))
 			data["HomeError"] = err.Error()
 		} else {
-			now := time.Now()
+			now := time.Now().In(loc)
 			for i := range ev {
-				if ev[i].Stop.After(now) {
+				// Build day dropdown from available EPG entries.
+				d := time.Date(ev[i].Start.In(loc).Year(), ev[i].Start.In(loc).Month(), ev[i].Start.In(loc).Day(), 0, 0, 0, 0, loc)
+				daysByValue[d.Format("2006-01-02")] = d
+
+				// Filter to the selected day.
+				if ev[i].Start.Before(dayEnd) && ev[i].Stop.After(dayStart) {
+					// Keep today's view compact by hiding already-finished programs.
+					if dayStart.Equal(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)) {
+						if !ev[i].Stop.After(now) {
+							continue
+						}
+					}
 					events = append(events, ev[i])
 				}
 			}
 		}
 	}
+
+	dayOptions := make([]channelsDayOption, 0, len(daysByValue))
+	for _, d := range daysByValue {
+		dayOptions = append(dayOptions, channelsDayOption{Value: d.Format("2006-01-02"), Label: d.Format("Mon 2006-01-02")})
+	}
+	sort.SliceStable(dayOptions, func(i, j int) bool { return dayOptions[i].Value < dayOptions[j].Value })
+	data["Days"] = dayOptions
 
 	sort.SliceStable(events, func(i, j int) bool {
 		if !events[i].Start.Equal(events[j].Start) {
@@ -159,18 +195,12 @@ func (h *Handler) Channels(w http.ResponseWriter, r *http.Request) {
 		return events[i].EventID < events[j].EventID
 	})
 
-	// Group by day, starting with current day.
-	groups := make([]channelsDayGroup, 0)
-	var currentDay time.Time
-	for i := range events {
-		day := time.Date(events[i].Start.Year(), events[i].Start.Month(), events[i].Start.Day(), 0, 0, 0, 0, events[i].Start.Location())
-		if currentDay.IsZero() || !day.Equal(currentDay) {
-			currentDay = day
-			groups = append(groups, channelsDayGroup{Day: day})
-		}
-		groups[len(groups)-1].Events = append(groups[len(groups)-1].Events, events[i])
+	// Single selected-day group.
+	if len(events) > 0 {
+		data["DayGroups"] = []channelsDayGroup{{Day: dayStart, Events: events}}
+	} else {
+		data["DayGroups"] = []channelsDayGroup{}
 	}
-	data["DayGroups"] = groups
 
 	h.renderTemplate(w, r, "channels.html", data)
 }

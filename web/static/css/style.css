@@ -397,6 +397,12 @@ header nav {
 .nav-channel-form {
     display: flex;
     align-items: center;
+    gap: 1rem;
+}
+
+.nav-select {
+    display: flex;
+    align-items: center;
     gap: 0.5rem;
     position: relative;
 }
@@ -439,7 +445,7 @@ header nav {
     box-shadow: var(--shadow-lg);
 }
 
-.nav-channel-form::after {
+.nav-select::after {
     content: '▾';
     position: absolute;
     right: 0.85rem;
