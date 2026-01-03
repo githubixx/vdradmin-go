@@ -211,12 +211,26 @@ func (h *Handler) Configurations(w http.ResponseWriter, r *http.Request) {
 	data := map[string]any{}
 	if h.cfg != nil {
 		data["Config"] = h.cfg
+		wanted := make(map[string]bool, len(h.cfg.VDR.WantedChannels))
+		for _, id := range h.cfg.VDR.WantedChannels {
+			wanted[id] = true
+		}
+		data["WantedChannelSet"] = wanted
 	}
 	if msg := strings.TrimSpace(r.URL.Query().Get("msg")); msg != "" {
 		data["Message"] = msg
 	}
 	if errMsg := strings.TrimSpace(r.URL.Query().Get("err")); errMsg != "" {
 		data["Error"] = errMsg
+	}
+	if h.epgService != nil {
+		chs, err := h.epgService.GetAllChannels(r.Context())
+		if err == nil {
+			data["AllChannels"] = chs
+		} else {
+			h.logger.Warn("channels fetch error for configurations", slog.Any("error", err))
+			data["AllChannels"] = []domain.Channel{}
+		}
 	}
 	h.renderTemplate(w, r, "configurations.html", data)
 }
@@ -389,6 +403,14 @@ func (h *Handler) buildConfigFromForm(form url.Values) (*config.Config, error) {
 	}
 
 	// VDR connection
+	if v := strings.TrimSpace(form.Get("vdr_dvb_cards")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid vdr dvb cards")
+		}
+		updated.VDR.DVBCards = n
+	}
+	updated.VDR.WantedChannels = append([]string(nil), form["vdr_wanted_channels"]...)
 	if v := strings.TrimSpace(form.Get("vdr_host")); v != "" {
 		updated.VDR.Host = v
 	}
@@ -524,6 +546,8 @@ func (h *Handler) applyRuntimeConfig(updated *config.Config) error {
 	h.SetUIThemeDefault(h.cfg.UI.Theme)
 	if h.epgService != nil {
 		h.epgService.SetCacheExpiry(h.cfg.Cache.EPGExpiry)
+		h.epgService.SetWantedChannels(h.cfg.VDR.WantedChannels)
+		h.epgService.InvalidateAllCaches()
 	}
 	if h.recordingService != nil {
 		h.recordingService.SetCacheExpiry(h.cfg.Cache.RecordingExpiry)
@@ -726,6 +750,8 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 		domain.Timer
 		ChannelName string
 		IsRecording bool
+		IsCritical  bool
+		IsCollision bool
 	}
 
 	views := make([]timerView, 0, len(timers))
@@ -740,6 +766,27 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 			isRec = (t.Start.Before(now) || t.Start.Equal(now)) && t.Stop.After(now)
 		}
 		views = append(views, timerView{Timer: t, ChannelName: name, IsRecording: isRec})
+	}
+
+	// Mark overlapping timers (yellow) and critical timers (red) based on configured DVB cards.
+	dvbCards := 1
+	if h.cfg != nil && h.cfg.VDR.DVBCards > 0 {
+		dvbCards = h.cfg.VDR.DVBCards
+	}
+	from := time.Now().In(time.Local)
+	from = time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, time.Local)
+	to := from.Add(8 * 24 * time.Hour) // cover at least one full week for recurring timers
+
+	collisionIDs, criticalIDs := timerOverlapStates(timers, dvbCards, from, to, func(t domain.Timer) string {
+		return transponderKeyForTimer(t, channels)
+	})
+	for i := range views {
+		if collisionIDs[views[i].ID] {
+			views[i].IsCollision = true
+		}
+		if criticalIDs[views[i].ID] {
+			views[i].IsCritical = true
+		}
 	}
 
 	now := time.Now()
@@ -791,6 +838,560 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 	h.renderTemplate(w, r, "timers.html", data)
 }
 
+func transponderKeyForTimer(t domain.Timer, channels []domain.Channel) string {
+	chID := strings.TrimSpace(t.ChannelID)
+	if looksLikeVDRChannelID(chID) {
+		return transponderKeyFromChannelID(chID)
+	}
+	if n, err := strconv.Atoi(chID); err == nil {
+		for i := range channels {
+			if channels[i].Number == n {
+				if looksLikeVDRChannelID(channels[i].ID) {
+					return transponderKeyFromChannelID(channels[i].ID)
+				}
+				break
+			}
+		}
+	}
+	// Unknown channel; treat as unique so it consumes a tuner.
+	return chID
+}
+
+func transponderKeyFromChannelID(channelID string) string {
+	parts := strings.Split(channelID, "-")
+	if len(parts) >= 3 {
+		return strings.Join(parts[:3], "-")
+	}
+	return channelID
+}
+
+func looksLikeVDRChannelID(s string) bool {
+	s = strings.TrimSpace(s)
+	return strings.Contains(s, "-") && (strings.HasPrefix(s, "S") || strings.HasPrefix(s, "C") || strings.HasPrefix(s, "T") || strings.HasPrefix(s, "A"))
+}
+
+type timerOccurrence struct {
+	TimerID int
+	Start   time.Time
+	Stop    time.Time
+	Key     string
+}
+
+func timerOverlapStates(timers []domain.Timer, dvbCards int, from, to time.Time, transponderKey func(domain.Timer) string) (collisionIDs, criticalIDs map[int]bool) {
+	if dvbCards < 1 {
+		dvbCards = 1
+	}
+	collisionIDs = map[int]bool{}
+	criticalIDs = map[int]bool{}
+
+	occs := make([]timerOccurrence, 0, len(timers))
+	for _, t := range timers {
+		if !t.Active {
+			continue
+		}
+		key := transponderKey(t)
+		if key == "" {
+			key = strconv.Itoa(t.ID)
+		}
+		for _, occ := range timerOccurrences(t, from, to) {
+			occ.Key = key
+			occs = append(occs, occ)
+		}
+	}
+
+	type endpoint struct {
+		at    time.Time
+		start bool
+		idx   int
+	}
+	endpoints := make([]endpoint, 0, len(occs)*2)
+	for i := range occs {
+		endpoints = append(endpoints, endpoint{at: occs[i].Start, start: true, idx: i})
+		endpoints = append(endpoints, endpoint{at: occs[i].Stop, start: false, idx: i})
+	}
+
+	sort.SliceStable(endpoints, func(i, j int) bool {
+		if endpoints[i].at.Equal(endpoints[j].at) {
+			if endpoints[i].start != endpoints[j].start {
+				return !endpoints[i].start && endpoints[j].start
+			}
+			return endpoints[i].idx < endpoints[j].idx
+		}
+		return endpoints[i].at.Before(endpoints[j].at)
+	})
+
+	activeOcc := map[int]struct{}{}
+	activeByKey := map[string]int{}
+
+	for _, e := range endpoints {
+		occ := occs[e.idx]
+		if e.start {
+			activeOcc[e.idx] = struct{}{}
+			activeByKey[occ.Key]++
+		} else {
+			delete(activeOcc, e.idx)
+			if activeByKey[occ.Key] > 1 {
+				activeByKey[occ.Key]--
+			} else {
+				delete(activeByKey, occ.Key)
+			}
+		}
+
+		// Yellow: any overlap that requires more than one transponder/tuner.
+		if len(activeByKey) > 1 {
+			for idx := range activeOcc {
+				collisionIDs[occs[idx].TimerID] = true
+			}
+		}
+		// Red: exceeds available DVB cards.
+		if len(activeByKey) > dvbCards {
+			for idx := range activeOcc {
+				criticalIDs[occs[idx].TimerID] = true
+			}
+		}
+	}
+
+	return collisionIDs, criticalIDs
+}
+
+func timerOccurrences(t domain.Timer, from, to time.Time) []timerOccurrence {
+	if from.After(to) {
+		return nil
+	}
+	if !t.Stop.After(t.Start) || t.Start.IsZero() || t.Stop.IsZero() {
+		// For recurring timers we may not have computed Start/Stop; rely on raw specs.
+		// We'll handle them below if we detect a weekday mask.
+	}
+
+	// One-time timer with concrete timestamps.
+	if !t.Start.IsZero() && !t.Stop.IsZero() && t.Stop.After(t.Start) && !isWeekdayMaskHTTP(t.DaySpec) {
+		if t.Stop.Before(from) || !t.Start.Before(to) {
+			return nil
+		}
+		return []timerOccurrence{{TimerID: t.ID, Start: t.Start, Stop: t.Stop}}
+	}
+
+	// Recurring timer: project onto each matching weekday in the window.
+	daySpec := strings.TrimSpace(t.DaySpec)
+	if !isWeekdayMaskHTTP(daySpec) {
+		return nil
+	}
+	if t.StartMinutes < 0 || t.StopMinutes < 0 {
+		return nil
+	}
+
+	loc := time.Local
+	startDay := time.Date(from.In(loc).Year(), from.In(loc).Month(), from.In(loc).Day(), 0, 0, 0, 0, loc)
+	endDay := time.Date(to.In(loc).Year(), to.In(loc).Month(), to.In(loc).Day(), 0, 0, 0, 0, loc)
+
+	var out []timerOccurrence
+	for d := startDay; d.Before(endDay); d = d.Add(24 * time.Hour) {
+		if !weekdayMaskAllowsHTTP(daySpec, d.Weekday()) {
+			continue
+		}
+		start := d.Add(time.Duration(t.StartMinutes) * time.Minute)
+		stop := d.Add(time.Duration(t.StopMinutes) * time.Minute)
+		if stop.Before(start) {
+			stop = stop.Add(24 * time.Hour)
+		}
+		if stop.Before(from) || !start.Before(to) {
+			continue
+		}
+		out = append(out, timerOccurrence{TimerID: t.ID, Start: start, Stop: stop})
+	}
+	return out
+}
+
+func isWeekdayMaskHTTP(daySpec string) bool {
+	daySpec = strings.TrimSpace(daySpec)
+	if len(daySpec) != 7 {
+		return false
+	}
+	for _, r := range daySpec {
+		switch r {
+		case 'M', 'T', 'W', 'F', 'S', '-', '.':
+			// ok
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func weekdayMaskAllowsHTTP(daySpec string, wd time.Weekday) bool {
+	idx := 0
+	switch wd {
+	case time.Monday:
+		idx = 0
+	case time.Tuesday:
+		idx = 1
+	case time.Wednesday:
+		idx = 2
+	case time.Thursday:
+		idx = 3
+	case time.Friday:
+		idx = 4
+	case time.Saturday:
+		idx = 5
+	case time.Sunday:
+		idx = 6
+	}
+	if idx < 0 || idx >= len(daySpec) {
+		return false
+	}
+	c := daySpec[idx]
+	return c != '-' && c != '.'
+}
+
+type timerFormModel struct {
+	ID        int
+	Active    bool
+	ChannelID string
+	Day       string
+	Start     string
+	Stop      string
+	Priority  int
+	Lifetime  int
+	Title     string
+	Aux       string
+}
+
+func (h *Handler) timerNewFormModel(now time.Time, channels []domain.Channel) (timerFormModel, string) {
+	selectedChannel := ""
+	if len(channels) > 0 {
+		selectedChannel = channels[0].ID
+	}
+
+	localNow := now.In(time.Local)
+	day := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 0, 0, 0, 0, time.Local)
+
+	model := timerFormModel{
+		ID:        0,
+		Active:    true,
+		ChannelID: selectedChannel,
+		Day:       day.Format("2006-01-02"),
+		Start:     localNow.Format("15:04"),
+		Stop:      "00:00",
+		Priority:  99,
+		Lifetime:  99,
+		Title:     "",
+		Aux:       "",
+	}
+	return model, selectedChannel
+}
+
+// TimerNew shows a form for creating a new manual timer.
+func (h *Handler) TimerNew(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	channels, err := h.epgService.GetChannels(r.Context())
+	if err != nil {
+		channels = []domain.Channel{}
+	}
+
+	model, selectedChannel := h.timerNewFormModel(time.Now(), channels)
+	data := map[string]any{
+		"PageTitle":       "New Timer - VDRAdmin-go",
+		"Heading":         "New Timer",
+		"FormAction":      "/timers/new",
+		"Timer":           model,
+		"SelectedChannel": selectedChannel,
+		"Channels":        channels,
+	}
+	h.renderTemplate(w, r, "timer_edit.html", data)
+}
+
+// TimerEdit shows a form for editing an existing timer.
+func (h *Handler) TimerEdit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	timerID, _ := strconv.Atoi(r.URL.Query().Get("id"))
+	if timerID <= 0 {
+		http.Error(w, "Invalid timer ID", http.StatusBadRequest)
+		return
+	}
+
+	timers, err := h.timerService.GetAllTimers(r.Context())
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	var found *domain.Timer
+	for i := range timers {
+		if timers[i].ID == timerID {
+			found = &timers[i]
+			break
+		}
+	}
+	if found == nil {
+		h.handleError(w, r, domain.ErrNotFound)
+		return
+	}
+
+	channels, chErr := h.epgService.GetChannels(r.Context())
+	if chErr != nil {
+		channels = []domain.Channel{}
+	}
+
+	model := h.timerToFormModel(*found)
+	selectedChannel := ""
+	for i := range channels {
+		if channels[i].ID != "" && channels[i].ID == found.ChannelID {
+			selectedChannel = channels[i].ID
+			break
+		}
+	}
+	if selectedChannel == "" {
+		if n, err := strconv.Atoi(found.ChannelID); err == nil {
+			for i := range channels {
+				if channels[i].Number == n {
+					selectedChannel = channels[i].ID
+					break
+				}
+			}
+		}
+	}
+
+	// If the timer references an unknown channel, append a single fallback option at the end.
+	// This avoids duplicates and keeps known channels in their original order.
+	if selectedChannel == "" && found.ChannelID != "" {
+		channels = append(channels, domain.Channel{ID: found.ChannelID, Name: found.ChannelID})
+		selectedChannel = found.ChannelID
+	}
+
+	data := map[string]any{
+		"PageTitle":       "Edit Timer - VDRAdmin-go",
+		"Heading":         "Edit Timer",
+		"FormAction":      "/timers/update",
+		"Timer":           model,
+		"SelectedChannel": selectedChannel,
+		"Channels":        channels,
+	}
+	h.renderTemplate(w, r, "timer_edit.html", data)
+}
+
+func (h *Handler) timerFromCreateForm(r *http.Request) (domain.Timer, error) {
+	form := r.Form
+
+	channelID := strings.TrimSpace(form.Get("channel"))
+	if channelID == "" {
+		return domain.Timer{}, domain.ErrInvalidInput
+	}
+
+	dayStr := strings.TrimSpace(form.Get("day"))
+	day, err := time.ParseInLocation("2006-01-02", dayStr, time.Local)
+	if err != nil {
+		return domain.Timer{}, domain.ErrInvalidInput
+	}
+
+	startStr := strings.TrimSpace(form.Get("start"))
+	stopStr := strings.TrimSpace(form.Get("stop"))
+	startClock, err1 := time.Parse("15:04", startStr)
+	stopClock, err2 := time.Parse("15:04", stopStr)
+	if err1 != nil || err2 != nil {
+		return domain.Timer{}, domain.ErrInvalidInput
+	}
+
+	start := time.Date(day.Year(), day.Month(), day.Day(), startClock.Hour(), startClock.Minute(), 0, 0, time.Local)
+	stop := time.Date(day.Year(), day.Month(), day.Day(), stopClock.Hour(), stopClock.Minute(), 0, 0, time.Local)
+	if stop.Before(start) {
+		stop = stop.Add(24 * time.Hour)
+	}
+
+	priority, err := strconv.Atoi(strings.TrimSpace(form.Get("priority")))
+	if err != nil {
+		return domain.Timer{}, domain.ErrInvalidInput
+	}
+	lifetime, err := strconv.Atoi(strings.TrimSpace(form.Get("lifetime")))
+	if err != nil {
+		return domain.Timer{}, domain.ErrInvalidInput
+	}
+
+	active := strings.TrimSpace(form.Get("active")) != "0"
+	title := strings.TrimSpace(form.Get("title"))
+	aux := form.Get("aux")
+
+	return domain.Timer{
+		ID:        0,
+		Active:    active,
+		ChannelID: channelID,
+		Day:       day,
+		Start:     start,
+		Stop:      stop,
+		Priority:  priority,
+		Lifetime:  lifetime,
+		Title:     title,
+		Aux:       aux,
+	}, nil
+}
+
+// TimerCreateManual creates a new timer from the manual form.
+func (h *Handler) TimerCreateManual(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	timer, err := h.timerFromCreateForm(r)
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	if err := h.timerService.CreateTimer(r.Context(), &timer); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	if r.Header.Get("HX-Request") != "" {
+		w.Header().Set("HX-Redirect", "/timers")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/timers", http.StatusSeeOther)
+}
+
+// TimerUpdate persists edits to an existing timer.
+func (h *Handler) TimerUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	timer, err := h.timerFromForm(r)
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	if err := h.timerService.UpdateTimer(r.Context(), &timer); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	if r.Header.Get("HX-Request") != "" {
+		w.Header().Set("HX-Redirect", "/timers")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/timers", http.StatusSeeOther)
+}
+
+func (h *Handler) timerToFormModel(t domain.Timer) timerFormModel {
+	day := t.Day
+	if day.IsZero() {
+		day = t.Start
+	}
+
+	dayStr := ""
+	if !day.IsZero() {
+		dayStr = day.In(time.Local).Format("2006-01-02")
+	}
+
+	startStr := ""
+	stopStr := ""
+	if !t.Start.IsZero() {
+		startStr = t.Start.In(time.Local).Format("15:04")
+	}
+	if !t.Stop.IsZero() {
+		stopStr = t.Stop.In(time.Local).Format("15:04")
+	}
+
+	return timerFormModel{
+		ID:        t.ID,
+		Active:    t.Active,
+		ChannelID: t.ChannelID,
+		Day:       dayStr,
+		Start:     startStr,
+		Stop:      stopStr,
+		Priority:  t.Priority,
+		Lifetime:  t.Lifetime,
+		Title:     t.Title,
+		Aux:       t.Aux,
+	}
+}
+
+func (h *Handler) timerFromForm(r *http.Request) (domain.Timer, error) {
+	form := r.Form
+
+	id, _ := strconv.Atoi(form.Get("id"))
+	if id <= 0 {
+		return domain.Timer{}, domain.ErrInvalidInput
+	}
+
+	channelID := strings.TrimSpace(form.Get("channel"))
+	if channelID == "" {
+		return domain.Timer{}, domain.ErrInvalidInput
+	}
+
+	dayStr := strings.TrimSpace(form.Get("day"))
+	day, err := time.ParseInLocation("2006-01-02", dayStr, time.Local)
+	if err != nil {
+		return domain.Timer{}, domain.ErrInvalidInput
+	}
+
+	startStr := strings.TrimSpace(form.Get("start"))
+	stopStr := strings.TrimSpace(form.Get("stop"))
+	startClock, err1 := time.Parse("15:04", startStr)
+	stopClock, err2 := time.Parse("15:04", stopStr)
+	if err1 != nil || err2 != nil {
+		return domain.Timer{}, domain.ErrInvalidInput
+	}
+
+	start := time.Date(day.Year(), day.Month(), day.Day(), startClock.Hour(), startClock.Minute(), 0, 0, time.Local)
+	stop := time.Date(day.Year(), day.Month(), day.Day(), stopClock.Hour(), stopClock.Minute(), 0, 0, time.Local)
+	if stop.Before(start) {
+		stop = stop.Add(24 * time.Hour)
+	}
+
+	priority, err := strconv.Atoi(strings.TrimSpace(form.Get("priority")))
+	if err != nil {
+		return domain.Timer{}, domain.ErrInvalidInput
+	}
+	lifetime, err := strconv.Atoi(strings.TrimSpace(form.Get("lifetime")))
+	if err != nil {
+		return domain.Timer{}, domain.ErrInvalidInput
+	}
+
+	title := strings.TrimSpace(form.Get("title"))
+	if title == "" {
+		return domain.Timer{}, domain.ErrInvalidInput
+	}
+
+	active := strings.TrimSpace(form.Get("active")) != "0"
+	aux := form.Get("aux")
+
+	return domain.Timer{
+		ID:        id,
+		Active:    active,
+		ChannelID: channelID,
+		Day:       day,
+		Start:     start,
+		Stop:      stop,
+		Priority:  priority,
+		Lifetime:  lifetime,
+		Title:     title,
+		Aux:       aux,
+	}, nil
+}
+
 // TimerCreate creates a new timer
 func (h *Handler) TimerCreate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -827,7 +1428,8 @@ func (h *Handler) TimerCreate(w http.ResponseWriter, r *http.Request) {
 			if channelID != "" && event.ChannelID != channelID {
 				continue
 			}
-			err := h.timerService.CreateTimerFromEPG(r.Context(), event, 50, 99, 2, 10)
+			priority, lifetime, marginStart, marginEnd := h.timerDefaults()
+			err := h.timerService.CreateTimerFromEPG(r.Context(), event, priority, lifetime, marginStart, marginEnd)
 			if err != nil {
 				h.handleError(w, r, err)
 				return
@@ -845,6 +1447,33 @@ func (h *Handler) TimerCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Error(w, "Event not found", http.StatusNotFound)
+}
+
+func (h *Handler) timerDefaults() (priority, lifetime, marginStart, marginEnd int) {
+	// Keep behavior stable even if config isn't wired (e.g., in tests or early boot).
+	priority = 50
+	lifetime = 99
+	marginStart = 2
+	marginEnd = 10
+
+	if h.cfg == nil {
+		return priority, lifetime, marginStart, marginEnd
+	}
+
+	if h.cfg.Timer.DefaultPriority >= 0 {
+		priority = h.cfg.Timer.DefaultPriority
+	}
+	if h.cfg.Timer.DefaultLifetime >= 0 {
+		lifetime = h.cfg.Timer.DefaultLifetime
+	}
+	if h.cfg.Timer.DefaultMarginStart >= 0 {
+		marginStart = h.cfg.Timer.DefaultMarginStart
+	}
+	if h.cfg.Timer.DefaultMarginEnd >= 0 {
+		marginEnd = h.cfg.Timer.DefaultMarginEnd
+	}
+
+	return priority, lifetime, marginStart, marginEnd
 }
 
 // TimerDelete deletes a timer
@@ -865,6 +1494,11 @@ func (h *Handler) TimerDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.Header.Get("HX-Request") != "" {
+		w.Header().Set("HX-Redirect", "/timers")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -886,6 +1520,11 @@ func (h *Handler) TimerToggle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.Header.Get("HX-Request") != "" {
+		w.Header().Set("HX-Redirect", "/timers")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 

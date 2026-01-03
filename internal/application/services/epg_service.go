@@ -18,6 +18,9 @@ type EPGService struct {
 	cacheMu     sync.RWMutex
 	cacheExpiry time.Duration
 
+	wantedMu  sync.RWMutex
+	wantedSet map[string]struct{}
+
 	currentMu        sync.RWMutex
 	currentPrograms  []domain.EPGEvent
 	currentExpiresAt time.Time
@@ -47,18 +50,55 @@ func NewEPGService(vdrClient ports.VDRClient, cacheExpiry time.Duration) *EPGSer
 		vdrClient:   vdrClient,
 		cache:       make(map[string]*epgCache),
 		cacheExpiry: cacheExpiry,
+		wantedSet:   make(map[string]struct{}),
 		// Keep "What's On Now?" snappy; refresh frequently but cheaply.
 		currentExpiry:  15 * time.Second,
 		channelsExpiry: 5 * time.Minute,
 	}
 }
 
-// GetChannels returns the channels list in channels.conf order (as reported by VDR).
-func (s *EPGService) GetChannels(ctx context.Context) ([]domain.Channel, error) {
-	return s.getChannelsCached(ctx)
+// SetWantedChannels configures which channels are considered "wanted" globally.
+// An empty list means "all channels".
+func (s *EPGService) SetWantedChannels(channelIDs []string) {
+	set := make(map[string]struct{}, len(channelIDs))
+	for _, id := range channelIDs {
+		if id == "" {
+			continue
+		}
+		set[id] = struct{}{}
+	}
+
+	s.wantedMu.Lock()
+	s.wantedSet = set
+	s.wantedMu.Unlock()
 }
 
-func (s *EPGService) getChannelsCached(ctx context.Context) ([]domain.Channel, error) {
+// GetChannels returns the channels list in channels.conf order (as reported by VDR).
+func (s *EPGService) GetChannels(ctx context.Context) ([]domain.Channel, error) {
+	chs, err := s.getAllChannelsCached(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !s.wantedEnabled() {
+		return chs, nil
+	}
+
+	out := make([]domain.Channel, 0, len(chs))
+	for _, ch := range chs {
+		if s.isWantedChannel(ch.ID) {
+			out = append(out, ch)
+		}
+	}
+	return out, nil
+}
+
+// GetAllChannels returns channels without applying the wanted-channel filter.
+// This is intended for configuration UIs.
+func (s *EPGService) GetAllChannels(ctx context.Context) ([]domain.Channel, error) {
+	return s.getAllChannelsCached(ctx)
+}
+
+func (s *EPGService) getAllChannelsCached(ctx context.Context) ([]domain.Channel, error) {
 	now := time.Now()
 	s.channelsMu.RLock()
 	if now.Before(s.channelsExpiresAt) && s.channelsCache != nil {
@@ -84,6 +124,9 @@ func (s *EPGService) getChannelsCached(ctx context.Context) ([]domain.Channel, e
 
 // GetEPG retrieves EPG data with caching
 func (s *EPGService) GetEPG(ctx context.Context, channelID string, at time.Time) ([]domain.EPGEvent, error) {
+	if channelID != "" && !s.isWantedChannel(channelID) {
+		return []domain.EPGEvent{}, nil
+	}
 	cacheKey := s.getCacheKey(channelID, at)
 
 	// Check cache first
@@ -98,6 +141,19 @@ func (s *EPGService) GetEPG(ctx context.Context, channelID string, at time.Time)
 	events, err := s.vdrClient.GetEPG(ctx, channelID, at)
 	if err != nil {
 		return nil, err
+	}
+
+	if s.wantedEnabled() {
+		filtered := events[:0]
+		for _, ev := range events {
+			if ev.ChannelID == "" {
+				continue
+			}
+			if s.isWantedChannel(ev.ChannelID) {
+				filtered = append(filtered, ev)
+			}
+		}
+		events = filtered
 	}
 
 	// Update cache
@@ -138,6 +194,9 @@ func (s *EPGService) GetCurrentPrograms(ctx context.Context) ([]domain.EPGEvent,
 		if ev.ChannelID == "" {
 			continue
 		}
+		if !s.isWantedChannel(ev.ChannelID) {
+			continue
+		}
 		if ev.Start.After(now) || !ev.Stop.After(now) {
 			continue
 		}
@@ -154,7 +213,7 @@ func (s *EPGService) GetCurrentPrograms(ctx context.Context) ([]domain.EPGEvent,
 
 	// Ensure channels.conf order: if the EPG payload doesn't include a numeric channel number,
 	// map the channel id back to the LSTC order.
-	channels, err := s.getChannelsCached(ctx)
+	channels, err := s.getAllChannelsCached(ctx)
 	if err == nil {
 		numByID := make(map[string]int, len(channels))
 		nameByID := make(map[string]string, len(channels))
@@ -226,6 +285,42 @@ func (s *EPGService) InvalidateCache() {
 	s.cacheMu.Lock()
 	defer s.cacheMu.Unlock()
 	s.cache = make(map[string]*epgCache)
+}
+
+// InvalidateAllCaches clears EPG, channels, and current-program caches.
+func (s *EPGService) InvalidateAllCaches() {
+	s.InvalidateCache()
+
+	s.channelsMu.Lock()
+	s.channelsCache = nil
+	s.channelsExpiresAt = time.Time{}
+	s.channelsMu.Unlock()
+
+	s.currentMu.Lock()
+	s.currentPrograms = nil
+	s.currentExpiresAt = time.Time{}
+	s.currentMu.Unlock()
+}
+
+func (s *EPGService) wantedEnabled() bool {
+	s.wantedMu.RLock()
+	enabled := len(s.wantedSet) > 0
+	s.wantedMu.RUnlock()
+	return enabled
+}
+
+func (s *EPGService) isWantedChannel(channelID string) bool {
+	if channelID == "" {
+		return false
+	}
+	s.wantedMu.RLock()
+	if len(s.wantedSet) == 0 {
+		s.wantedMu.RUnlock()
+		return true
+	}
+	_, ok := s.wantedSet[channelID]
+	s.wantedMu.RUnlock()
+	return ok
 }
 
 func (s *EPGService) getCacheKey(channelID string, at time.Time) string {

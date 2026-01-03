@@ -15,6 +15,13 @@ vdr:
   host: "localhost"
   port: 6419  # Use 2001 for older VDR versions
   timeout: 10s
+  # Number of DVB cards VDR can access.
+  # Used to calculate critical timer overlaps on the Timers page.
+  dvb_cards: 1
+  # If set, only these channels are shown across the UI.
+  # Leave empty to show all channels.
+  # Values are VDR channel IDs (as returned by SVDRP LSTC), e.g. "C-1-1-1".
+  wanted_channels: []
   video_dir: "/var/lib/video.00"
   config_dir: "/etc/vdr"
   reconnect_delay: 5s

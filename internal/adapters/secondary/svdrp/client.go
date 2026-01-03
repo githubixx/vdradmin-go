@@ -801,9 +801,14 @@ func parseTimer(line string) (domain.Timer, error) {
 	priority, _ := strconv.Atoi(fields[5])
 	lifetime, _ := strconv.Atoi(fields[6])
 
-	day := parseTimerDay(fields[2])
+	daySpec := strings.TrimSpace(fields[2])
 	startClock := parseTimerClock(fields[3])
 	stopClock := parseTimerClock(fields[4])
+
+	day := parseTimerDay(daySpec)
+	if day.IsZero() && isWeekdayMask(daySpec) {
+		day = nextOccurrenceDay(daySpec, startClock, time.Now())
+	}
 
 	var startTime time.Time
 	var stopTime time.Time
@@ -830,11 +835,77 @@ func parseTimer(line string) (domain.Timer, error) {
 		Day:       day,
 		Start:     startTime,
 		Stop:      stopTime,
+		DaySpec:   daySpec,
+		StartMinutes: startClock,
+		StopMinutes:  stopClock,
 		Priority:  priority,
 		Lifetime:  lifetime,
 		Title:     title,
 		Aux:       aux,
 	}, nil
+}
+
+func isWeekdayMask(daySpec string) bool {
+	daySpec = strings.TrimSpace(daySpec)
+	if len(daySpec) != 7 {
+		return false
+	}
+	// VDR uses a position-based weekday mask (Mon..Sun) with letters or '-' for disabled days.
+	for _, r := range daySpec {
+		switch r {
+		case 'M', 'T', 'W', 'F', 'S', '-', '.':
+			// ok
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func weekdayMaskAllows(daySpec string, wd time.Weekday) bool {
+	// Map Go weekday (Sun=0) to mask index (Mon=0..Sun=6).
+	idx := 0
+	switch wd {
+	case time.Monday:
+		idx = 0
+	case time.Tuesday:
+		idx = 1
+	case time.Wednesday:
+		idx = 2
+	case time.Thursday:
+		idx = 3
+	case time.Friday:
+		idx = 4
+	case time.Saturday:
+		idx = 5
+	case time.Sunday:
+		idx = 6
+	}
+	if idx < 0 || idx >= len(daySpec) {
+		return false
+	}
+	c := daySpec[idx]
+	return c != '-' && c != '.'
+}
+
+func nextOccurrenceDay(daySpec string, startMinutes int, now time.Time) time.Time {
+	loc := time.Local
+	localNow := now.In(loc)
+	base := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 0, 0, 0, 0, loc)
+	for i := 0; i < 8; i++ {
+		day := base.Add(time.Duration(i) * 24 * time.Hour)
+		if !weekdayMaskAllows(daySpec, day.Weekday()) {
+			continue
+		}
+		if startMinutes >= 0 {
+			start := day.Add(time.Duration(startMinutes) * time.Minute)
+			if !start.After(localNow) {
+				continue
+			}
+		}
+		return day
+	}
+	return base
 }
 
 func parseTimerDay(daySpec string) time.Time {
@@ -889,17 +960,47 @@ func formatTimer(timer *domain.Timer) string {
 	// IMPORTANT: Using a weekday mask (e.g. MTWTFSS) creates a repeating timer.
 	// For "Record" actions from EPG we want a one-time timer for the selected date.
 
-	day := timer.Day
-	if day.IsZero() {
-		day = timer.Start
+	daySpec := strings.TrimSpace(timer.DaySpec)
+	if daySpec == "" || (!isWeekdayMask(daySpec) && parseTimerDay(daySpec).IsZero()) {
+		day := timer.Day
+		if day.IsZero() {
+			day = timer.Start
+		}
+		if day.IsZero() {
+			day = time.Now()
+		}
+		daySpec = day.In(time.Local).Format("2006-01-02")
 	}
-	if day.IsZero() {
-		day = time.Now()
-	}
-	daySpec := day.In(time.Local).Format("2006-01-02")
 
-	startClock := timer.Start.In(time.Local).Format("1504")
-	stopClock := timer.Stop.In(time.Local).Format("1504")
+	// For one-time timers, Start/Stop timestamps are authoritative.
+	// For repeating timers (weekday mask), preserve the raw clock minutes if available.
+	startMinutes := -1
+	stopMinutes := -1
+	if isWeekdayMask(daySpec) {
+		if timer.StartMinutes >= 0 {
+			startMinutes = timer.StartMinutes
+		}
+		if timer.StopMinutes >= 0 {
+			stopMinutes = timer.StopMinutes
+		}
+	}
+	if startMinutes < 0 {
+		if !timer.Start.IsZero() {
+			startMinutes = timer.Start.In(time.Local).Hour()*60 + timer.Start.In(time.Local).Minute()
+		} else {
+			startMinutes = 0
+		}
+	}
+	if stopMinutes < 0 {
+		if !timer.Stop.IsZero() {
+			stopMinutes = timer.Stop.In(time.Local).Hour()*60 + timer.Stop.In(time.Local).Minute()
+		} else {
+			stopMinutes = 0
+		}
+	}
+
+	startClock := fmt.Sprintf("%02d%02d", startMinutes/60, startMinutes%60)
+	stopClock := fmt.Sprintf("%02d%02d", stopMinutes/60, stopMinutes%60)
 
 	file := sanitizeTimerField(timer.Title)
 	aux := sanitizeTimerField(timer.Aux)

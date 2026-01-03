@@ -1,0 +1,91 @@
+{{define "timer_edit.html"}}
+<!DOCTYPE html>
+<html lang="en" {{if eq .ThemeMode "dark"}}data-theme="dark"{{else if eq .ThemeMode "light"}}data-theme="light"{{end}} data-theme-default="{{.ThemeDefault}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{if .PageTitle}}{{.PageTitle}}{{else}}Edit Timer - VDRAdmin-go{{end}}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header>
+        <nav class="container">
+            <div class="nav-brand">
+                <h1>VDRAdmin-go</h1>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/" {{if eq .Path "/"}}class="active" aria-current="page"{{end}}>Home</a></li>
+                <li><a href="/channels" {{if eq .Path "/channels"}}class="active" aria-current="page"{{end}}>Channels</a></li>
+                <li><a href="/playing" {{if eq .Path "/playing"}}class="active" aria-current="page"{{end}}>Playing Today</a></li>
+                <li><a href="/timers" {{if eq .Path "/timers"}}class="active" aria-current="page"{{end}}>Timers</a></li>
+                <li><a href="/recordings" {{if eq .Path "/recordings"}}class="active" aria-current="page"{{end}}>Recordings</a></li>
+                <li><a href="/search" {{if eq .Path "/search"}}class="active" aria-current="page"{{end}}>Search</a></li>
+                <li><a href="/configurations" {{if eq .Path "/configurations"}}class="active" aria-current="page"{{end}}>Configurations</a></li>
+            </ul>
+            {{if .User}}
+            <div class="nav-user">
+                <span>{{.User}}</span>
+                {{if eq .Role "admin"}}<span class="badge">Admin</span>{{end}}
+            </div>
+            {{end}}
+        </nav>
+    </header>
+
+    <main class="container">
+        <div class="toolbar">
+            <h2 style="font-family: var(--font-display); font-size: 1.25rem; margin-bottom: 0.75rem;">{{if .Heading}}{{.Heading}}{{else}}Edit Timer{{end}}</h2>
+
+            <form action="{{if .FormAction}}{{.FormAction}}{{else}}/timers/update{{end}}" method="post" class="config-grid">
+                {{if gt .Timer.ID 0}}<input type="hidden" name="id" value="{{.Timer.ID}}">{{end}}
+
+                <label>Timer Active</label>
+                <div class="timer-radio-group">
+                    <label><input type="radio" name="active" value="1" {{if .Timer.Active}}checked{{end}}> Yes</label>
+                    <label><input type="radio" name="active" value="0" {{if not .Timer.Active}}checked{{end}}> No</label>
+                </div>
+
+                <label for="channel">Channel</label>
+                <select id="channel" name="channel" required>
+                    {{range .Channels}}
+                    <option value="{{.ID}}" {{if eq $.SelectedChannel .ID}}selected{{end}}>{{.Name}}</option>
+                    {{end}}
+                </select>
+
+                <label for="day">Day Of Recording</label>
+                <input id="day" type="date" name="day" value="{{.Timer.Day}}" required>
+
+                <label for="start">Start Time</label>
+                <input id="start" type="text" name="start" value="{{.Timer.Start}}" inputmode="numeric" placeholder="HH:MM" pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$" required>
+
+                <label for="stop">End Time</label>
+                <input id="stop" type="text" name="stop" value="{{.Timer.Stop}}" inputmode="numeric" placeholder="HH:MM" pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$" required>
+
+                <label for="priority">Priority</label>
+                <input id="priority" type="number" name="priority" min="0" max="99" value="{{.Timer.Priority}}" required>
+
+                <label for="lifetime">Lifetime</label>
+                <input id="lifetime" type="number" name="lifetime" min="0" max="99" value="{{.Timer.Lifetime}}" required>
+
+                <label for="title">Title Of Recording</label>
+                <input id="title" type="text" name="title" value="{{.Timer.Title}}" required>
+
+                <label for="aux">Summary (readonly)</label>
+                <textarea id="aux" name="aux" rows="4" readonly>{{.Timer.Aux}}</textarea>
+
+                <div></div>
+                <div class="timer-form-actions">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <a href="/timers" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; {{.Year}} vdradmin-go | <a href="https://github.com/githubixx/vdradmin-go">GitHub</a></p>
+        </div>
+    </footer>
+</body>
+</html>
+{{end}}

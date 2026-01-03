@@ -12,6 +12,7 @@
     --secondary-color: #64748b;
     --success-color: #10b981;
     --danger-color: #ef4444;
+    --warning-color: #f59e0b;
 
     --bg-color: #f6f7fb;
     --bg-image: radial-gradient(900px 500px at 15% 10%, rgba(124, 58, 237, 0.10), transparent 60%),
@@ -528,11 +529,16 @@ main {
 /* Buttons */
 .btn {
     display: inline-block;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
     padding: 0.625rem 1.25rem;
     border: 1px solid var(--border-color);
     border-radius: 999px;
     font-size: 1rem;
     font-weight: 500;
+    font-family: inherit;
+    line-height: 1.1;
     text-decoration: none;
     cursor: pointer;
     box-shadow: var(--shadow);
@@ -747,6 +753,16 @@ main {
     opacity: 0.7;
 }
 
+.timer-item.collision {
+    border-left-color: var(--warning-color);
+    border-color: var(--warning-color);
+}
+
+.timer-item.conflict {
+    border-left-color: var(--danger-color);
+    border-color: var(--danger-color);
+}
+
 .timer-info h3 {
     margin-bottom: 0.5rem;
 }
@@ -852,6 +868,8 @@ main {
 .config-grid input[type="text"],
 .config-grid input[type="number"],
 .config-grid input[type="password"],
+.config-grid input[type="date"],
+.config-grid input[type="time"],
 .config-grid select,
 .config-grid textarea {
     width: 100%;
@@ -861,6 +879,27 @@ main {
     font-size: 1rem;
     background: var(--surface-color);
     color: var(--text-color);
+}
+
+.timer-radio-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.timer-radio-group label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 500;
+}
+
+.timer-form-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 .config-grid input[type="checkbox"] {

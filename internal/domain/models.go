@@ -50,6 +50,13 @@ type Timer struct {
 	Day       time.Time
 	Start     time.Time
 	Stop      time.Time
+	// DaySpec preserves the raw VDR day specification for this timer.
+	// It is either an explicit date (e.g. "2006-01-02") or a weekday mask (e.g. "MTWTFSS" with '-' for disabled days).
+	DaySpec string
+	// StartMinutes/StopMinutes preserve the raw timer clock values as minutes since midnight.
+	// These are required for recurring timers where Start/Stop may be computed relative to a projected day.
+	StartMinutes int
+	StopMinutes  int
 	Priority  int
 	Lifetime  int // days to keep recording
 	Title     string
