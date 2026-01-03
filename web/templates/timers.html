@@ -48,6 +48,7 @@
                 </div>
                 {{if eq $.Role "admin"}}
                 <div class="timer-actions">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="window.location.href='/timers/edit?id={{.ID}}'">Edit</button>
                     <button
                         hx-post="/timers/toggle?id={{.ID}}"
                         hx-swap="outerHTML"
