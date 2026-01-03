@@ -827,7 +827,8 @@ func (h *Handler) TimerCreate(w http.ResponseWriter, r *http.Request) {
 			if channelID != "" && event.ChannelID != channelID {
 				continue
 			}
-			err := h.timerService.CreateTimerFromEPG(r.Context(), event, 50, 99, 2, 10)
+			priority, lifetime, marginStart, marginEnd := h.timerDefaults()
+			err := h.timerService.CreateTimerFromEPG(r.Context(), event, priority, lifetime, marginStart, marginEnd)
 			if err != nil {
 				h.handleError(w, r, err)
 				return
@@ -845,6 +846,33 @@ func (h *Handler) TimerCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Error(w, "Event not found", http.StatusNotFound)
+}
+
+func (h *Handler) timerDefaults() (priority, lifetime, marginStart, marginEnd int) {
+	// Keep behavior stable even if config isn't wired (e.g., in tests or early boot).
+	priority = 50
+	lifetime = 99
+	marginStart = 2
+	marginEnd = 10
+
+	if h.cfg == nil {
+		return priority, lifetime, marginStart, marginEnd
+	}
+
+	if h.cfg.Timer.DefaultPriority >= 0 {
+		priority = h.cfg.Timer.DefaultPriority
+	}
+	if h.cfg.Timer.DefaultLifetime >= 0 {
+		lifetime = h.cfg.Timer.DefaultLifetime
+	}
+	if h.cfg.Timer.DefaultMarginStart >= 0 {
+		marginStart = h.cfg.Timer.DefaultMarginStart
+	}
+	if h.cfg.Timer.DefaultMarginEnd >= 0 {
+		marginEnd = h.cfg.Timer.DefaultMarginEnd
+	}
+
+	return priority, lifetime, marginStart, marginEnd
 }
 
 // TimerDelete deletes a timer
