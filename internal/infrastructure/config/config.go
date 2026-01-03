@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"go.yaml.in/yaml/v4"
@@ -50,6 +51,7 @@ type VDRConfig struct {
 	ConfigDir      string        `yaml:"config_dir"`
 	ReconnectDelay time.Duration `yaml:"reconnect_delay"`
 	DVBCards       int           `yaml:"dvb_cards"`
+	WantedChannels []string      `yaml:"wanted_channels"`
 }
 
 // AuthConfig contains authentication settings
@@ -96,6 +98,7 @@ func Load(path string) (*Config, error) {
 			ConfigDir:      "/etc/vdr",
 			ReconnectDelay: 5 * time.Second,
 			DVBCards:       1,
+			WantedChannels: []string{},
 		},
 		Auth: AuthConfig{
 			Enabled:      true,
@@ -159,6 +162,22 @@ func (c *Config) Validate() error {
 	if c.VDR.DVBCards < 1 || c.VDR.DVBCards > 99 {
 		return fmt.Errorf("invalid vdr dvb_cards: %d (must be 1-99)", c.VDR.DVBCards)
 	}
+
+	// Normalize wanted channels: empty means "all channels".
+	seen := map[string]struct{}{}
+	clean := make([]string, 0, len(c.VDR.WantedChannels))
+	for _, raw := range c.VDR.WantedChannels {
+		v := strings.TrimSpace(raw)
+		if v == "" {
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		clean = append(clean, v)
+	}
+	c.VDR.WantedChannels = clean
 
 	if c.Server.TLS.Enabled {
 		if c.Server.TLS.CertFile == "" {

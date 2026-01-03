@@ -211,12 +211,26 @@ func (h *Handler) Configurations(w http.ResponseWriter, r *http.Request) {
 	data := map[string]any{}
 	if h.cfg != nil {
 		data["Config"] = h.cfg
+		wanted := make(map[string]bool, len(h.cfg.VDR.WantedChannels))
+		for _, id := range h.cfg.VDR.WantedChannels {
+			wanted[id] = true
+		}
+		data["WantedChannelSet"] = wanted
 	}
 	if msg := strings.TrimSpace(r.URL.Query().Get("msg")); msg != "" {
 		data["Message"] = msg
 	}
 	if errMsg := strings.TrimSpace(r.URL.Query().Get("err")); errMsg != "" {
 		data["Error"] = errMsg
+	}
+	if h.epgService != nil {
+		chs, err := h.epgService.GetAllChannels(r.Context())
+		if err == nil {
+			data["AllChannels"] = chs
+		} else {
+			h.logger.Warn("channels fetch error for configurations", slog.Any("error", err))
+			data["AllChannels"] = []domain.Channel{}
+		}
 	}
 	h.renderTemplate(w, r, "configurations.html", data)
 }
@@ -396,6 +410,7 @@ func (h *Handler) buildConfigFromForm(form url.Values) (*config.Config, error) {
 		}
 		updated.VDR.DVBCards = n
 	}
+	updated.VDR.WantedChannels = append([]string(nil), form["vdr_wanted_channels"]...)
 	if v := strings.TrimSpace(form.Get("vdr_host")); v != "" {
 		updated.VDR.Host = v
 	}
@@ -531,6 +546,8 @@ func (h *Handler) applyRuntimeConfig(updated *config.Config) error {
 	h.SetUIThemeDefault(h.cfg.UI.Theme)
 	if h.epgService != nil {
 		h.epgService.SetCacheExpiry(h.cfg.Cache.EPGExpiry)
+		h.epgService.SetWantedChannels(h.cfg.VDR.WantedChannels)
+		h.epgService.InvalidateAllCaches()
 	}
 	if h.recordingService != nil {
 		h.recordingService.SetCacheExpiry(h.cfg.Cache.RecordingExpiry)
@@ -1027,16 +1044,16 @@ func weekdayMaskAllowsHTTP(daySpec string, wd time.Weekday) bool {
 }
 
 type timerFormModel struct {
-	ID       int
-	Active   bool
+	ID        int
+	Active    bool
 	ChannelID string
-	Day      string
-	Start    string
-	Stop     string
-	Priority int
-	Lifetime int
-	Title    string
-	Aux      string
+	Day       string
+	Start     string
+	Stop      string
+	Priority  int
+	Lifetime  int
+	Title     string
+	Aux       string
 }
 
 func (h *Handler) timerNewFormModel(now time.Time, channels []domain.Channel) (timerFormModel, string) {
@@ -1298,16 +1315,16 @@ func (h *Handler) timerToFormModel(t domain.Timer) timerFormModel {
 	}
 
 	return timerFormModel{
-		ID:       t.ID,
-		Active:   t.Active,
+		ID:        t.ID,
+		Active:    t.Active,
 		ChannelID: t.ChannelID,
-		Day:      dayStr,
-		Start:    startStr,
-		Stop:     stopStr,
-		Priority: t.Priority,
-		Lifetime: t.Lifetime,
-		Title:    t.Title,
-		Aux:      t.Aux,
+		Day:       dayStr,
+		Start:     startStr,
+		Stop:      stopStr,
+		Priority:  t.Priority,
+		Lifetime:  t.Lifetime,
+		Title:     t.Title,
+		Aux:       t.Aux,
 	}
 }
 

@@ -107,6 +107,37 @@
                     <label for="vdr_dvb_cards">Number of DVB cards</label>
                     <input id="vdr_dvb_cards" name="vdr_dvb_cards" type="number" min="1" max="99" value="{{if .Config}}{{.Config.VDR.DVBCards}}{{end}}">
 
+                    <label for="vdr_wanted_channels">Wanted channels</label>
+                    <div>
+                        <div style="display: flex; gap: 1rem; align-items: flex-start; width: 100%;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div class="empty-state" style="padding: 0 0 0.5rem 0; text-align: left;">Available (double-click to add)</div>
+                                <select id="vdr_available_channels" multiple size="12" style="width: 100%;">
+                                    {{range .AllChannels}}
+                                        {{if not (and $.WantedChannelSet (index $.WantedChannelSet .ID))}}
+                                            <option value="{{.ID}}" data-ord="{{.Number}}">{{.Number}} - {{.Name}}</option>
+                                        {{end}}
+                                    {{end}}
+                                </select>
+                            </div>
+
+                            <div style="flex: 1; min-width: 0;">
+                                <div class="empty-state" style="padding: 0 0 0.5rem 0; text-align: left;">Wanted (double-click to remove)</div>
+                                <select id="vdr_wanted_channels" name="vdr_wanted_channels" multiple size="12" style="width: 100%;">
+                                    {{range .AllChannels}}
+                                        {{if and $.WantedChannelSet (index $.WantedChannelSet .ID)}}
+                                            <option value="{{.ID}}" data-ord="{{.Number}}" selected>{{.Number}} - {{.Name}}</option>
+                                        {{end}}
+                                    {{end}}
+                                </select>
+                            </div>
+                        </div>
+
+                        <p class="empty-state" style="padding: 0.5rem 0 0 0; text-align: left;">
+                            Leave the Wanted list empty to show all channels.
+                        </p>
+                    </div>
+
                     <label for="vdr_host">Host</label>
                     <input id="vdr_host" name="vdr_host" type="text" value="{{if .Config}}{{.Config.VDR.Host}}{{end}}">
 
@@ -199,6 +230,57 @@
             <p>&copy; {{.Year}} vdradmin-go | <a href="https://github.com/githubixx/vdradmin-go">GitHub</a></p>
         </div>
     </footer>
+
+    <script>
+        (function () {
+            const available = document.getElementById('vdr_available_channels');
+            const wanted = document.getElementById('vdr_wanted_channels');
+            if (!available || !wanted) return;
+
+            function sortSelect(selectEl) {
+                const opts = Array.from(selectEl.options);
+                opts.sort((a, b) => {
+                    const oa = parseInt(a.dataset.ord || '0', 10);
+                    const ob = parseInt(b.dataset.ord || '0', 10);
+                    if (oa !== 0 && ob !== 0 && oa !== ob) return oa - ob;
+                    return a.text.localeCompare(b.text);
+                });
+                selectEl.innerHTML = '';
+                for (const o of opts) selectEl.add(o);
+            }
+
+            function moveOption(optionEl, fromSelect, toSelect, selected) {
+                optionEl.selected = selected;
+                toSelect.add(optionEl);
+                sortSelect(fromSelect);
+                sortSelect(toSelect);
+            }
+
+            available.addEventListener('dblclick', (e) => {
+                const opt = e.target;
+                if (opt && opt.tagName === 'OPTION') {
+                    moveOption(opt, available, wanted, true);
+                }
+            });
+
+            wanted.addEventListener('dblclick', (e) => {
+                const opt = e.target;
+                if (opt && opt.tagName === 'OPTION') {
+                    moveOption(opt, wanted, available, false);
+                }
+            });
+
+            // Ensure all wanted options are submitted (HTML only submits selected options).
+            const form = wanted.closest('form');
+            if (form) {
+                form.addEventListener('submit', () => {
+                    for (const opt of Array.from(wanted.options)) {
+                        opt.selected = true;
+                    }
+                });
+            }
+        })();
+    </script>
 </body>
 </html>
 {{end}}
