@@ -804,6 +804,54 @@ type timerFormModel struct {
 	Aux      string
 }
 
+func (h *Handler) timerNewFormModel(now time.Time, channels []domain.Channel) (timerFormModel, string) {
+	selectedChannel := ""
+	if len(channels) > 0 {
+		selectedChannel = channels[0].ID
+	}
+
+	localNow := now.In(time.Local)
+	day := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 0, 0, 0, 0, time.Local)
+
+	model := timerFormModel{
+		ID:        0,
+		Active:    true,
+		ChannelID: selectedChannel,
+		Day:       day.Format("2006-01-02"),
+		Start:     localNow.Format("15:04"),
+		Stop:      "00:00",
+		Priority:  99,
+		Lifetime:  99,
+		Title:     "",
+		Aux:       "",
+	}
+	return model, selectedChannel
+}
+
+// TimerNew shows a form for creating a new manual timer.
+func (h *Handler) TimerNew(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	channels, err := h.epgService.GetChannels(r.Context())
+	if err != nil {
+		channels = []domain.Channel{}
+	}
+
+	model, selectedChannel := h.timerNewFormModel(time.Now(), channels)
+	data := map[string]any{
+		"PageTitle":       "New Timer - VDRAdmin-go",
+		"Heading":         "New Timer",
+		"FormAction":      "/timers/new",
+		"Timer":           model,
+		"SelectedChannel": selectedChannel,
+		"Channels":        channels,
+	}
+	h.renderTemplate(w, r, "timer_edit.html", data)
+}
+
 // TimerEdit shows a form for editing an existing timer.
 func (h *Handler) TimerEdit(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -867,11 +915,100 @@ func (h *Handler) TimerEdit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := map[string]any{
+		"PageTitle":       "Edit Timer - VDRAdmin-go",
+		"Heading":         "Edit Timer",
+		"FormAction":      "/timers/update",
 		"Timer":           model,
 		"SelectedChannel": selectedChannel,
 		"Channels":        channels,
 	}
 	h.renderTemplate(w, r, "timer_edit.html", data)
+}
+
+func (h *Handler) timerFromCreateForm(r *http.Request) (domain.Timer, error) {
+	form := r.Form
+
+	channelID := strings.TrimSpace(form.Get("channel"))
+	if channelID == "" {
+		return domain.Timer{}, domain.ErrInvalidInput
+	}
+
+	dayStr := strings.TrimSpace(form.Get("day"))
+	day, err := time.ParseInLocation("2006-01-02", dayStr, time.Local)
+	if err != nil {
+		return domain.Timer{}, domain.ErrInvalidInput
+	}
+
+	startStr := strings.TrimSpace(form.Get("start"))
+	stopStr := strings.TrimSpace(form.Get("stop"))
+	startClock, err1 := time.Parse("15:04", startStr)
+	stopClock, err2 := time.Parse("15:04", stopStr)
+	if err1 != nil || err2 != nil {
+		return domain.Timer{}, domain.ErrInvalidInput
+	}
+
+	start := time.Date(day.Year(), day.Month(), day.Day(), startClock.Hour(), startClock.Minute(), 0, 0, time.Local)
+	stop := time.Date(day.Year(), day.Month(), day.Day(), stopClock.Hour(), stopClock.Minute(), 0, 0, time.Local)
+	if stop.Before(start) {
+		stop = stop.Add(24 * time.Hour)
+	}
+
+	priority, err := strconv.Atoi(strings.TrimSpace(form.Get("priority")))
+	if err != nil {
+		return domain.Timer{}, domain.ErrInvalidInput
+	}
+	lifetime, err := strconv.Atoi(strings.TrimSpace(form.Get("lifetime")))
+	if err != nil {
+		return domain.Timer{}, domain.ErrInvalidInput
+	}
+
+	active := strings.TrimSpace(form.Get("active")) != "0"
+	title := strings.TrimSpace(form.Get("title"))
+	aux := form.Get("aux")
+
+	return domain.Timer{
+		ID:        0,
+		Active:    active,
+		ChannelID: channelID,
+		Day:       day,
+		Start:     start,
+		Stop:      stop,
+		Priority:  priority,
+		Lifetime:  lifetime,
+		Title:     title,
+		Aux:       aux,
+	}, nil
+}
+
+// TimerCreateManual creates a new timer from the manual form.
+func (h *Handler) TimerCreateManual(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	timer, err := h.timerFromCreateForm(r)
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	if err := h.timerService.CreateTimer(r.Context(), &timer); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	if r.Header.Get("HX-Request") != "" {
+		w.Header().Set("HX-Redirect", "/timers")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/timers", http.StatusSeeOther)
 }
 
 // TimerUpdate persists edits to an existing timer.

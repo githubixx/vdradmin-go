@@ -34,6 +34,12 @@
 
     <main class="container">
 
+        {{if eq .Role "admin"}}
+        <div class="toolbar">
+            <a href="/timers/new" class="btn btn-primary">New Timer</a>
+        </div>
+        {{end}}
+
         <div class="timer-list">
             {{range .Timers}}
             <div class="timer-item {{if .IsRecording}}recording{{end}} {{if .Active}}active{{else}}inactive{{end}}">

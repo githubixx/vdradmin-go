@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Timer - VDRAdmin-go</title>
+    <title>{{if .PageTitle}}{{.PageTitle}}{{else}}Edit Timer - VDRAdmin-go{{end}}</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
@@ -33,10 +33,10 @@
 
     <main class="container">
         <div class="toolbar">
-            <h2 style="font-family: var(--font-display); font-size: 1.25rem; margin-bottom: 0.75rem;">Edit Timer</h2>
+            <h2 style="font-family: var(--font-display); font-size: 1.25rem; margin-bottom: 0.75rem;">{{if .Heading}}{{.Heading}}{{else}}Edit Timer{{end}}</h2>
 
-            <form action="/timers/update" method="post" class="config-grid">
-                <input type="hidden" name="id" value="{{.Timer.ID}}">
+            <form action="{{if .FormAction}}{{.FormAction}}{{else}}/timers/update{{end}}" method="post" class="config-grid">
+                {{if gt .Timer.ID 0}}<input type="hidden" name="id" value="{{.Timer.ID}}">{{end}}
 
                 <label>Timer Active</label>
                 <div class="timer-radio-group">
