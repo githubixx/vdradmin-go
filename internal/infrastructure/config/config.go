@@ -49,6 +49,7 @@ type VDRConfig struct {
 	VideoDir       string        `yaml:"video_dir"`
 	ConfigDir      string        `yaml:"config_dir"`
 	ReconnectDelay time.Duration `yaml:"reconnect_delay"`
+	DVBCards       int           `yaml:"dvb_cards"`
 }
 
 // AuthConfig contains authentication settings
@@ -94,6 +95,7 @@ func Load(path string) (*Config, error) {
 			VideoDir:       "/var/lib/video.00",
 			ConfigDir:      "/etc/vdr",
 			ReconnectDelay: 5 * time.Second,
+			DVBCards:       1,
 		},
 		Auth: AuthConfig{
 			Enabled:      true,
@@ -152,6 +154,10 @@ func (c *Config) Validate() error {
 
 	if c.VDR.Host == "" {
 		return fmt.Errorf("VDR host is required")
+	}
+
+	if c.VDR.DVBCards < 1 || c.VDR.DVBCards > 99 {
+		return fmt.Errorf("invalid vdr dvb_cards: %d (must be 1-99)", c.VDR.DVBCards)
 	}
 
 	if c.Server.TLS.Enabled {

@@ -104,6 +104,9 @@
             <div class="toolbar">
                 <h3>VDR</h3>
                 <div class="config-grid">
+                    <label for="vdr_dvb_cards">Number of DVB cards</label>
+                    <input id="vdr_dvb_cards" name="vdr_dvb_cards" type="number" min="1" max="99" value="{{if .Config}}{{.Config.VDR.DVBCards}}{{end}}">
+
                     <label for="vdr_host">Host</label>
                     <input id="vdr_host" name="vdr_host" type="text" value="{{if .Config}}{{.Config.VDR.Host}}{{end}}">
 

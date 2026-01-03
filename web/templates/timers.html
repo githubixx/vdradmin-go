@@ -42,7 +42,7 @@
 
         <div class="timer-list">
             {{range .Timers}}
-            <div class="timer-item {{if .IsRecording}}recording{{end}} {{if .Active}}active{{else}}inactive{{end}}">
+            <div class="timer-item {{if .IsRecording}}recording{{end}} {{if .IsCollision}}collision{{end}} {{if .IsCritical}}conflict{{end}} {{if .Active}}active{{else}}inactive{{end}}">
                 <div class="timer-info">
                     <h3>{{.Title}}</h3>
                     <div class="timer-meta">

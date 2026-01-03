@@ -12,6 +12,7 @@
     --secondary-color: #64748b;
     --success-color: #10b981;
     --danger-color: #ef4444;
+    --warning-color: #f59e0b;
 
     --bg-color: #f6f7fb;
     --bg-image: radial-gradient(900px 500px at 15% 10%, rgba(124, 58, 237, 0.10), transparent 60%),
@@ -750,6 +751,16 @@ main {
 .timer-item.inactive {
     border-left-color: var(--secondary-color);
     opacity: 0.7;
+}
+
+.timer-item.collision {
+    border-left-color: var(--warning-color);
+    border-color: var(--warning-color);
+}
+
+.timer-item.conflict {
+    border-left-color: var(--danger-color);
+    border-color: var(--danger-color);
 }
 
 .timer-info h3 {

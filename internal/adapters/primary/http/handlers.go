@@ -389,6 +389,13 @@ func (h *Handler) buildConfigFromForm(form url.Values) (*config.Config, error) {
 	}
 
 	// VDR connection
+	if v := strings.TrimSpace(form.Get("vdr_dvb_cards")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid vdr dvb cards")
+		}
+		updated.VDR.DVBCards = n
+	}
 	if v := strings.TrimSpace(form.Get("vdr_host")); v != "" {
 		updated.VDR.Host = v
 	}
@@ -726,6 +733,8 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 		domain.Timer
 		ChannelName string
 		IsRecording bool
+		IsCritical  bool
+		IsCollision bool
 	}
 
 	views := make([]timerView, 0, len(timers))
@@ -740,6 +749,27 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 			isRec = (t.Start.Before(now) || t.Start.Equal(now)) && t.Stop.After(now)
 		}
 		views = append(views, timerView{Timer: t, ChannelName: name, IsRecording: isRec})
+	}
+
+	// Mark overlapping timers (yellow) and critical timers (red) based on configured DVB cards.
+	dvbCards := 1
+	if h.cfg != nil && h.cfg.VDR.DVBCards > 0 {
+		dvbCards = h.cfg.VDR.DVBCards
+	}
+	from := time.Now().In(time.Local)
+	from = time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, time.Local)
+	to := from.Add(8 * 24 * time.Hour) // cover at least one full week for recurring timers
+
+	collisionIDs, criticalIDs := timerOverlapStates(timers, dvbCards, from, to, func(t domain.Timer) string {
+		return transponderKeyForTimer(t, channels)
+	})
+	for i := range views {
+		if collisionIDs[views[i].ID] {
+			views[i].IsCollision = true
+		}
+		if criticalIDs[views[i].ID] {
+			views[i].IsCritical = true
+		}
 	}
 
 	now := time.Now()
@@ -789,6 +819,211 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.renderTemplate(w, r, "timers.html", data)
+}
+
+func transponderKeyForTimer(t domain.Timer, channels []domain.Channel) string {
+	chID := strings.TrimSpace(t.ChannelID)
+	if looksLikeVDRChannelID(chID) {
+		return transponderKeyFromChannelID(chID)
+	}
+	if n, err := strconv.Atoi(chID); err == nil {
+		for i := range channels {
+			if channels[i].Number == n {
+				if looksLikeVDRChannelID(channels[i].ID) {
+					return transponderKeyFromChannelID(channels[i].ID)
+				}
+				break
+			}
+		}
+	}
+	// Unknown channel; treat as unique so it consumes a tuner.
+	return chID
+}
+
+func transponderKeyFromChannelID(channelID string) string {
+	parts := strings.Split(channelID, "-")
+	if len(parts) >= 3 {
+		return strings.Join(parts[:3], "-")
+	}
+	return channelID
+}
+
+func looksLikeVDRChannelID(s string) bool {
+	s = strings.TrimSpace(s)
+	return strings.Contains(s, "-") && (strings.HasPrefix(s, "S") || strings.HasPrefix(s, "C") || strings.HasPrefix(s, "T") || strings.HasPrefix(s, "A"))
+}
+
+type timerOccurrence struct {
+	TimerID int
+	Start   time.Time
+	Stop    time.Time
+	Key     string
+}
+
+func timerOverlapStates(timers []domain.Timer, dvbCards int, from, to time.Time, transponderKey func(domain.Timer) string) (collisionIDs, criticalIDs map[int]bool) {
+	if dvbCards < 1 {
+		dvbCards = 1
+	}
+	collisionIDs = map[int]bool{}
+	criticalIDs = map[int]bool{}
+
+	occs := make([]timerOccurrence, 0, len(timers))
+	for _, t := range timers {
+		if !t.Active {
+			continue
+		}
+		key := transponderKey(t)
+		if key == "" {
+			key = strconv.Itoa(t.ID)
+		}
+		for _, occ := range timerOccurrences(t, from, to) {
+			occ.Key = key
+			occs = append(occs, occ)
+		}
+	}
+
+	type endpoint struct {
+		at    time.Time
+		start bool
+		idx   int
+	}
+	endpoints := make([]endpoint, 0, len(occs)*2)
+	for i := range occs {
+		endpoints = append(endpoints, endpoint{at: occs[i].Start, start: true, idx: i})
+		endpoints = append(endpoints, endpoint{at: occs[i].Stop, start: false, idx: i})
+	}
+
+	sort.SliceStable(endpoints, func(i, j int) bool {
+		if endpoints[i].at.Equal(endpoints[j].at) {
+			if endpoints[i].start != endpoints[j].start {
+				return !endpoints[i].start && endpoints[j].start
+			}
+			return endpoints[i].idx < endpoints[j].idx
+		}
+		return endpoints[i].at.Before(endpoints[j].at)
+	})
+
+	activeOcc := map[int]struct{}{}
+	activeByKey := map[string]int{}
+
+	for _, e := range endpoints {
+		occ := occs[e.idx]
+		if e.start {
+			activeOcc[e.idx] = struct{}{}
+			activeByKey[occ.Key]++
+		} else {
+			delete(activeOcc, e.idx)
+			if activeByKey[occ.Key] > 1 {
+				activeByKey[occ.Key]--
+			} else {
+				delete(activeByKey, occ.Key)
+			}
+		}
+
+		// Yellow: any overlap that requires more than one transponder/tuner.
+		if len(activeByKey) > 1 {
+			for idx := range activeOcc {
+				collisionIDs[occs[idx].TimerID] = true
+			}
+		}
+		// Red: exceeds available DVB cards.
+		if len(activeByKey) > dvbCards {
+			for idx := range activeOcc {
+				criticalIDs[occs[idx].TimerID] = true
+			}
+		}
+	}
+
+	return collisionIDs, criticalIDs
+}
+
+func timerOccurrences(t domain.Timer, from, to time.Time) []timerOccurrence {
+	if from.After(to) {
+		return nil
+	}
+	if !t.Stop.After(t.Start) || t.Start.IsZero() || t.Stop.IsZero() {
+		// For recurring timers we may not have computed Start/Stop; rely on raw specs.
+		// We'll handle them below if we detect a weekday mask.
+	}
+
+	// One-time timer with concrete timestamps.
+	if !t.Start.IsZero() && !t.Stop.IsZero() && t.Stop.After(t.Start) && !isWeekdayMaskHTTP(t.DaySpec) {
+		if t.Stop.Before(from) || !t.Start.Before(to) {
+			return nil
+		}
+		return []timerOccurrence{{TimerID: t.ID, Start: t.Start, Stop: t.Stop}}
+	}
+
+	// Recurring timer: project onto each matching weekday in the window.
+	daySpec := strings.TrimSpace(t.DaySpec)
+	if !isWeekdayMaskHTTP(daySpec) {
+		return nil
+	}
+	if t.StartMinutes < 0 || t.StopMinutes < 0 {
+		return nil
+	}
+
+	loc := time.Local
+	startDay := time.Date(from.In(loc).Year(), from.In(loc).Month(), from.In(loc).Day(), 0, 0, 0, 0, loc)
+	endDay := time.Date(to.In(loc).Year(), to.In(loc).Month(), to.In(loc).Day(), 0, 0, 0, 0, loc)
+
+	var out []timerOccurrence
+	for d := startDay; d.Before(endDay); d = d.Add(24 * time.Hour) {
+		if !weekdayMaskAllowsHTTP(daySpec, d.Weekday()) {
+			continue
+		}
+		start := d.Add(time.Duration(t.StartMinutes) * time.Minute)
+		stop := d.Add(time.Duration(t.StopMinutes) * time.Minute)
+		if stop.Before(start) {
+			stop = stop.Add(24 * time.Hour)
+		}
+		if stop.Before(from) || !start.Before(to) {
+			continue
+		}
+		out = append(out, timerOccurrence{TimerID: t.ID, Start: start, Stop: stop})
+	}
+	return out
+}
+
+func isWeekdayMaskHTTP(daySpec string) bool {
+	daySpec = strings.TrimSpace(daySpec)
+	if len(daySpec) != 7 {
+		return false
+	}
+	for _, r := range daySpec {
+		switch r {
+		case 'M', 'T', 'W', 'F', 'S', '-', '.':
+			// ok
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func weekdayMaskAllowsHTTP(daySpec string, wd time.Weekday) bool {
+	idx := 0
+	switch wd {
+	case time.Monday:
+		idx = 0
+	case time.Tuesday:
+		idx = 1
+	case time.Wednesday:
+		idx = 2
+	case time.Thursday:
+		idx = 3
+	case time.Friday:
+		idx = 4
+	case time.Saturday:
+		idx = 5
+	case time.Sunday:
+		idx = 6
+	}
+	if idx < 0 || idx >= len(daySpec) {
+		return false
+	}
+	c := daySpec[idx]
+	return c != '-' && c != '.'
 }
 
 type timerFormModel struct {
@@ -1242,6 +1477,11 @@ func (h *Handler) TimerDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.Header.Get("HX-Request") != "" {
+		w.Header().Set("HX-Redirect", "/timers")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -1263,6 +1503,11 @@ func (h *Handler) TimerToggle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.Header.Get("HX-Request") != "" {
+		w.Header().Set("HX-Redirect", "/timers")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 

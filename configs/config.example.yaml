@@ -15,6 +15,9 @@ vdr:
   host: "localhost"
   port: 6419  # Use 2001 for older VDR versions
   timeout: 10s
+  # Number of DVB cards VDR can access.
+  # Used to calculate critical timer overlaps on the Timers page.
+  dvb_cards: 1
   video_dir: "/var/lib/video.00"
   config_dir: "/etc/vdr"
   reconnect_delay: 5s
