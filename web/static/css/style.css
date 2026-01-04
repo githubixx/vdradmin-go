@@ -560,6 +560,14 @@ main {
     outline-offset: 2px;
 }
 
+.btn[disabled],
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: var(--shadow);
+}
+
 .btn-primary {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.06)), var(--primary-color);
     color: white;
@@ -854,6 +862,38 @@ main {
     padding: var(--spacing);
     margin-bottom: var(--spacing);
     box-shadow: var(--shadow);
+}
+
+/* Data Table (used for EPG Search list) */
+.data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.data-table th,
+.data-table td {
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: top;
+}
+
+.data-table th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.data-table tbody tr:hover {
+    background: var(--surface-hover);
+}
+
+.data-table td.actions {
+    white-space: nowrap;
+}
+
+.data-table tr:last-child td {
+    border-bottom: none;
 }
 
 /* Configuration form */

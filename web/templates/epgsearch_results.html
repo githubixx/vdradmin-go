@@ -1,0 +1,107 @@
+{{define "epgsearch_results.html"}}
+<!DOCTYPE html>
+<html lang="en" {{if eq .ThemeMode "dark"}}data-theme="dark"{{else if eq .ThemeMode "light"}}data-theme="light"{{end}} data-theme-default="{{.ThemeDefault}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPG Search Results - VDRAdmin-go</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/theme.js" defer></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body>
+    <header>
+        <nav class="container">
+            <div class="nav-brand">
+                <h1>VDRAdmin-go</h1>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/" {{if eq .Path "/"}}class="active" aria-current="page"{{end}}>Home</a></li>
+                <li><a href="/channels" {{if eq .Path "/channels"}}class="active" aria-current="page"{{end}}>Channels</a></li>
+                <li><a href="/playing" {{if eq .Path "/playing"}}class="active" aria-current="page"{{end}}>Playing Today</a></li>
+                <li><a href="/timers" {{if eq .Path "/timers"}}class="active" aria-current="page"{{end}}>Timers</a></li>
+                <li><a href="/recordings" {{if eq .Path "/recordings"}}class="active" aria-current="page"{{end}}>Recordings</a></li>
+                <li><a href="/search" {{if eq .Path "/search"}}class="active" aria-current="page"{{end}}>Search</a></li>
+                <li><a href="/epgsearch" {{if eq .Path "/epgsearch"}}class="active" aria-current="page"{{end}}>EPG Search</a></li>
+                <li><a href="/configurations" {{if eq .Path "/configurations"}}class="active" aria-current="page"{{end}}>Configurations</a></li>
+            </ul>
+
+            <div class="nav-right">
+                {{if .User}}
+                <div class="nav-user">
+                    <span>{{.User}}</span>
+                    {{if eq .Role "admin"}}<span class="badge">Admin</span>{{end}}
+                </div>
+                {{end}}
+            </div>
+        </nav>
+    </header>
+
+    <main class="container">
+        <div class="toolbar">
+            <a href="/epgsearch" class="btn btn-secondary">Back to searches</a>
+        </div>
+
+        {{range .DayGroups}}
+        <div class="toolbar">
+            <h3>{{.DayLabel}}</h3>
+        </div>
+
+        <div class="toolbar">
+            <table class="data-table" style="table-layout: fixed;">
+                <thead>
+                    <tr>
+                        <th style="width: 120px;">Time</th>
+                        <th>Title</th>
+                        <th style="width: 200px;">Channel</th>
+                        <th style="width: 220px;">Timer</th>
+                        {{if eq $.Role "admin"}}<th style="width: 120px;"></th>{{end}}
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Events}}
+                    <tr>
+                        <td>
+                            <time datetime="{{.Start.Format "2006-01-02T15:04"}}">{{.Start.Format "15:04"}} - {{.Stop.Format "15:04"}}</time>
+                        </td>
+                        <td>
+                            <div style="font-weight: 600;">{{.Title}}</div>
+                            {{if .Subtitle}}<div class="epg-subtitle">{{.Subtitle}}</div>{{end}}
+                        </td>
+                        <td>{{.ChannelName}}</td>
+                        <td>{{.TimerLabel}}</td>
+                        {{if eq $.Role "admin"}}
+                        <td class="actions" style="text-align: right;">
+                            {{if or .TimerActive (le .EventID 0)}}
+                            <button class="btn btn-sm btn-secondary" disabled>Record</button>
+                            {{else}}
+                            <button
+                                hx-post="/timers/create?channel={{.ChannelID}}&event_id={{.EventID}}"
+                                class="btn btn-sm btn-primary">
+                                Record
+                            </button>
+                            {{end}}
+                        </td>
+                        {{end}}
+                    </tr>
+                    {{else}}
+                    <tr>
+                        <td colspan="{{if eq $.Role "admin"}}5{{else}}4{{end}}">
+                            <p class="empty-state" style="padding: 0.75rem 0; text-align: left;">No matches</p>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        {{end}}
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; {{.Year}} vdradmin-go | <a href="https://github.com/githubixx/vdradmin-go">GitHub</a></p>
+        </div>
+    </footer>
+</body>
+</html>
+{{end}}

@@ -16,7 +16,31 @@ type Config struct {
 	Auth   AuthConfig   `yaml:"auth"`
 	Cache  CacheConfig  `yaml:"cache"`
 	Timer  TimerConfig  `yaml:"timer"`
+	EPG    EPGConfig    `yaml:"epg"`
 	UI     UIConfig     `yaml:"ui"`
+}
+
+// EPGConfig contains settings and saved searches related to EPG.
+type EPGConfig struct {
+	Searches []EPGSearch `yaml:"searches"`
+}
+
+// EPGSearch represents a saved EPG search definition.
+// This is executed client-side against SVDRP EPG data (it does not require vdr-plugin-epgsearch).
+type EPGSearch struct {
+	ID          int    `yaml:"id"`
+	Active      bool   `yaml:"active"`
+	Pattern     string `yaml:"pattern"`
+	Mode        string `yaml:"mode"` // "phrase" (default) or "regex"
+	MatchCase   bool   `yaml:"match_case"`
+	InTitle     bool   `yaml:"in_title"`
+	InSubtitle  bool   `yaml:"in_subtitle"`
+	InDesc      bool   `yaml:"in_description"`
+	UseChannel  string `yaml:"use_channel"`  // "no" (default), "single", "range"
+	ChannelID   string `yaml:"channel_id"`   // when UseChannel=="single"
+	ChannelFrom string `yaml:"channel_from"` // when UseChannel=="range"
+	ChannelTo   string `yaml:"channel_to"`   // when UseChannel=="range"
+	// Reserved for future fields (time range, duration, day-of-week).
 }
 
 // UIConfig contains user interface settings
@@ -117,6 +141,9 @@ func Load(path string) (*Config, error) {
 			DefaultMarginStart: 2,
 			DefaultMarginEnd:   10,
 		},
+		EPG: EPGConfig{
+			Searches: []EPGSearch{},
+		},
 		UI: UIConfig{
 			Theme: "system",
 		},
@@ -210,6 +237,43 @@ func (c *Config) Validate() error {
 		// ok
 	default:
 		return fmt.Errorf("invalid ui.theme: %q (must be system, light, or dark)", c.UI.Theme)
+	}
+
+	// Normalize/validate saved EPG searches.
+	maxID := 0
+	seenID := map[int]struct{}{}
+	for i := range c.EPG.Searches {
+		s := &c.EPG.Searches[i]
+		if s.ID < 0 {
+			return fmt.Errorf("invalid epg.searches[%d].id: %d", i, s.ID)
+		}
+		if s.ID > 0 {
+			if _, ok := seenID[s.ID]; ok {
+				return fmt.Errorf("duplicate epg search id: %d", s.ID)
+			}
+			seenID[s.ID] = struct{}{}
+			if s.ID > maxID {
+				maxID = s.ID
+			}
+		}
+		if strings.TrimSpace(s.Mode) == "" {
+			s.Mode = "phrase"
+		}
+		s.Mode = strings.ToLower(strings.TrimSpace(s.Mode))
+		s.UseChannel = strings.ToLower(strings.TrimSpace(s.UseChannel))
+		if s.UseChannel == "" {
+			s.UseChannel = "no"
+		}
+		if s.UseChannel != "no" && s.UseChannel != "single" && s.UseChannel != "range" {
+			return fmt.Errorf("invalid epg.searches[%d].use_channel: %q", i, s.UseChannel)
+		}
+		if s.Mode != "phrase" && s.Mode != "regex" {
+			return fmt.Errorf("invalid epg.searches[%d].mode: %q", i, s.Mode)
+		}
+		// Default search scope: title+subtitle+description.
+		if !s.InTitle && !s.InSubtitle && !s.InDesc {
+			s.InTitle, s.InSubtitle, s.InDesc = true, true, true
+		}
 	}
 
 	return nil
