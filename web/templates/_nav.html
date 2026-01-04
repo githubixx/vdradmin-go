@@ -1,0 +1,33 @@
+{{define "nav_header"}}
+<header>
+    <nav class="container">
+        <div class="nav-brand">
+            <h1>VDRAdmin-go</h1>
+        </div>
+        <div class="nav-right">
+            {{if .User}}
+            <div class="nav-user">
+                <span>{{.User}}</span>
+                {{if eq .Role "admin"}}<span class="badge">Admin</span>{{end}}
+            </div>
+            {{end}}
+
+            <details class="nav-burger">
+                <summary class="btn btn-secondary btn-menu nav-burger-button" aria-label="Menu">
+                    <span class="burger-icon" aria-hidden="true"></span>
+                </summary>
+                <div class="nav-burger-menu" role="menu">
+                    <a href="/" {{if eq .Path "/"}}class="active" aria-current="page"{{end}}>Home</a>
+                    <a href="/channels" {{if eq .Path "/channels"}}class="active" aria-current="page"{{end}}>Channels</a>
+                    <a href="/playing" {{if eq .Path "/playing"}}class="active" aria-current="page"{{end}}>Playing Today</a>
+                    <a href="/timers" {{if eq .Path "/timers"}}class="active" aria-current="page"{{end}}>Timers</a>
+                    <a href="/recordings" {{if eq .Path "/recordings"}}class="active" aria-current="page"{{end}}>Recordings</a>
+                    <a href="/search" {{if eq .Path "/search"}}class="active" aria-current="page"{{end}}>Search</a>
+                    <a href="/epgsearch" {{if eq .Path "/epgsearch"}}class="active" aria-current="page"{{end}}>EPG Search</a>
+                    <a href="/configurations" {{if eq .Path "/configurations"}}class="active" aria-current="page"{{end}}>Configurations</a>
+                </div>
+            </details>
+        </div>
+    </nav>
+</header>
+{{end}}

@@ -267,9 +267,6 @@ func (h *Handler) ConfigurationsApply(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-
-	setThemeCookie(w, updated.UI.Theme)
-
 	http.Redirect(w, r, "/configurations?msg="+url.QueryEscape("Applied configuration (not saved)."), http.StatusSeeOther)
 }
 
@@ -323,8 +320,6 @@ func (h *Handler) ConfigurationsSave(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-
-	setThemeCookie(w, updated.UI.Theme)
 
 	msg := "Saved and applied configuration."
 	if restartRequired {
@@ -2236,12 +2231,9 @@ func normalizeTheme(theme string) string {
 }
 
 func themeFromRequest(r *http.Request, fallback string) string {
-	fallback = normalizeTheme(fallback)
-	c, err := r.Cookie("theme")
-	if err != nil {
-		return fallback
-	}
-	return normalizeTheme(c.Value)
+	// The UI theme is configured server-side (Configurations page) and should apply
+	// consistently across all pages. Ignore any legacy per-browser theme cookie.
+	return normalizeTheme(fallback)
 }
 
 func (h *Handler) handleError(w http.ResponseWriter, r *http.Request, err error) {
