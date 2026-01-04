@@ -2,13 +2,12 @@
 <header>
     <nav class="container">
         <div class="nav-brand">
-            <h1>VDRAdmin-go</h1>
+            <h1><a href="/" style="color: inherit; text-decoration: none;">VDRAdmin-go</a></h1>
         </div>
         <div class="nav-right">
-            {{if .User}}
+            {{if eq .Role "admin"}}
             <div class="nav-user">
-                <span>{{.User}}</span>
-                {{if eq .Role "admin"}}<span class="badge">Admin</span>{{end}}
+                <span class="badge">Admin</span>
             </div>
             {{end}}
 
