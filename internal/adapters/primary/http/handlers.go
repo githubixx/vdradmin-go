@@ -267,9 +267,6 @@ func (h *Handler) ConfigurationsApply(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-
-	setThemeCookie(w, updated.UI.Theme)
-
 	http.Redirect(w, r, "/configurations?msg="+url.QueryEscape("Applied configuration (not saved)."), http.StatusSeeOther)
 }
 
@@ -323,8 +320,6 @@ func (h *Handler) ConfigurationsSave(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-
-	setThemeCookie(w, updated.UI.Theme)
 
 	msg := "Saved and applied configuration."
 	if restartRequired {
@@ -723,6 +718,624 @@ func (h *Handler) EPGSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.renderTemplate(w, r, "search.html", data)
+}
+
+type epgSearchView struct {
+	config.EPGSearch
+	ChannelLabel string
+	FromLabel    string
+	ToLabel      string
+}
+
+// EPGSearchList shows saved EPG searches and allows executing selected searches.
+func (h *Handler) EPGSearchList(w http.ResponseWriter, r *http.Request) {
+	searches := []config.EPGSearch{}
+	if h.cfg != nil {
+		searches = append([]config.EPGSearch(nil), h.cfg.EPG.Searches...)
+	}
+
+	channels, chErr := h.epgService.GetChannels(r.Context())
+	nameByID := map[string]string{}
+	for _, ch := range channels {
+		if ch.ID != "" {
+			nameByID[ch.ID] = ch.Name
+		}
+	}
+
+	views := make([]epgSearchView, 0, len(searches))
+	for _, s := range searches {
+		label := "-"
+		if s.UseChannel == "single" {
+			if n := nameByID[s.ChannelID]; n != "" {
+				label = n
+			} else if s.ChannelID != "" {
+				label = s.ChannelID
+			}
+		} else if s.UseChannel == "range" {
+			from := nameByID[s.ChannelFrom]
+			to := nameByID[s.ChannelTo]
+			if from != "" && to != "" {
+				label = from + " - " + to
+			} else if s.ChannelFrom != "" || s.ChannelTo != "" {
+				label = strings.TrimSpace(s.ChannelFrom + " - " + s.ChannelTo)
+			}
+		}
+
+		views = append(views, epgSearchView{
+			EPGSearch:    s,
+			ChannelLabel: label,
+			FromLabel:    "--:--",
+			ToLabel:      "--:--",
+		})
+	}
+
+	data := map[string]any{
+		"Searches": views,
+	}
+	if chErr != nil {
+		h.logger.Warn("channels fetch error for epgsearch", slog.Any("error", chErr))
+		data["HomeError"] = chErr.Error()
+	}
+
+	if msg := strings.TrimSpace(r.URL.Query().Get("msg")); msg != "" {
+		data["Message"] = msg
+	}
+	if errMsg := strings.TrimSpace(r.URL.Query().Get("err")); errMsg != "" {
+		data["Error"] = errMsg
+	}
+
+	h.renderTemplate(w, r, "epgsearch.html", data)
+}
+
+type epgSearchResultGroup struct {
+	Search  epgSearchView
+	Matches []domain.EPGEvent
+}
+
+type epgSearchResultEventView struct {
+	domain.EPGEvent
+	TimerActive bool
+	TimerLabel  string
+}
+
+type epgSearchResultDayGroup struct {
+	DayLabel string
+	Events   []epgSearchResultEventView
+}
+
+// EPGSearchExecute runs selected searches and renders matching events.
+func (h *Handler) EPGSearchExecute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form", http.StatusBadRequest)
+		return
+	}
+
+	idsRaw := r.PostForm["ids"]
+
+	searchByID := map[int]config.EPGSearch{}
+	activeSearches := make([]config.EPGSearch, 0, 16)
+	if h.cfg != nil {
+		activeSearches = make([]config.EPGSearch, 0, len(h.cfg.EPG.Searches))
+		for _, s := range h.cfg.EPG.Searches {
+			searchByID[s.ID] = s
+			if s.Active {
+				activeSearches = append(activeSearches, s)
+			}
+		}
+	}
+
+	selected := make([]config.EPGSearch, 0, len(idsRaw))
+	if len(idsRaw) == 0 {
+		// No explicit selection means: execute all *active* searches.
+		selected = append(selected, activeSearches...)
+	}
+	for _, raw := range idsRaw {
+		id, err := strconv.Atoi(strings.TrimSpace(raw))
+		if err != nil || id <= 0 {
+			continue
+		}
+		s, ok := searchByID[id]
+		if !ok {
+			continue
+		}
+		if !s.Active {
+			continue
+		}
+		selected = append(selected, s)
+	}
+	if len(selected) == 0 {
+		http.Redirect(w, r, "/epgsearch?err="+url.QueryEscape("No active searches configured."), http.StatusSeeOther)
+		return
+	}
+
+	channels, _ := h.epgService.GetChannels(r.Context())
+	order := make(map[string]int, len(channels))
+	nameByID := make(map[string]string, len(channels))
+	numberByID := make(map[string]int, len(channels))
+	idByNumber := make(map[int]string, len(channels))
+	for i, ch := range channels {
+		if ch.ID != "" {
+			order[ch.ID] = i + 1
+			nameByID[ch.ID] = ch.Name
+			numberByID[ch.ID] = ch.Number
+		}
+		if ch.Number > 0 && ch.ID != "" {
+			idByNumber[ch.Number] = ch.ID
+		}
+	}
+
+	allEvents, err := h.epgService.GetEPG(r.Context(), "", time.Time{})
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	// Lookup existing active timers by channel + time overlap.
+	// NOTE: SVDRP LSTT output doesn't include an EPG EventID, so matching by (ChannelID, EventID)
+	// doesn't work reliably. Instead, treat an event as "already scheduled" when any active timer
+	// on the same channel overlaps the event time window (timers usually include margins).
+	timersByID := map[int]domain.Timer{}
+	occByChannelNumber := map[int][]timerOccurrence{}
+	occByChannelID := map[string][]timerOccurrence{}
+	if h.timerService != nil {
+		timers, tErr := h.timerService.GetAllTimers(r.Context())
+		if tErr != nil {
+			h.logger.Warn("timers fetch error for epgsearch results", slog.Any("error", tErr))
+		} else {
+			for _, t := range timers {
+				if !t.Active || strings.TrimSpace(t.ChannelID) == "" {
+					continue
+				}
+				timersByID[t.ID] = t
+			}
+		}
+	}
+
+	// Merge matches from all selected searches; de-duplicate by ChannelID+EventID.
+	seen := map[string]bool{}
+	combined := make([]domain.EPGEvent, 0, 128)
+	for _, s := range selected {
+		matches, err := services.ExecuteSavedEPGSearch(allEvents, s, order)
+		if err != nil {
+			http.Redirect(w, r, "/epgsearch?err="+url.QueryEscape("Invalid search: "+err.Error()), http.StatusSeeOther)
+			return
+		}
+		for _, ev := range matches {
+			key := fmt.Sprintf("%s:%d", ev.ChannelID, ev.EventID)
+			if ev.EventID <= 0 {
+				key = fmt.Sprintf("%s:%s", ev.ChannelID, ev.Start.UTC().Format(time.RFC3339Nano))
+			}
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			combined = append(combined, ev)
+		}
+	}
+
+	loc := time.Local
+	now := time.Now().In(loc)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+
+	// Build timer occurrences for the relevant event window.
+	if len(timersByID) > 0 && len(combined) > 0 {
+		minStart := combined[0].Start.In(loc)
+		maxStop := combined[0].Stop.In(loc)
+		for i := 1; i < len(combined); i++ {
+			s := combined[i].Start.In(loc)
+			e := combined[i].Stop.In(loc)
+			if s.Before(minStart) {
+				minStart = s
+			}
+			if e.After(maxStop) {
+				maxStop = e
+			}
+		}
+		from := minStart.Add(-24 * time.Hour)
+		to := maxStop.Add(24 * time.Hour)
+		for _, t := range timersByID {
+			occs := timerOccurrences(t, from, to)
+			// Always index by the raw timer channel field.
+			if t.ChannelID != "" {
+				occByChannelID[t.ChannelID] = append(occByChannelID[t.ChannelID], occs...)
+			}
+
+			// Additionally index by channel number when possible, because timers often
+			// reference channels by number (e.g. "2159") while EPG events carry the
+			// derived VDR channel id.
+			timerChNum := 0
+			if n, err := strconv.Atoi(strings.TrimSpace(t.ChannelID)); err == nil {
+				timerChNum = n
+			} else if n := numberByID[t.ChannelID]; n > 0 {
+				timerChNum = n
+			}
+			if timerChNum > 0 {
+				occByChannelNumber[timerChNum] = append(occByChannelNumber[timerChNum], occs...)
+			}
+		}
+		for ch := range occByChannelID {
+			occs := occByChannelID[ch]
+			sort.SliceStable(occs, func(i, j int) bool {
+				if occs[i].Start.Equal(occs[j].Start) {
+					return occs[i].TimerID < occs[j].TimerID
+				}
+				return occs[i].Start.Before(occs[j].Start)
+			})
+			occByChannelID[ch] = occs
+		}
+		for n := range occByChannelNumber {
+			occs := occByChannelNumber[n]
+			sort.SliceStable(occs, func(i, j int) bool {
+				if occs[i].Start.Equal(occs[j].Start) {
+					return occs[i].TimerID < occs[j].TimerID
+				}
+				return occs[i].Start.Before(occs[j].Start)
+			})
+			occByChannelNumber[n] = occs
+		}
+	}
+
+	sort.SliceStable(combined, func(i, j int) bool {
+		a := combined[i].Start.In(loc)
+		b := combined[j].Start.In(loc)
+
+		aDay := time.Date(a.Year(), a.Month(), a.Day(), 0, 0, 0, 0, loc)
+		bDay := time.Date(b.Year(), b.Month(), b.Day(), 0, 0, 0, 0, loc)
+
+		aIsToday := aDay.Equal(today)
+		bIsToday := bDay.Equal(today)
+		if aIsToday != bIsToday {
+			return aIsToday
+		}
+
+		aAfter := aDay.After(today)
+		bAfter := bDay.After(today)
+		if aAfter != bAfter {
+			// Future results before past results.
+			return aAfter
+		}
+
+		if !aDay.Equal(bDay) {
+			if aAfter && bAfter {
+				return aDay.Before(bDay)
+			}
+			// Past days: most recent first.
+			return aDay.After(bDay)
+		}
+
+		if !a.Equal(b) {
+			return a.Before(b)
+		}
+		return combined[i].ChannelNumber < combined[j].ChannelNumber
+	})
+
+	dayGroups := []epgSearchResultDayGroup{}
+	var currentDay time.Time
+	var currentIdx int
+	for _, ev := range combined {
+		start := ev.Start.In(loc)
+		evDay := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, loc)
+		if len(dayGroups) == 0 || !evDay.Equal(currentDay) {
+			dayGroups = append(dayGroups, epgSearchResultDayGroup{
+				DayLabel: start.Format("Monday, 01/02/2006"),
+				Events:   []epgSearchResultEventView{},
+			})
+			currentDay = evDay
+			currentIdx = len(dayGroups) - 1
+		}
+
+		label := "---"
+		active := false
+		lookupOccs := func() []timerOccurrence {
+			if ev.ChannelNumber > 0 {
+				if occs := occByChannelNumber[ev.ChannelNumber]; len(occs) > 0 {
+					return occs
+				}
+			}
+			if ev.ChannelID != "" {
+				// Some VDR/SVDRP outputs don't provide the numeric channel in the EPG header.
+				// When that happens, map the derived channel id -> number via the channels list.
+				if ev.ChannelNumber <= 0 {
+					if n := numberByID[ev.ChannelID]; n > 0 {
+						if occs := occByChannelNumber[n]; len(occs) > 0 {
+							return occs
+						}
+					}
+				}
+				if occs := occByChannelID[ev.ChannelID]; len(occs) > 0 {
+					return occs
+				}
+				// Sometimes timers are indexed by numeric channel id string.
+				if ev.ChannelNumber > 0 {
+					if occs := occByChannelID[strconv.Itoa(ev.ChannelNumber)]; len(occs) > 0 {
+						return occs
+					}
+				}
+			}
+			// Last resort: if we can map number->id, try that.
+			if ev.ChannelNumber > 0 {
+				if id := idByNumber[ev.ChannelNumber]; id != "" {
+					if occs := occByChannelID[id]; len(occs) > 0 {
+						return occs
+					}
+				}
+			}
+			return nil
+		}
+
+		if occs := lookupOccs(); len(occs) > 0 {
+			evStart := ev.Start.In(loc)
+			evStop := ev.Stop.In(loc)
+			if evStop.Before(evStart) {
+				evStop = evStart
+			}
+			for _, occ := range occs {
+				// overlap if: occ.Start < evStop && evStart < occ.Stop
+				if occ.Start.Before(evStop) && evStart.Before(occ.Stop) {
+					active = true
+					if t, ok := timersByID[occ.TimerID]; ok {
+						if strings.TrimSpace(t.Title) != "" {
+							label = t.Title
+						} else {
+							label = "active"
+						}
+					} else {
+						label = "active"
+					}
+					break
+				}
+			}
+		}
+
+		dayGroups[currentIdx].Events = append(dayGroups[currentIdx].Events, epgSearchResultEventView{
+			EPGEvent:    ev,
+			TimerActive: active,
+			TimerLabel:  label,
+		})
+	}
+
+	data := map[string]any{
+		"DayGroups": dayGroups,
+	}
+	h.renderTemplate(w, r, "epgsearch_results.html", data)
+}
+
+type epgSearchFormModel struct {
+	Search   config.EPGSearch
+	Channels []domain.Channel
+}
+
+func (h *Handler) epgSearchFormData(r *http.Request, search config.EPGSearch) map[string]any {
+	channels, err := h.epgService.GetChannels(r.Context())
+	if err != nil {
+		channels = []domain.Channel{}
+	}
+	data := map[string]any{
+		"Search":   search,
+		"Channels": channels,
+	}
+	return data
+}
+
+func (h *Handler) EPGSearchNew(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	search := config.EPGSearch{
+		Active:     true,
+		Mode:       "phrase",
+		InTitle:    true,
+		InSubtitle: true,
+		InDesc:     true,
+		UseChannel: "no",
+	}
+	data := h.epgSearchFormData(r, search)
+	data["PageTitle"] = "Add New Search - VDRAdmin-go"
+	data["Heading"] = "Add New Search"
+	data["FormAction"] = "/epgsearch/new"
+	h.renderTemplate(w, r, "epgsearch_edit.html", data)
+}
+
+func (h *Handler) EPGSearchCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.cfg == nil {
+		http.Error(w, "Configuration not available", http.StatusInternalServerError)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form", http.StatusBadRequest)
+		return
+	}
+
+	search := parseEPGSearchFromForm(r.PostForm)
+	search.ID = nextEPGSearchID(h.cfg.EPG.Searches)
+
+	updated := *h.cfg
+	updated.EPG.Searches = append(append([]config.EPGSearch(nil), h.cfg.EPG.Searches...), search)
+	if err := updated.Validate(); err != nil {
+		data := h.epgSearchFormData(r, search)
+		data["Error"] = err.Error()
+		data["PageTitle"] = "Add New Search - VDRAdmin-go"
+		data["Heading"] = "Add New Search"
+		data["FormAction"] = "/epgsearch/new"
+		h.renderTemplate(w, r, "epgsearch_edit.html", data)
+		return
+	}
+	*h.cfg = updated
+	if strings.TrimSpace(h.configPath) != "" {
+		if err := h.cfg.Save(h.configPath); err != nil {
+			http.Redirect(w, r, "/epgsearch?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+			return
+		}
+	}
+
+	http.Redirect(w, r, "/epgsearch?msg="+url.QueryEscape("Saved search."), http.StatusSeeOther)
+}
+
+func (h *Handler) EPGSearchEdit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.cfg == nil {
+		http.Error(w, "Configuration not available", http.StatusInternalServerError)
+		return
+	}
+	id, _ := strconv.Atoi(r.URL.Query().Get("id"))
+	if id <= 0 {
+		http.Error(w, "Invalid search id", http.StatusBadRequest)
+		return
+	}
+	var found *config.EPGSearch
+	for i := range h.cfg.EPG.Searches {
+		if h.cfg.EPG.Searches[i].ID == id {
+			found = &h.cfg.EPG.Searches[i]
+			break
+		}
+	}
+	if found == nil {
+		http.Error(w, "Search not found", http.StatusNotFound)
+		return
+	}
+	data := h.epgSearchFormData(r, *found)
+	data["PageTitle"] = "Edit Search - VDRAdmin-go"
+	data["Heading"] = "Edit Search"
+	data["FormAction"] = "/epgsearch/edit"
+	h.renderTemplate(w, r, "epgsearch_edit.html", data)
+}
+
+func (h *Handler) EPGSearchUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.cfg == nil {
+		http.Error(w, "Configuration not available", http.StatusInternalServerError)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form", http.StatusBadRequest)
+		return
+	}
+
+	search := parseEPGSearchFromForm(r.PostForm)
+	if v := strings.TrimSpace(r.PostForm.Get("id")); v != "" {
+		id, _ := strconv.Atoi(v)
+		search.ID = id
+	}
+	if search.ID <= 0 {
+		http.Error(w, "Invalid search id", http.StatusBadRequest)
+		return
+	}
+
+	updated := *h.cfg
+	updated.EPG.Searches = append([]config.EPGSearch(nil), h.cfg.EPG.Searches...)
+	replaced := false
+	for i := range updated.EPG.Searches {
+		if updated.EPG.Searches[i].ID == search.ID {
+			updated.EPG.Searches[i] = search
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		http.Error(w, "Search not found", http.StatusNotFound)
+		return
+	}
+	if err := updated.Validate(); err != nil {
+		data := h.epgSearchFormData(r, search)
+		data["Error"] = err.Error()
+		data["PageTitle"] = "Edit Search - VDRAdmin-go"
+		data["Heading"] = "Edit Search"
+		data["FormAction"] = "/epgsearch/edit"
+		h.renderTemplate(w, r, "epgsearch_edit.html", data)
+		return
+	}
+	*h.cfg = updated
+	if strings.TrimSpace(h.configPath) != "" {
+		if err := h.cfg.Save(h.configPath); err != nil {
+			http.Redirect(w, r, "/epgsearch?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+			return
+		}
+	}
+
+	http.Redirect(w, r, "/epgsearch?msg="+url.QueryEscape("Saved search."), http.StatusSeeOther)
+}
+
+func (h *Handler) EPGSearchDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.cfg == nil {
+		http.Error(w, "Configuration not available", http.StatusInternalServerError)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form", http.StatusBadRequest)
+		return
+	}
+	id, _ := strconv.Atoi(r.PostForm.Get("id"))
+	if id <= 0 {
+		http.Error(w, "Invalid search id", http.StatusBadRequest)
+		return
+	}
+
+	updated := *h.cfg
+	updated.EPG.Searches = make([]config.EPGSearch, 0, len(h.cfg.EPG.Searches))
+	for _, s := range h.cfg.EPG.Searches {
+		if s.ID == id {
+			continue
+		}
+		updated.EPG.Searches = append(updated.EPG.Searches, s)
+	}
+	if err := updated.Validate(); err != nil {
+		http.Redirect(w, r, "/epgsearch?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+	*h.cfg = updated
+	if strings.TrimSpace(h.configPath) != "" {
+		if err := h.cfg.Save(h.configPath); err != nil {
+			http.Redirect(w, r, "/epgsearch?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+			return
+		}
+	}
+
+	http.Redirect(w, r, "/epgsearch?msg="+url.QueryEscape("Deleted search."), http.StatusSeeOther)
+}
+
+func nextEPGSearchID(existing []config.EPGSearch) int {
+	max := 0
+	for _, s := range existing {
+		if s.ID > max {
+			max = s.ID
+		}
+	}
+	return max + 1
+}
+
+func parseEPGSearchFromForm(form url.Values) config.EPGSearch {
+	s := config.EPGSearch{}
+	s.Active = form.Get("active") == "on"
+	s.Pattern = strings.TrimSpace(form.Get("pattern"))
+	s.Mode = strings.TrimSpace(form.Get("mode"))
+	s.MatchCase = form.Get("match_case") == "on"
+	s.InTitle = form.Get("in_title") == "on"
+	s.InSubtitle = form.Get("in_subtitle") == "on"
+	s.InDesc = form.Get("in_description") == "on"
+	s.UseChannel = strings.TrimSpace(form.Get("use_channel"))
+	s.ChannelID = strings.TrimSpace(form.Get("channel_id"))
+	s.ChannelFrom = strings.TrimSpace(form.Get("channel_from"))
+	s.ChannelTo = strings.TrimSpace(form.Get("channel_to"))
+	return s
 }
 
 // TimerList shows all timers
@@ -1618,12 +2231,9 @@ func normalizeTheme(theme string) string {
 }
 
 func themeFromRequest(r *http.Request, fallback string) string {
-	fallback = normalizeTheme(fallback)
-	c, err := r.Cookie("theme")
-	if err != nil {
-		return fallback
-	}
-	return normalizeTheme(c.Value)
+	// The UI theme is configured server-side (Configurations page) and should apply
+	// consistently across all pages. Ignore any legacy per-browser theme cookie.
+	return normalizeTheme(fallback)
 }
 
 func (h *Handler) handleError(w http.ResponseWriter, r *http.Request, err error) {

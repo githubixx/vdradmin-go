@@ -33,6 +33,10 @@
     --nav-active-bg: linear-gradient(180deg, rgba(124, 58, 237, 0.14), rgba(124, 58, 237, 0.08));
     --nav-active-border: rgba(124, 58, 237, 0.22);
     --nav-active-shadow: 0 10px 26px rgba(124, 58, 237, 0.16);
+
+    /* Burger menu localized dim overlay (around the dropdown) */
+    --menu-scrim-color: rgba(0, 0, 0, 0.18);
+    --menu-scrim-padding: 20px;
     --radius: 0.75rem;
     --spacing: 1rem;
     color-scheme: light;
@@ -60,6 +64,8 @@
         --nav-active-bg: linear-gradient(180deg, rgba(167, 139, 250, 0.20), rgba(167, 139, 250, 0.10));
         --nav-active-border: rgba(167, 139, 250, 0.22);
         --nav-active-shadow: 0 14px 34px rgba(167, 139, 250, 0.22);
+
+        --menu-scrim-color: rgba(0, 0, 0, 0.32);
         color-scheme: dark;
     }
 }
@@ -85,6 +91,8 @@
     --nav-active-bg: linear-gradient(180deg, rgba(167, 139, 250, 0.20), rgba(167, 139, 250, 0.10));
     --nav-active-border: rgba(167, 139, 250, 0.22);
     --nav-active-shadow: 0 14px 34px rgba(167, 139, 250, 0.22);
+
+    --menu-scrim-color: rgba(0, 0, 0, 0.32);
     color-scheme: dark;
 }
 
@@ -395,6 +403,160 @@ header nav {
     gap: 0.5rem;
 }
 
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.nav-burger {
+    position: relative;
+}
+
+.nav-burger summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.nav-burger summary::-webkit-details-marker {
+    display: none;
+}
+
+.nav-burger-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.45rem 0.6rem;
+}
+
+.burger-icon {
+    width: 18px;
+    height: 12px;
+    display: inline-block;
+    position: relative;
+}
+
+.burger-icon::before,
+.burger-icon::after,
+.burger-icon {
+    background: transparent;
+}
+
+.burger-icon::before,
+.burger-icon::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--text-color);
+    border-radius: 2px;
+}
+
+.burger-icon::before {
+    top: 0;
+}
+
+.burger-icon::after {
+    bottom: 0;
+}
+
+.nav-burger-button .burger-icon {
+    background: none;
+}
+
+.nav-burger-button .burger-icon {
+    box-shadow: inset 0 0 0 0 transparent;
+}
+
+.nav-burger-button .burger-icon {
+    /* Middle line */
+    background-image: linear-gradient(var(--text-color), var(--text-color));
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 100% 2px;
+    border-radius: 2px;
+}
+
+.nav-burger-menu {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    min-width: 220px;
+    padding: 0.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px);
+    z-index: 200;
+
+    /* Keep menu content above its own scrim layer */
+    isolation: isolate;
+}
+
+/* Dim only a tight area around the dropdown (menu size + padding). */
+.nav-burger-menu::before {
+    content: "";
+    position: absolute;
+    inset: calc(var(--menu-scrim-padding) * -1);
+    border-radius: calc(14px + var(--menu-scrim-padding));
+    background: var(--menu-scrim-color);
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* In dark mode, --surface-color is a translucent gradient. Layer it over a solid base
+   so underlying page content doesn't show through the open menu. */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) .nav-burger-menu {
+        background-color: var(--bg-color);
+        background-image: var(--surface-color);
+    }
+}
+
+:root[data-theme="dark"] .nav-burger-menu {
+    background-color: var(--bg-color);
+    background-image: var(--surface-color);
+}
+
+details.nav-burger:not([open]) .nav-burger-menu {
+    display: none;
+}
+
+.nav-burger-menu a {
+    text-decoration: none;
+    color: var(--text-color);
+    font-weight: 500;
+    transition: color 0.2s;
+    padding: 0.45rem 0.7rem;
+    border-radius: 12px;
+}
+
+.nav-burger-menu a:hover {
+    color: var(--primary-color);
+    background: var(--surface-hover);
+}
+
+.nav-burger-menu a.active,
+.nav-burger-menu a[aria-current="page"] {
+    color: var(--text-color);
+    background: var(--nav-active-bg);
+    border: 1px solid var(--nav-active-border);
+    box-shadow: var(--nav-active-shadow);
+    text-decoration: none;
+    backdrop-filter: blur(10px);
+}
+
+.nav-burger-menu a:focus-visible {
+    outline: 2px solid var(--nav-active-border);
+    outline-offset: 2px;
+}
+
 .nav-channel-form {
     display: flex;
     align-items: center;
@@ -558,6 +720,14 @@ main {
 .btn:focus-visible {
     outline: 2px solid var(--nav-active-border);
     outline-offset: 2px;
+}
+
+.btn[disabled],
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: var(--shadow);
 }
 
 .btn-primary {
@@ -856,6 +1026,38 @@ main {
     box-shadow: var(--shadow);
 }
 
+/* Data Table (used for EPG Search list) */
+.data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.data-table th,
+.data-table td {
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: top;
+}
+
+.data-table th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.data-table tbody tr:hover {
+    background: var(--surface-hover);
+}
+
+.data-table td.actions {
+    white-space: nowrap;
+}
+
+.data-table tr:last-child td {
+    border-bottom: none;
+}
+
 /* Configuration form */
 .config-grid {
     display: grid;
@@ -963,13 +1165,12 @@ footer a:hover {
 /* Responsive Design */
 @media (max-width: 768px) {
     header nav {
-        flex-direction: column;
+        flex-direction: row;
         gap: var(--spacing);
     }
 
-    .nav-links {
-        flex-wrap: wrap;
-        justify-content: center;
+    .nav-right {
+        gap: 0.5rem;
     }
 
     .hero h2 {

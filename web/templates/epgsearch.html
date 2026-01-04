@@ -1,0 +1,145 @@
+{{define "epgsearch.html"}}
+<!DOCTYPE html>
+<html lang="en" {{if eq .ThemeMode "dark"}}data-theme="dark"{{else if eq .ThemeMode "light"}}data-theme="light"{{end}} data-theme-default="{{.ThemeDefault}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPG Search - VDRAdmin-go</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/theme.js?v=20260104" defer></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body>
+    {{template "nav_header" .}}
+
+    <main class="container">
+        {{if .HomeError}}
+        <div class="toolbar">
+            <strong>VDR connection error:</strong> {{.HomeError}}
+        </div>
+        {{end}}
+
+        {{if .Message}}
+        <div class="toolbar">
+            <p><strong>{{.Message}}</strong></p>
+        </div>
+        {{end}}
+        {{if .Error}}
+        <div class="toolbar">
+            <p><strong>Error:</strong> {{.Error}}</p>
+        </div>
+        {{end}}
+
+        <div class="toolbar" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3>EPG Search</h3>
+            <div class="sort-options" style="justify-content: flex-end; width: 100%;">
+                {{if eq .Role "admin"}}
+                <a class="btn btn-primary" href="/epgsearch/new">New Search</a>
+                {{end}}
+            </div>
+        </div>
+
+        <form method="post" action="/epgsearch/execute">
+            <div class="toolbar">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Active</th>
+                            <th>Channel</th>
+                            <th>From</th>
+                            <th>To</th>
+                            <th>Search Pattern</th>
+                            <th></th>
+                            <th style="text-align: right;">
+                                <label style="display: inline-flex; align-items: center; gap: 0.4rem; justify-content: flex-end; width: 100%;">
+                                    <input id="select_all" type="checkbox" aria-label="Select all">
+                                    Select
+                                </label>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Searches}}
+                        <tr>
+                            <td>{{if .Active}}Yes{{else}}No{{end}}</td>
+                            <td>{{if eq .UseChannel "no"}}Any{{else}}{{.ChannelLabel}}{{end}}</td>
+                            <td>{{.FromLabel}}</td>
+                            <td>{{.ToLabel}}</td>
+                            <td>{{.Pattern}}</td>
+                            <td class="actions" style="text-align: right;">
+                                {{if eq $.Role "admin"}}
+                                <a class="btn btn-sm btn-secondary" href="/epgsearch/edit?id={{.ID}}">Edit</a>
+                                <button type="submit" class="btn btn-sm btn-danger" formaction="/epgsearch/delete" formmethod="post" name="id" value="{{.ID}}" onclick="return confirm('Delete this search?');">Delete</button>
+                                {{end}}
+                            </td>
+                            <td style="text-align: right;">
+                                <input class="search-select" type="checkbox" name="ids" value="{{.ID}}" aria-label="Select search" {{if .Active}}checked{{end}}>
+                            </td>
+                        </tr>
+                        {{else}}
+                        <tr>
+                            <td colspan="7">
+                                <p class="empty-state" style="padding: 0.75rem 0; text-align: left;">No saved searches configured</p>
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="toolbar">
+                <div class="sort-options" style="justify-content: flex-end; width: 100%;">
+                    <button type="submit" class="btn btn-primary">Execute</button>
+                </div>
+                <p class="empty-state" style="padding: 0.75rem 0 0 0; text-align: left;">If nothing is selected, executes all active searches.</p>
+            </div>
+        </form>
+
+        <script>
+            (function() {
+                const selectAll = document.getElementById('select_all');
+                const selects = Array.from(document.querySelectorAll('input.search-select'));
+
+                function setAllChecked(checked) {
+                    selects.forEach((cb) => {
+                        cb.checked = checked;
+                    });
+                }
+
+                function updateSelectAllState() {
+                    if (!selectAll) return;
+                    if (selects.length === 0) {
+                        selectAll.checked = false;
+                        selectAll.indeterminate = false;
+                        return;
+                    }
+
+                    const checkedCount = selects.filter((cb) => cb.checked).length;
+                    selectAll.checked = checkedCount === selects.length;
+                    selectAll.indeterminate = checkedCount > 0 && checkedCount < selects.length;
+                }
+
+                if (selectAll) {
+                    selectAll.addEventListener('change', () => {
+                        setAllChecked(selectAll.checked);
+                        updateSelectAllState();
+                    });
+                }
+
+                selects.forEach((cb) => {
+                    cb.addEventListener('change', updateSelectAllState);
+                });
+
+                updateSelectAllState();
+            })();
+        </script>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; {{.Year}} vdradmin-go | <a href="https://github.com/githubixx/vdradmin-go">GitHub</a></p>
+        </div>
+    </footer>
+</body>
+</html>
+{{end}}

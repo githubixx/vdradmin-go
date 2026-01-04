@@ -1,0 +1,125 @@
+{{define "epgsearch_edit.html"}}
+<!DOCTYPE html>
+<html lang="en" {{if eq .ThemeMode "dark"}}data-theme="dark"{{else if eq .ThemeMode "light"}}data-theme="light"{{end}} data-theme-default="{{.ThemeDefault}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{if .PageTitle}}{{.PageTitle}}{{else}}EPG Search - VDRAdmin-go{{end}}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/theme.js?v=20260104" defer></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body>
+    {{template "nav_header" .}}
+
+    <main class="container">
+        {{if .Message}}
+        <div class="toolbar">
+            <p><strong>{{.Message}}</strong></p>
+        </div>
+        {{end}}
+        {{if .Error}}
+        <div class="toolbar">
+            <p><strong>Error:</strong> {{.Error}}</p>
+        </div>
+        {{end}}
+
+        <div class="toolbar">
+            <h2 style="font-family: var(--font-display); font-size: 1.25rem; margin-bottom: 0.75rem;">{{if .Heading}}{{.Heading}}{{else}}EPG Search{{end}}</h2>
+
+            <form action="{{if .FormAction}}{{.FormAction}}{{else}}/epgsearch/new{{end}}" method="post" class="config-grid">
+                {{if gt .Search.ID 0}}<input type="hidden" name="id" value="{{.Search.ID}}">{{end}}
+
+                <label for="active">Active</label>
+                <input id="active" type="checkbox" name="active" {{if .Search.Active}}checked{{end}}>
+
+                <label for="pattern">Search term</label>
+                <input id="pattern" name="pattern" type="text" value="{{.Search.Pattern}}" required>
+
+                <label for="mode">Mode</label>
+                <select id="mode" name="mode">
+                    <option value="phrase" {{if eq .Search.Mode "phrase"}}selected{{end}}>phrase</option>
+                    <option value="regex" {{if eq .Search.Mode "regex"}}selected{{end}}>regex</option>
+                </select>
+
+                <label for="match_case">Match case</label>
+                <input id="match_case" type="checkbox" name="match_case" {{if .Search.MatchCase}}checked{{end}}>
+
+                <label>Search in</label>
+                <div class="timer-radio-group">
+                    <label><input type="checkbox" name="in_title" {{if .Search.InTitle}}checked{{end}}> Title</label>
+                    <label><input type="checkbox" name="in_subtitle" {{if .Search.InSubtitle}}checked{{end}}> Subtitle</label>
+                    <label><input type="checkbox" name="in_description" {{if .Search.InDesc}}checked{{end}}> Description</label>
+                </div>
+
+                <label for="use_channel">Channel restriction</label>
+                <select id="use_channel" name="use_channel">
+                    <option value="no" {{if eq .Search.UseChannel "no"}}selected{{end}}>Any channel</option>
+                    <option value="single" {{if eq .Search.UseChannel "single"}}selected{{end}}>Single channel</option>
+                    <option value="range" {{if eq .Search.UseChannel "range"}}selected{{end}}>Channel range</option>
+                </select>
+
+                <div id="channel_single_rows" style="{{if eq .Search.UseChannel "single"}}display: contents;{{else}}display: none;{{end}}">
+                    <label for="channel_id">Channel</label>
+                    <select id="channel_id" name="channel_id">
+                        <option value="">-- Select --</option>
+                        {{range .Channels}}
+                        <option value="{{.ID}}" {{if eq $.Search.ChannelID .ID}}selected{{end}}>{{.Name}}</option>
+                        {{end}}
+                    </select>
+                </div>
+
+                <div id="channel_range_rows" style="{{if eq .Search.UseChannel "range"}}display: contents;{{else}}display: none;{{end}}">
+                    <label for="channel_from">From</label>
+                    <select id="channel_from" name="channel_from">
+                        <option value="">-- Select --</option>
+                        {{range .Channels}}
+                        <option value="{{.ID}}" {{if eq $.Search.ChannelFrom .ID}}selected{{end}}>{{.Name}}</option>
+                        {{end}}
+                    </select>
+
+                    <label for="channel_to">To</label>
+                    <select id="channel_to" name="channel_to">
+                        <option value="">-- Select --</option>
+                        {{range .Channels}}
+                        <option value="{{.ID}}" {{if eq $.Search.ChannelTo .ID}}selected{{end}}>{{.Name}}</option>
+                        {{end}}
+                    </select>
+                </div>
+
+                <div></div>
+                <div class="timer-form-actions">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <a href="/epgsearch" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+
+        <script>
+            (function() {
+                const useChannel = document.getElementById('use_channel');
+                const single = document.getElementById('channel_single_rows');
+                const range = document.getElementById('channel_range_rows');
+
+                function update() {
+                    const v = (useChannel && useChannel.value) ? useChannel.value : 'no';
+                    if (single) single.style.display = (v === 'single') ? 'contents' : 'none';
+                    if (range) range.style.display = (v === 'range') ? 'contents' : 'none';
+                }
+
+                if (useChannel) {
+                    useChannel.addEventListener('change', update);
+                }
+                update();
+            })();
+        </script>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; {{.Year}} vdradmin-go | <a href="https://github.com/githubixx/vdradmin-go">GitHub</a></p>
+        </div>
+    </footer>
+</body>
+</html>
+{{end}}

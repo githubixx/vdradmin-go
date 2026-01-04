@@ -49,6 +49,11 @@ timer:
   default_margin_start: 2   # minutes
   default_margin_end: 10    # minutes
 
+epg:
+  # Saved EPG searches executed client-side against SVDRP EPG data.
+  # These do not require vdr-plugin-epgsearch.
+  searches: []
+
 ui:
   # Default theme: system (auto), light, or dark
   theme: system
