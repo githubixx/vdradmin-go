@@ -2633,7 +2633,7 @@ func normalizeTheme(theme string) string {
 	}
 }
 
-func themeFromRequest(r *http.Request, fallback string) string {
+func themeFromRequest(_ *http.Request, fallback string) string {
 	// The UI theme is configured server-side (Configurations page) and should apply
 	// consistently across all pages. Ignore any legacy per-browser theme cookie.
 	return normalizeTheme(fallback)
