@@ -16,7 +16,9 @@ func (s *timerCreateSpyVDR) Connect(ctx context.Context) error { return nil }
 func (s *timerCreateSpyVDR) Close() error                      { return nil }
 func (s *timerCreateSpyVDR) Ping(ctx context.Context) error    { return nil }
 
-func (s *timerCreateSpyVDR) GetChannels(ctx context.Context) ([]domain.Channel, error) { return nil, nil }
+func (s *timerCreateSpyVDR) GetChannels(ctx context.Context) ([]domain.Channel, error) {
+	return nil, nil
+}
 func (s *timerCreateSpyVDR) GetEPG(ctx context.Context, channelID string, at time.Time) ([]domain.EPGEvent, error) {
 	return nil, nil
 }
@@ -30,11 +32,15 @@ func (s *timerCreateSpyVDR) CreateTimer(ctx context.Context, timer *domain.Timer
 func (s *timerCreateSpyVDR) UpdateTimer(ctx context.Context, timer *domain.Timer) error { return nil }
 func (s *timerCreateSpyVDR) DeleteTimer(ctx context.Context, timerID int) error         { return nil }
 
-func (s *timerCreateSpyVDR) GetRecordings(ctx context.Context) ([]domain.Recording, error) { return nil, nil }
-func (s *timerCreateSpyVDR) DeleteRecording(ctx context.Context, path string) error         { return nil }
-func (s *timerCreateSpyVDR) GetCurrentChannel(ctx context.Context) (string, error)         { return "", nil }
-func (s *timerCreateSpyVDR) SetCurrentChannel(ctx context.Context, channelID string) error { return nil }
-func (s *timerCreateSpyVDR) SendKey(ctx context.Context, key string) error                 { return nil }
+func (s *timerCreateSpyVDR) GetRecordings(ctx context.Context) ([]domain.Recording, error) {
+	return nil, nil
+}
+func (s *timerCreateSpyVDR) DeleteRecording(ctx context.Context, path string) error { return nil }
+func (s *timerCreateSpyVDR) GetCurrentChannel(ctx context.Context) (string, error)  { return "", nil }
+func (s *timerCreateSpyVDR) SetCurrentChannel(ctx context.Context, channelID string) error {
+	return nil
+}
+func (s *timerCreateSpyVDR) SendKey(ctx context.Context, key string) error { return nil }
 
 func TestCreateTimerFromEPG_MidnightMarginAdjustsDay(t *testing.T) {
 	loc := time.Local

@@ -211,15 +211,21 @@ func (m *channelsEPGAtSpyVDRMock) GetTimers(ctx context.Context) ([]domain.Timer
 	return []domain.Timer{}, nil
 }
 
-func (m *channelsEPGAtSpyVDRMock) CreateTimer(ctx context.Context, timer *domain.Timer) error { return nil }
-func (m *channelsEPGAtSpyVDRMock) UpdateTimer(ctx context.Context, timer *domain.Timer) error { return nil }
-func (m *channelsEPGAtSpyVDRMock) DeleteTimer(ctx context.Context, timerID int) error         { return nil }
+func (m *channelsEPGAtSpyVDRMock) CreateTimer(ctx context.Context, timer *domain.Timer) error {
+	return nil
+}
+func (m *channelsEPGAtSpyVDRMock) UpdateTimer(ctx context.Context, timer *domain.Timer) error {
+	return nil
+}
+func (m *channelsEPGAtSpyVDRMock) DeleteTimer(ctx context.Context, timerID int) error { return nil }
 
 func (m *channelsEPGAtSpyVDRMock) GetRecordings(ctx context.Context) ([]domain.Recording, error) {
 	return nil, nil
 }
 func (m *channelsEPGAtSpyVDRMock) DeleteRecording(ctx context.Context, path string) error { return nil }
-func (m *channelsEPGAtSpyVDRMock) GetCurrentChannel(ctx context.Context) (string, error)  { return "", nil }
+func (m *channelsEPGAtSpyVDRMock) GetCurrentChannel(ctx context.Context) (string, error) {
+	return "", nil
+}
 func (m *channelsEPGAtSpyVDRMock) SetCurrentChannel(ctx context.Context, channelID string) error {
 	return nil
 }

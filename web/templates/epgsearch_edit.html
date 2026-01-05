@@ -89,11 +89,52 @@
 
                 <div></div>
                 <div class="timer-form-actions">
-                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="submit" name="action" value="save" class="btn btn-primary">Save</button>
+                    {{if or (eq .FormAction "/epgsearch/new") (eq .FormAction "/epgsearch/edit")}}
+                    <button type="submit" name="action" value="run" class="btn btn-secondary">Run</button>
+                    {{end}}
                     <a href="/epgsearch" class="btn btn-secondary">Cancel</a>
                 </div>
             </form>
         </div>
+
+        {{if .RunDayGroups}}
+        <div class="toolbar">
+            <h3>Matches</h3>
+        </div>
+        {{range .RunDayGroups}}
+        <div class="channels-day">{{.DayLabel}}</div>
+        <div class="epg-list">
+            {{range .Events}}
+            <div class="epg-item">
+                <div class="epg-time">
+                    <time datetime="{{.Start.Format "2006-01-02T15:04"}}">{{.Start.Format "15:04"}}-{{.Stop.Format "15:04"}}</time>
+                </div>
+                <div class="epg-content">
+                    <div class="epg-header">
+                        <h4>{{.Title}}</h4>
+                        <span class="epg-channel">{{.ChannelName}}</span>
+                    </div>
+                    {{if .Subtitle}}
+                    <p class="epg-subtitle">{{.Subtitle}}</p>
+                    {{end}}
+                </div>
+                {{if eq $.Role "admin"}}
+                <div class="epg-actions">
+                    {{if or .TimerActive (le .EventID 0)}}
+                    <button type="button" class="btn btn-sm btn-secondary" disabled>Scheduled</button>
+                    {{else}}
+                    <a class="btn btn-sm btn-primary" href="/timers/new?channel={{.ChannelID | urlquery}}&day={{.Start.Format "2006-01-02"}}&start={{.Start.Format "15:04"}}&stop={{.Stop.Format "15:04"}}&title={{.Title | urlquery}}">Record</a>
+                    {{end}}
+                </div>
+                {{end}}
+            </div>
+            {{else}}
+            <p class="empty-state">No matches</p>
+            {{end}}
+        </div>
+        {{end}}
+        {{end}}
 
         <script>
             (function() {

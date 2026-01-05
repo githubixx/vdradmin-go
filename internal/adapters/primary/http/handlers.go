@@ -161,6 +161,17 @@ func (h *Handler) Channels(w http.ResponseWriter, r *http.Request) {
 	dayEnd := dayStart.Add(24 * time.Hour)
 	data["SelectedDay"] = dayStart.Format("2006-01-02")
 
+	numberByID := make(map[string]int, len(channels))
+	idByNumber := make(map[int]string, len(channels))
+	for _, ch := range channels {
+		if ch.ID != "" {
+			numberByID[ch.ID] = ch.Number
+		}
+		if ch.Number > 0 && ch.ID != "" {
+			idByNumber[ch.Number] = ch.ID
+		}
+	}
+
 	var events []domain.EPGEvent
 	daysByValue := map[string]time.Time{}
 	// Always include selected day in the dropdown.
@@ -233,59 +244,9 @@ func (h *Handler) Channels(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	normalizeTitle := func(s string) string {
-		s = strings.ToLower(strings.TrimSpace(s))
-		s = strings.Join(strings.Fields(s), " ")
-		return s
-	}
-
 	eventScheduled := func(ev domain.EPGEvent) bool {
-		evTitle := normalizeTitle(ev.Title)
-		if evTitle == "" {
-			return false
-		}
-
-		lookupOccs := func() []timerOccurrence {
-			if ev.ChannelNumber > 0 {
-				if occs := occByChannelNumber[ev.ChannelNumber]; len(occs) > 0 {
-					return occs
-				}
-			}
-			if ev.ChannelID != "" {
-				if occs := occByChannelID[ev.ChannelID]; len(occs) > 0 {
-					return occs
-				}
-				if ev.ChannelNumber > 0 {
-					if occs := occByChannelID[strconv.Itoa(ev.ChannelNumber)]; len(occs) > 0 {
-						return occs
-					}
-				}
-			}
-			return nil
-		}
-
-		occs := lookupOccs()
-		if len(occs) == 0 {
-			return false
-		}
-		evStart := ev.Start.In(time.Local)
-		evStop := ev.Stop.In(time.Local)
-		if evStop.Before(evStart) {
-			evStop = evStart
-		}
-		for _, occ := range occs {
-			if !occ.Start.Before(evStop) || !evStart.Before(occ.Stop) {
-				continue
-			}
-			t, ok := timersByID[occ.TimerID]
-			if !ok {
-				continue
-			}
-			if normalizeTitle(t.Title) == evTitle {
-				return true
-			}
-		}
-		return false
+		_, ok := scheduledTimerForEvent(ev, loc, occByChannelNumber, occByChannelID, numberByID, idByNumber, timersByID)
+		return ok
 	}
 
 	dayOptions := make([]channelsDayOption, 0, len(daysByValue))
@@ -779,73 +740,9 @@ func (h *Handler) PlayingToday(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	normalizeTitle := func(s string) string {
-		s = strings.ToLower(strings.TrimSpace(s))
-		s = strings.Join(strings.Fields(s), " ")
-		return s
-	}
-
 	hasOverlappingActiveTimer := func(ev domain.EPGEvent) bool {
-		evTitle := normalizeTitle(ev.Title)
-		if evTitle == "" {
-			return false
-		}
-		lookupOccs := func() []timerOccurrence {
-			if ev.ChannelNumber > 0 {
-				if occs := occByChannelNumber[ev.ChannelNumber]; len(occs) > 0 {
-					return occs
-				}
-			}
-			if ev.ChannelID != "" {
-				if ev.ChannelNumber <= 0 {
-					if n := numberByID[ev.ChannelID]; n > 0 {
-						if occs := occByChannelNumber[n]; len(occs) > 0 {
-							return occs
-						}
-					}
-				}
-				if occs := occByChannelID[ev.ChannelID]; len(occs) > 0 {
-					return occs
-				}
-				if ev.ChannelNumber > 0 {
-					if occs := occByChannelID[strconv.Itoa(ev.ChannelNumber)]; len(occs) > 0 {
-						return occs
-					}
-				}
-			}
-			if ev.ChannelNumber > 0 {
-				if id := idByNumber[ev.ChannelNumber]; id != "" {
-					if occs := occByChannelID[id]; len(occs) > 0 {
-						return occs
-					}
-				}
-			}
-			return nil
-		}
-
-		occs := lookupOccs()
-		if len(occs) == 0 {
-			return false
-		}
-
-		evStart := ev.Start.In(loc)
-		evStop := ev.Stop.In(loc)
-		if evStop.Before(evStart) {
-			evStop = evStart
-		}
-		for _, occ := range occs {
-			if !occ.Start.Before(evStop) || !evStart.Before(occ.Stop) {
-				continue
-			}
-			t, ok := timersByID[occ.TimerID]
-			if !ok {
-				continue
-			}
-			if normalizeTitle(t.Title) == evTitle {
-				return true
-			}
-		}
-		return false
+		_, ok := scheduledTimerForEvent(ev, loc, occByChannelNumber, occByChannelID, numberByID, idByNumber, timersByID)
+		return ok
 	}
 
 	groups := make([]playingChannelGroup, 0, len(channels))
@@ -1147,7 +1044,7 @@ func (h *Handler) EPGSearchExecute(w http.ResponseWriter, r *http.Request) {
 			h.logger.Warn("timers fetch error for epgsearch results", slog.Any("error", tErr))
 		} else {
 			for _, t := range timers {
-				if !t.Active || strings.TrimSpace(t.ChannelID) == "" {
+				if strings.TrimSpace(t.ChannelID) == "" {
 					continue
 				}
 				timersByID[t.ID] = t
@@ -1290,64 +1187,12 @@ func (h *Handler) EPGSearchExecute(w http.ResponseWriter, r *http.Request) {
 
 		label := "---"
 		active := false
-		lookupOccs := func() []timerOccurrence {
-			if ev.ChannelNumber > 0 {
-				if occs := occByChannelNumber[ev.ChannelNumber]; len(occs) > 0 {
-					return occs
-				}
-			}
-			if ev.ChannelID != "" {
-				// Some VDR/SVDRP outputs don't provide the numeric channel in the EPG header.
-				// When that happens, map the derived channel id -> number via the channels list.
-				if ev.ChannelNumber <= 0 {
-					if n := numberByID[ev.ChannelID]; n > 0 {
-						if occs := occByChannelNumber[n]; len(occs) > 0 {
-							return occs
-						}
-					}
-				}
-				if occs := occByChannelID[ev.ChannelID]; len(occs) > 0 {
-					return occs
-				}
-				// Sometimes timers are indexed by numeric channel id string.
-				if ev.ChannelNumber > 0 {
-					if occs := occByChannelID[strconv.Itoa(ev.ChannelNumber)]; len(occs) > 0 {
-						return occs
-					}
-				}
-			}
-			// Last resort: if we can map number->id, try that.
-			if ev.ChannelNumber > 0 {
-				if id := idByNumber[ev.ChannelNumber]; id != "" {
-					if occs := occByChannelID[id]; len(occs) > 0 {
-						return occs
-					}
-				}
-			}
-			return nil
-		}
-
-		if occs := lookupOccs(); len(occs) > 0 {
-			evStart := ev.Start.In(loc)
-			evStop := ev.Stop.In(loc)
-			if evStop.Before(evStart) {
-				evStop = evStart
-			}
-			for _, occ := range occs {
-				// overlap if: occ.Start < evStop && evStart < occ.Stop
-				if occ.Start.Before(evStop) && evStart.Before(occ.Stop) {
-					active = true
-					if t, ok := timersByID[occ.TimerID]; ok {
-						if strings.TrimSpace(t.Title) != "" {
-							label = t.Title
-						} else {
-							label = "active"
-						}
-					} else {
-						label = "active"
-					}
-					break
-				}
+		if t, ok := scheduledTimerForEvent(ev, loc, occByChannelNumber, occByChannelID, numberByID, idByNumber, timersByID); ok {
+			active = true
+			if strings.TrimSpace(t.Title) != "" {
+				label = t.Title
+			} else {
+				label = "active"
 			}
 		}
 
@@ -1401,21 +1246,201 @@ func (h *Handler) EPGSearchNew(w http.ResponseWriter, r *http.Request) {
 	h.renderTemplate(w, r, "epgsearch_edit.html", data)
 }
 
+func (h *Handler) renderEPGSearchRun(w http.ResponseWriter, r *http.Request, search config.EPGSearch, pageTitle, heading, formAction string) {
+	config.NormalizeEPGSearch(&search)
+	if err := config.ValidateEPGSearch(search); err != nil {
+		data := h.epgSearchFormData(r, search)
+		data["Error"] = "Invalid search: " + err.Error()
+		data["PageTitle"] = pageTitle
+		data["Heading"] = heading
+		data["FormAction"] = formAction
+		h.renderTemplate(w, r, "epgsearch_edit.html", data)
+		return
+	}
+
+	channels, chErr := h.epgService.GetChannels(r.Context())
+	if chErr != nil {
+		channels = []domain.Channel{}
+	}
+	order := make(map[string]int, len(channels))
+	nameByID := make(map[string]string, len(channels))
+	numberByID := make(map[string]int, len(channels))
+	idByNumber := make(map[int]string, len(channels))
+	for i, ch := range channels {
+		if ch.ID != "" {
+			order[ch.ID] = i + 1
+			nameByID[ch.ID] = ch.Name
+			numberByID[ch.ID] = ch.Number
+		}
+		if ch.Number > 0 && ch.ID != "" {
+			idByNumber[ch.Number] = ch.ID
+		}
+	}
+
+	allEvents, err := h.epgService.GetEPG(r.Context(), "", time.Time{})
+	if err != nil {
+		data := h.epgSearchFormData(r, search)
+		data["Error"] = err.Error()
+		data["PageTitle"] = pageTitle
+		data["Heading"] = heading
+		data["FormAction"] = formAction
+		h.renderTemplate(w, r, "epgsearch_edit.html", data)
+		return
+	}
+
+	matches, err := services.ExecuteSavedEPGSearch(allEvents, search, order)
+	if err != nil {
+		data := h.epgSearchFormData(r, search)
+		data["Error"] = "Invalid search: " + err.Error()
+		data["PageTitle"] = pageTitle
+		data["Heading"] = heading
+		data["FormAction"] = formAction
+		h.renderTemplate(w, r, "epgsearch_edit.html", data)
+		return
+	}
+
+	// Build timer occurrences for the relevant event window.
+	timersByID := map[int]domain.Timer{}
+	occByChannelNumber := map[int][]timerOccurrence{}
+	occByChannelID := map[string][]timerOccurrence{}
+	if h.timerService != nil {
+		timers, tErr := h.timerService.GetAllTimers(r.Context())
+		if tErr != nil {
+			h.logger.Warn("timers fetch error for epgsearch run", slog.Any("error", tErr))
+		} else {
+			for _, t := range timers {
+				if strings.TrimSpace(t.ChannelID) == "" {
+					continue
+				}
+				timersByID[t.ID] = t
+			}
+		}
+	}
+
+	loc := time.Local
+	if len(timersByID) > 0 && len(matches) > 0 {
+		minStart := matches[0].Start.In(loc)
+		maxStop := matches[0].Stop.In(loc)
+		for i := 1; i < len(matches); i++ {
+			s := matches[i].Start.In(loc)
+			e := matches[i].Stop.In(loc)
+			if s.Before(minStart) {
+				minStart = s
+			}
+			if e.After(maxStop) {
+				maxStop = e
+			}
+		}
+		from := minStart.Add(-24 * time.Hour)
+		to := maxStop.Add(24 * time.Hour)
+		for _, t := range timersByID {
+			occs := timerOccurrences(t, from, to)
+			if t.ChannelID != "" {
+				occByChannelID[t.ChannelID] = append(occByChannelID[t.ChannelID], occs...)
+			}
+			timerChNum := 0
+			if n, err := strconv.Atoi(strings.TrimSpace(t.ChannelID)); err == nil {
+				timerChNum = n
+			} else if n := numberByID[t.ChannelID]; n > 0 {
+				timerChNum = n
+			}
+			if timerChNum > 0 {
+				occByChannelNumber[timerChNum] = append(occByChannelNumber[timerChNum], occs...)
+			}
+		}
+		for ch := range occByChannelID {
+			occs := occByChannelID[ch]
+			sort.SliceStable(occs, func(i, j int) bool {
+				if occs[i].Start.Equal(occs[j].Start) {
+					return occs[i].TimerID < occs[j].TimerID
+				}
+				return occs[i].Start.Before(occs[j].Start)
+			})
+			occByChannelID[ch] = occs
+		}
+		for n := range occByChannelNumber {
+			occs := occByChannelNumber[n]
+			sort.SliceStable(occs, func(i, j int) bool {
+				if occs[i].Start.Equal(occs[j].Start) {
+					return occs[i].TimerID < occs[j].TimerID
+				}
+				return occs[i].Start.Before(occs[j].Start)
+			})
+			occByChannelNumber[n] = occs
+		}
+	}
+
+	sort.SliceStable(matches, func(i, j int) bool {
+		a := matches[i].Start.In(loc)
+		b := matches[j].Start.In(loc)
+		if !a.Equal(b) {
+			return a.Before(b)
+		}
+		return matches[i].ChannelNumber < matches[j].ChannelNumber
+	})
+
+	dayGroups := []epgSearchResultDayGroup{}
+	var currentDay time.Time
+	var currentIdx int
+	for _, ev := range matches {
+		start := ev.Start.In(loc)
+		evDay := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, loc)
+		if len(dayGroups) == 0 || !evDay.Equal(currentDay) {
+			dayGroups = append(dayGroups, epgSearchResultDayGroup{
+				DayLabel: start.Format("Monday, 01/02/2006"),
+				Events:   []epgSearchResultEventView{},
+			})
+			currentDay = evDay
+			currentIdx = len(dayGroups) - 1
+		}
+
+		if ev.ChannelNumber <= 0 && strings.TrimSpace(ev.ChannelID) != "" {
+			ev.ChannelNumber = numberByID[ev.ChannelID]
+		}
+		if strings.TrimSpace(ev.ChannelName) == "" && strings.TrimSpace(ev.ChannelID) != "" {
+			ev.ChannelName = nameByID[ev.ChannelID]
+		}
+		_, active := scheduledTimerForEvent(ev, loc, occByChannelNumber, occByChannelID, numberByID, idByNumber, timersByID)
+
+		dayGroups[currentIdx].Events = append(dayGroups[currentIdx].Events, epgSearchResultEventView{
+			EPGEvent:    ev,
+			TimerActive: active,
+			TimerLabel:  "",
+		})
+	}
+
+	data := h.epgSearchFormData(r, search)
+	data["PageTitle"] = pageTitle
+	data["Heading"] = heading
+	data["FormAction"] = formAction
+	data["RunDayGroups"] = dayGroups
+	h.renderTemplate(w, r, "epgsearch_edit.html", data)
+}
+
 func (h *Handler) EPGSearchCreate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	if h.cfg == nil {
-		http.Error(w, "Configuration not available", http.StatusInternalServerError)
 		return
 	}
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form", http.StatusBadRequest)
 		return
 	}
+	action := strings.TrimSpace(r.PostForm.Get("action"))
 
 	search := parseEPGSearchFromForm(r.PostForm)
+
+	// "Run" executes the search without saving and re-renders the form with matches.
+	if action == "run" {
+		h.renderEPGSearchRun(w, r, search, "Add New Search - VDRAdmin-go", "Add New Search", "/epgsearch/new")
+		return
+	}
+
+	if h.cfg == nil {
+		http.Error(w, "Configuration not available", http.StatusInternalServerError)
+		return
+	}
+
 	search.ID = nextEPGSearchID(h.cfg.EPG.Searches)
 
 	updated := *h.cfg
@@ -1477,14 +1502,11 @@ func (h *Handler) EPGSearchUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if h.cfg == nil {
-		http.Error(w, "Configuration not available", http.StatusInternalServerError)
-		return
-	}
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form", http.StatusBadRequest)
 		return
 	}
+	action := strings.TrimSpace(r.PostForm.Get("action"))
 
 	search := parseEPGSearchFromForm(r.PostForm)
 	if v := strings.TrimSpace(r.PostForm.Get("id")); v != "" {
@@ -1493,6 +1515,17 @@ func (h *Handler) EPGSearchUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if search.ID <= 0 {
 		http.Error(w, "Invalid search id", http.StatusBadRequest)
+		return
+	}
+
+	// "Run" executes the (edited) search without saving and re-renders the form with matches.
+	if action == "run" {
+		h.renderEPGSearchRun(w, r, search, "Edit Search - VDRAdmin-go", "Edit Search", "/epgsearch/edit")
+		return
+	}
+
+	if h.cfg == nil {
+		http.Error(w, "Configuration not available", http.StatusInternalServerError)
 		return
 	}
 
@@ -1875,6 +1908,90 @@ func timerOccurrences(t domain.Timer, from, to time.Time) []timerOccurrence {
 	return out
 }
 
+func normalizeTitleForTimerMatch(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	s = strings.Join(strings.Fields(s), " ")
+	return s
+}
+
+func scheduledTimerForEvent(
+	ev domain.EPGEvent,
+	loc *time.Location,
+	occByChannelNumber map[int][]timerOccurrence,
+	occByChannelID map[string][]timerOccurrence,
+	numberByID map[string]int,
+	idByNumber map[int]string,
+	timersByID map[int]domain.Timer,
+) (domain.Timer, bool) {
+	if loc == nil {
+		loc = time.Local
+	}
+
+	evTitle := normalizeTitleForTimerMatch(ev.Title)
+	if evTitle == "" {
+		return domain.Timer{}, false
+	}
+
+	lookupOccs := func() []timerOccurrence {
+		if ev.ChannelNumber > 0 {
+			if occs := occByChannelNumber[ev.ChannelNumber]; len(occs) > 0 {
+				return occs
+			}
+		}
+		if ev.ChannelID != "" {
+			if ev.ChannelNumber <= 0 {
+				if n := numberByID[ev.ChannelID]; n > 0 {
+					if occs := occByChannelNumber[n]; len(occs) > 0 {
+						return occs
+					}
+				}
+			}
+			if occs := occByChannelID[ev.ChannelID]; len(occs) > 0 {
+				return occs
+			}
+			if ev.ChannelNumber > 0 {
+				if occs := occByChannelID[strconv.Itoa(ev.ChannelNumber)]; len(occs) > 0 {
+					return occs
+				}
+			}
+		}
+		if ev.ChannelNumber > 0 {
+			if id := idByNumber[ev.ChannelNumber]; id != "" {
+				if occs := occByChannelID[id]; len(occs) > 0 {
+					return occs
+				}
+			}
+		}
+		return nil
+	}
+
+	occs := lookupOccs()
+	if len(occs) == 0 {
+		return domain.Timer{}, false
+	}
+
+	evStart := ev.Start.In(loc)
+	evStop := ev.Stop.In(loc)
+	if evStop.Before(evStart) {
+		evStop = evStart
+	}
+
+	for _, occ := range occs {
+		if !occ.Start.Before(evStop) || !evStart.Before(occ.Stop) {
+			continue
+		}
+		t, ok := timersByID[occ.TimerID]
+		if !ok {
+			continue
+		}
+		if normalizeTitleForTimerMatch(t.Title) == evTitle {
+			return t, true
+		}
+	}
+
+	return domain.Timer{}, false
+}
+
 func isWeekdayMaskHTTP(daySpec string) bool {
 	daySpec = strings.TrimSpace(daySpec)
 	if len(daySpec) != 7 {
@@ -1966,6 +2083,31 @@ func (h *Handler) TimerNew(w http.ResponseWriter, r *http.Request) {
 	}
 
 	model, selectedChannel := h.timerNewFormModel(time.Now(), channels)
+
+	// Optional prefill (used by EPG search "Record" links).
+	q := r.URL.Query()
+	if v := strings.TrimSpace(q.Get("channel")); v != "" {
+		model.ChannelID = v
+		selectedChannel = v
+	}
+	if v := strings.TrimSpace(q.Get("day")); v != "" {
+		if _, err := time.ParseInLocation("2006-01-02", v, time.Local); err == nil {
+			model.Day = v
+		}
+	}
+	if v := strings.TrimSpace(q.Get("start")); v != "" {
+		if _, err := time.Parse("15:04", v); err == nil {
+			model.Start = v
+		}
+	}
+	if v := strings.TrimSpace(q.Get("stop")); v != "" {
+		if _, err := time.Parse("15:04", v); err == nil {
+			model.Stop = v
+		}
+	}
+	if v := strings.TrimSpace(q.Get("title")); v != "" {
+		model.Title = v
+	}
 	data := map[string]any{
 		"PageTitle":       "New Timer - VDRAdmin-go",
 		"Heading":         "New Timer",
@@ -2300,65 +2442,6 @@ func (h *Handler) TimerCreate(w http.ResponseWriter, r *http.Request) {
 			}
 			if channelID != "" && event.ChannelID != channelID {
 				continue
-			}
-
-			// Guard against duplicate timers: if an existing timer overlaps the event window
-			// on the same channel *and matches the event title*, treat it as already scheduled.
-			if h.timerService != nil {
-				existing, tErr := h.timerService.GetAllTimers(r.Context())
-				if tErr == nil {
-					normalizeTitle := func(s string) string {
-						s = strings.ToLower(strings.TrimSpace(s))
-						s = strings.Join(strings.Fields(s), " ")
-						return s
-					}
-					evTitle := normalizeTitle(event.Title)
-					for _, t := range existing {
-						if strings.TrimSpace(t.ChannelID) == "" {
-							continue
-						}
-						sameChannel := false
-						if channelID != "" {
-							sameChannel = (strings.TrimSpace(t.ChannelID) == strings.TrimSpace(channelID))
-						}
-						if !sameChannel {
-							// Try numeric channel match when timer uses channel number.
-							if event.ChannelNumber > 0 {
-								if n, err := strconv.Atoi(strings.TrimSpace(t.ChannelID)); err == nil && n == event.ChannelNumber {
-									sameChannel = true
-								}
-							}
-						}
-						if !sameChannel {
-							continue
-						}
-						if evTitle == "" || normalizeTitle(t.Title) != evTitle {
-							continue
-						}
-
-						evStart := event.Start.In(time.Local)
-						evStop := event.Stop.In(time.Local)
-						if evStop.Before(evStart) {
-							evStop = evStart
-						}
-						// Timer overlap check: start < stop && evStart < timerStop
-						for _, occ := range timerOccurrences(t, evStart.Add(-24*time.Hour), evStop.Add(24*time.Hour)) {
-							if occ.Start.Before(evStop) && evStart.Before(occ.Stop) {
-								// Redirect back with a message instead of creating a duplicate.
-								ref := r.Referer()
-								if ref == "" {
-									ref = "/timers"
-								}
-								sep := "?"
-								if strings.Contains(ref, "?") {
-									sep = "&"
-								}
-								http.Redirect(w, r, ref+sep+"msg="+url.QueryEscape("Timer already exists for this show."), http.StatusSeeOther)
-								return
-							}
-						}
-					}
-				}
 			}
 
 			priority, lifetime, marginStart, marginEnd := h.timerDefaults()
