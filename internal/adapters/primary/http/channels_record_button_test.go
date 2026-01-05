@@ -58,7 +58,10 @@ func (m *channelsVDRMock) SendKey(ctx context.Context, key string) error { retur
 
 func TestChannels_DisablesRecordOnlyForScheduledShow(t *testing.T) {
 	loc := time.Local
-	day := time.Date(2026, 1, 5, 0, 0, 0, 0, loc)
+	// Pick a day that is not "today" so the handler doesn't hide finished programs.
+	now := time.Now().In(loc)
+	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).Add(48 * time.Hour)
+	dayStr := day.Format("2006-01-02")
 
 	ch := domain.Channel{ID: "C-1-2-3", Number: 1, Name: "SWR BW HD"}
 
@@ -125,7 +128,7 @@ func TestChannels_DisablesRecordOnlyForScheduledShow(t *testing.T) {
 	h.SetUIThemeDefault("light")
 	h.SetTemplates(map[string]*template.Template{"channels.html": parsed})
 
-	req := httptest.NewRequest(http.MethodGet, "/channels?channel="+ch.ID+"&day=2026-01-05", nil)
+	req := httptest.NewRequest(http.MethodGet, "/channels?channel="+ch.ID+"&day="+dayStr, nil)
 	ctx := context.WithValue(req.Context(), "user", "admin")
 	ctx = context.WithValue(ctx, "role", "admin")
 	req = req.WithContext(ctx)

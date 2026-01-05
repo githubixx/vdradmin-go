@@ -622,18 +622,6 @@ func (h *Handler) buildConfigFromForm(form url.Values) (*config.Config, error) {
 	return &updated, nil
 }
 
-func setThemeCookie(w http.ResponseWriter, theme string) {
-	theme = normalizeTheme(strings.TrimSpace(theme))
-	// Persist explicit mode (including system) for a long time.
-	http.SetCookie(w, &http.Cookie{
-		Name:     "theme",
-		Value:    url.QueryEscape(theme),
-		Path:     "/",
-		MaxAge:   60 * 60 * 24 * 365,
-		SameSite: http.SameSiteLaxMode,
-	})
-}
-
 func parseLines(raw string) []string {
 	raw = strings.ReplaceAll(raw, ",", "\n")
 	parts := strings.Split(raw, "\n")

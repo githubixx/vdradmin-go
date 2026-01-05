@@ -69,7 +69,7 @@ func TestPlayingToday_DisablesRecordWhenTimerExists(t *testing.T) {
 		Start:         day.Add(10 * time.Hour),
 		Stop:          day.Add(11 * time.Hour),
 	}
-	t := domain.Timer{
+	timer := domain.Timer{
 		ID:        1,
 		Active:    true,
 		ChannelID: ch.ID,
@@ -90,14 +90,14 @@ func TestPlayingToday_DisablesRecordWhenTimerExists(t *testing.T) {
 	evMissingNumber.EventID = 456
 	evMissingNumber.ChannelNumber = 0
 	evMissingNumber.ChannelName = ""
-	tNumericChannel := t
-	tNumericChannel.ID = 2
-	tNumericChannel.ChannelID = "1"
+	timerNumericChannel := timer
+	timerNumericChannel.ID = 2
+	timerNumericChannel.ChannelID = "1"
 
 	mock := &playingVDRMock{
 		channels: []domain.Channel{ch},
 		epq:      []domain.EPGEvent{ev, adjacent, evMissingNumber},
-		timers:   []domain.Timer{t, tNumericChannel},
+		timers:   []domain.Timer{timer, timerNumericChannel},
 	}
 
 	epqService := services.NewEPGService(mock, 0)
@@ -132,15 +132,36 @@ func TestPlayingToday_DisablesRecordWhenTimerExists(t *testing.T) {
 	}
 
 	body := rw.Body.String()
-	if !strings.Contains(body, "class=\"btn btn-sm btn-secondary\" disabled>Scheduled</button>") {
-		t.Fatalf("expected disabled Record button when timer exists")
+	const recordForm = "<form method=\"post\" action=\"/timers/create\""
+	const scheduledButton = "disabled>Scheduled</button>"
+
+	// Two EPG items have the title "Test Show" (one with missing channel metadata).
+	if got := strings.Count(body, scheduledButton); got != 2 {
+		t.Fatalf("expected exactly 2 scheduled buttons (for both Test Show entries), got %d", got)
 	}
-	// The matching show should not render the create form.
-	if strings.Contains(body, "<form method=\"post\" action=\"/timers/create\"") && strings.Contains(body, "Test Show") {
-		t.Fatalf("did not expect timers/create form when timer exists")
+	// Only the adjacent show should remain recordable.
+	if got := strings.Count(body, recordForm); got != 1 {
+		t.Fatalf("expected exactly 1 record form (for Other Show), got %d", got)
 	}
-	// Adjacent show should still offer Record.
-	if !strings.Contains(body, "Other Show") || !strings.Contains(body, "<form method=\"post\" action=\"/timers/create\"") {
-		t.Fatalf("expected adjacent show to still be recordable")
+
+	otherIdx := strings.Index(body, "Other Show")
+	testIdx := strings.Index(body, "Test Show")
+	if otherIdx == -1 || testIdx == -1 {
+		t.Fatalf("expected both show titles to be present")
+	}
+	if otherIdx > testIdx {
+		t.Fatalf("expected Other Show to appear before Test Show")
+	}
+	otherSeg := body[otherIdx:testIdx]
+	if !strings.Contains(otherSeg, recordForm) {
+		t.Fatalf("expected Other Show to still be recordable")
+	}
+
+	scheduledSeg := body[testIdx:]
+	if !strings.Contains(scheduledSeg, scheduledButton) {
+		t.Fatalf("expected Test Show to be marked Scheduled")
+	}
+	if strings.Contains(scheduledSeg, recordForm) {
+		t.Fatalf("did not expect record form for scheduled items")
 	}
 }
