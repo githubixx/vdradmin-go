@@ -50,7 +50,7 @@
                         {{if eq $.Role "admin"}}
                         <td class="actions" style="text-align: right;">
                             {{if or .TimerActive (le .EventID 0)}}
-                            <button class="btn btn-sm btn-secondary" disabled>Record</button>
+                            <button class="btn btn-sm btn-secondary" disabled>Scheduled</button>
                             {{else}}
                             <button
                                 hx-post="/timers/create?channel={{.ChannelID}}&event_id={{.EventID}}"

@@ -4,7 +4,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/githubixx/vdradmin-go/internal/domain"
 	"github.com/githubixx/vdradmin-go/internal/infrastructure/config"
@@ -144,40 +143,4 @@ func savedSearchChannelMatches(ev domain.EPGEvent, search config.EPGSearch, orde
 	default:
 		return true
 	}
-}
-
-// parseHHMM parses "HH:MM" in local time for comparisons; returns minutes since midnight.
-func parseHHMM(s string) (int, bool) {
-	parts := strings.Split(strings.TrimSpace(s), ":")
-	if len(parts) != 2 {
-		return 0, false
-	}
-	// Avoid strconv import here; tiny parser.
-	toInt := func(x string) (int, bool) {
-		if x == "" {
-			return 0, false
-		}
-		v := 0
-		for i := 0; i < len(x); i++ {
-			if x[i] < '0' || x[i] > '9' {
-				return 0, false
-			}
-			v = v*10 + int(x[i]-'0')
-		}
-		return v, true
-	}
-	h, ok := toInt(parts[0])
-	if !ok || h < 0 || h > 23 {
-		return 0, false
-	}
-	m, ok := toInt(parts[1])
-	if !ok || m < 0 || m > 59 {
-		return 0, false
-	}
-	return h*60 + m, true
-}
-
-func minutesSinceMidnight(t time.Time) int {
-	lt := t.In(time.Local)
-	return lt.Hour()*60 + lt.Minute()
 }

@@ -829,19 +829,19 @@ func parseTimer(line string) (domain.Timer, error) {
 	}
 
 	return domain.Timer{
-		ID:        timerID,
-		Active:    active,
-		ChannelID: fields[1],
-		Day:       day,
-		Start:     startTime,
-		Stop:      stopTime,
-		DaySpec:   daySpec,
+		ID:           timerID,
+		Active:       active,
+		ChannelID:    fields[1],
+		Day:          day,
+		Start:        startTime,
+		Stop:         stopTime,
+		DaySpec:      daySpec,
 		StartMinutes: startClock,
 		StopMinutes:  stopClock,
-		Priority:  priority,
-		Lifetime:  lifetime,
-		Title:     title,
-		Aux:       aux,
+		Priority:     priority,
+		Lifetime:     lifetime,
+		Title:        title,
+		Aux:          aux,
 	}, nil
 }
 

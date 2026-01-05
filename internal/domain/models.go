@@ -57,11 +57,11 @@ type Timer struct {
 	// These are required for recurring timers where Start/Stop may be computed relative to a projected day.
 	StartMinutes int
 	StopMinutes  int
-	Priority  int
-	Lifetime  int // days to keep recording
-	Title     string
-	Aux       string
-	EventID   int
+	Priority     int
+	Lifetime     int // days to keep recording
+	Title        string
+	Aux          string
+	EventID      int
 }
 
 // Recording represents a completed recording

@@ -43,6 +43,42 @@ type EPGSearch struct {
 	// Reserved for future fields (time range, duration, day-of-week).
 }
 
+// NormalizeEPGSearch normalizes a single EPG search definition in-place.
+// It mirrors the normalization performed in Config.Validate().
+func NormalizeEPGSearch(s *EPGSearch) {
+	if s == nil {
+		return
+	}
+	if strings.TrimSpace(s.Mode) == "" {
+		s.Mode = "phrase"
+	}
+	s.Mode = strings.ToLower(strings.TrimSpace(s.Mode))
+	s.UseChannel = strings.ToLower(strings.TrimSpace(s.UseChannel))
+	if s.UseChannel == "" {
+		s.UseChannel = "no"
+	}
+	// Default search scope: title+subtitle+description.
+	if !s.InTitle && !s.InSubtitle && !s.InDesc {
+		s.InTitle, s.InSubtitle, s.InDesc = true, true, true
+	}
+}
+
+// ValidateEPGSearch validates an EPG search definition.
+// It is intentionally narrower than Config.Validate() so it can be safely used
+// by endpoints like "Run" which accept untrusted user input.
+func ValidateEPGSearch(s EPGSearch) error {
+	if s.ID < 0 {
+		return fmt.Errorf("invalid id: %d", s.ID)
+	}
+	if s.UseChannel != "no" && s.UseChannel != "single" && s.UseChannel != "range" {
+		return fmt.Errorf("invalid use_channel: %q", s.UseChannel)
+	}
+	if s.Mode != "phrase" && s.Mode != "regex" {
+		return fmt.Errorf("invalid mode: %q", s.Mode)
+	}
+	return nil
+}
+
 // UIConfig contains user interface settings
 type UIConfig struct {
 	// Theme controls the default theme: "system" (default), "light", or "dark".
@@ -256,23 +292,21 @@ func (c *Config) Validate() error {
 				maxID = s.ID
 			}
 		}
-		if strings.TrimSpace(s.Mode) == "" {
-			s.Mode = "phrase"
-		}
-		s.Mode = strings.ToLower(strings.TrimSpace(s.Mode))
-		s.UseChannel = strings.ToLower(strings.TrimSpace(s.UseChannel))
-		if s.UseChannel == "" {
-			s.UseChannel = "no"
-		}
-		if s.UseChannel != "no" && s.UseChannel != "single" && s.UseChannel != "range" {
-			return fmt.Errorf("invalid epg.searches[%d].use_channel: %q", i, s.UseChannel)
-		}
-		if s.Mode != "phrase" && s.Mode != "regex" {
-			return fmt.Errorf("invalid epg.searches[%d].mode: %q", i, s.Mode)
-		}
-		// Default search scope: title+subtitle+description.
-		if !s.InTitle && !s.InSubtitle && !s.InDesc {
-			s.InTitle, s.InSubtitle, s.InDesc = true, true, true
+
+		NormalizeEPGSearch(s)
+		if err := ValidateEPGSearch(*s); err != nil {
+			// Keep error messages stable for existing configs.
+			msg := err.Error()
+			if strings.HasPrefix(msg, "invalid use_channel") {
+				return fmt.Errorf("invalid epg.searches[%d].use_channel: %q", i, s.UseChannel)
+			}
+			if strings.HasPrefix(msg, "invalid mode") {
+				return fmt.Errorf("invalid epg.searches[%d].mode: %q", i, s.Mode)
+			}
+			if strings.HasPrefix(msg, "invalid id") {
+				return fmt.Errorf("invalid epg.searches[%d].id: %d", i, s.ID)
+			}
+			return fmt.Errorf("invalid epg.searches[%d]: %w", i, err)
 		}
 	}
 
