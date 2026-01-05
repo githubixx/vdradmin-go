@@ -13,9 +13,21 @@
 
     <main class="container">
         <div class="toolbar">
-            <strong>{{.Day.Format "Mon 2006-01-02"}}</strong>
-            <a class="btn btn-secondary btn-menu" href="/playing?day={{.PrevDay}}">Previous day</a>
-            <a class="btn btn-secondary btn-menu" href="/playing?day={{.NextDay}}">Next day</a>
+            <div class="nav-channel-form">
+                <strong>{{.Day.Format "Mon 2006-01-02"}}</strong>
+
+                <div class="nav-select">
+                    <select id="channel-jump" name="channel-jump" onchange="if (this.value) { location.hash = this.value; }">
+                        <option value="">Select channel...</option>
+                        {{range .ChannelJump}}
+                        <option value="{{.Anchor}}">{{.Label}}</option>
+                        {{end}}
+                    </select>
+                </div>
+
+                <a class="btn btn-secondary btn-menu" href="/playing?day={{.PrevDay}}">Previous day</a>
+                <a class="btn btn-secondary btn-menu" href="/playing?day={{.NextDay}}">Next day</a>
+            </div>
         </div>
 
         {{if .HomeError}}
@@ -25,7 +37,7 @@
         {{end}}
 
         {{range .ChannelGroups}}
-        <div class="channels-day">{{.Channel.Name}}</div>
+        <div class="channels-day" id="{{.Anchor}}">{{.Channel.Name}}</div>
         <div class="epg-list">
             {{range .Events}}
             <div class="epg-item">

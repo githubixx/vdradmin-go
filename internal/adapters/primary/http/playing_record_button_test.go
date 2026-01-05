@@ -165,3 +165,67 @@ func TestPlayingToday_DisablesRecordWhenTimerExists(t *testing.T) {
 		t.Fatalf("did not expect record form for scheduled items")
 	}
 }
+
+func TestPlayingToday_RendersChannelJumpDropdown(t *testing.T) {
+	loc := time.Local
+	day := time.Date(2026, 1, 4, 0, 0, 0, 0, loc)
+
+	ch := domain.Channel{ID: "C-1-2-3", Number: 1, Name: "Test Channel"}
+	ev := domain.EPGEvent{
+		EventID:       123,
+		ChannelID:     ch.ID,
+		ChannelNumber: ch.Number,
+		ChannelName:   ch.Name,
+		Title:         "Test Show",
+		Start:         day.Add(10 * time.Hour),
+		Stop:          day.Add(11 * time.Hour),
+	}
+
+	mock := &playingVDRMock{
+		channels: []domain.Channel{ch},
+		epq:      []domain.EPGEvent{ev},
+		timers:   nil,
+	}
+
+	epqService := services.NewEPGService(mock, 0)
+	timerService := services.NewTimerService(mock)
+
+	parsed := template.Must(template.ParseFiles(
+		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
+		filepath.Join(repoRoot(t), "web", "templates", "playing.html"),
+	))
+
+	h := NewHandler(
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		parsed,
+		epqService,
+		timerService,
+		nil,
+		nil,
+	)
+	h.SetUIThemeDefault("light")
+	h.SetTemplates(map[string]*template.Template{"playing.html": parsed})
+
+	req := httptest.NewRequest(http.MethodGet, "/playing?day=2026-01-04", nil)
+	ctx := context.WithValue(req.Context(), "user", "admin")
+	ctx = context.WithValue(ctx, "role", "admin")
+	req = req.WithContext(ctx)
+
+	rw := httptest.NewRecorder()
+	h.PlayingToday(rw, req)
+
+	if rw.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rw.Code)
+	}
+
+	body := rw.Body.String()
+	if !strings.Contains(body, "id=\"channel-jump\"") {
+		t.Fatalf("expected channel jump select to be present")
+	}
+	if !strings.Contains(body, "value=\"ch-1\"") {
+		t.Fatalf("expected channel option anchor ch-1")
+	}
+	if !strings.Contains(body, "id=\"ch-1\"") {
+		t.Fatalf("expected channel group anchor id ch-1")
+	}
+}

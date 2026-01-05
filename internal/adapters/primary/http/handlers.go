@@ -116,7 +116,13 @@ type playingEventView struct {
 
 type playingChannelGroup struct {
 	Channel domain.Channel
+	Anchor  string
 	Events  []playingEventView
+}
+
+type playingChannelJumpOption struct {
+	Anchor string
+	Label  string
 }
 
 func parseDayParam(r *http.Request, loc *time.Location) (time.Time, error) {
@@ -746,10 +752,16 @@ func (h *Handler) PlayingToday(w http.ResponseWriter, r *http.Request) {
 	}
 
 	groups := make([]playingChannelGroup, 0, len(channels))
+	jump := make([]playingChannelJumpOption, 0, len(channels))
 	for _, ch := range channels {
 		ev := eventsByChannel[ch.ID]
 		if len(ev) == 0 {
 			continue
+		}
+
+		anchor := fmt.Sprintf("ch-%d", ch.Number)
+		if ch.Number <= 0 {
+			anchor = fmt.Sprintf("ch-i-%d", len(groups)+1)
 		}
 		sort.SliceStable(ev, func(i, j int) bool {
 			if !ev[i].Start.Equal(ev[j].Start) {
@@ -773,10 +785,12 @@ func (h *Handler) PlayingToday(w http.ResponseWriter, r *http.Request) {
 			}
 			views = append(views, playingEventView{EPGEvent: e, TimerActive: hasOverlappingActiveTimer(e)})
 		}
-		groups = append(groups, playingChannelGroup{Channel: ch, Events: views})
+		groups = append(groups, playingChannelGroup{Channel: ch, Anchor: anchor, Events: views})
+		jump = append(jump, playingChannelJumpOption{Anchor: anchor, Label: ch.Name})
 	}
 
 	data["ChannelGroups"] = groups
+	data["ChannelJump"] = jump
 	h.renderTemplate(w, r, "playing.html", data)
 }
 
