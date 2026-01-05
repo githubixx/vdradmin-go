@@ -50,3 +50,5 @@
     if (mq.addEventListener) mq.addEventListener('change', handler);
     else if (mq.addListener) mq.addListener(handler);
   }
+
+})();
