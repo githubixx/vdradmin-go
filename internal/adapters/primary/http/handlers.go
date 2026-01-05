@@ -166,7 +166,9 @@ func (h *Handler) Channels(w http.ResponseWriter, r *http.Request) {
 	// Always include selected day in the dropdown.
 	daysByValue[dayStart.Format("2006-01-02")] = dayStart
 	if selected != "" {
-		ev, err := h.epgService.GetEPG(r.Context(), selected, time.Now())
+		// Anchor the EPG request to the selected day. Using time.Now() here causes
+		// inconsistent behavior across day selections (and cache keys).
+		ev, err := h.epgService.GetEPG(r.Context(), selected, dayStart)
 		if err != nil {
 			h.logger.Error("EPG fetch error on channels", slog.Any("error", err), slog.String("channel", selected))
 			data["HomeError"] = err.Error()

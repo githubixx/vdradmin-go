@@ -37,12 +37,20 @@ func (s *TimerService) CreateTimer(ctx context.Context, timer *domain.Timer) err
 
 // CreateTimerFromEPG creates a timer from an EPG event
 func (s *TimerService) CreateTimerFromEPG(ctx context.Context, event domain.EPGEvent, priority, lifetime, marginStart, marginEnd int) error {
+	start := event.Start.Add(-time.Duration(marginStart) * time.Minute)
+	stop := event.Stop.Add(time.Duration(marginEnd) * time.Minute)
+	// VDR's timer day spec is effectively the date of the timer start time.
+	// If margins push the timer start into the previous day (e.g. events at 00:00),
+	// we must adjust the day accordingly, otherwise VDR interprets it as 23:58 on the event day.
+	startLocal := start.In(time.Local)
+	day := time.Date(startLocal.Year(), startLocal.Month(), startLocal.Day(), 0, 0, 0, 0, time.Local)
+
 	timer := &domain.Timer{
 		Active:    true,
 		ChannelID: event.ChannelID,
-		Day:       event.Start,
-		Start:     event.Start.Add(-time.Duration(marginStart) * time.Minute),
-		Stop:      event.Stop.Add(time.Duration(marginEnd) * time.Minute),
+		Day:       day,
+		Start:     start,
+		Stop:      stop,
 		Priority:  priority,
 		Lifetime:  lifetime,
 		Title:     event.Title,

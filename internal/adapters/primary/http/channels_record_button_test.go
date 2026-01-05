@@ -185,3 +185,91 @@ func TestChannels_DisablesRecordOnlyForScheduledShow(t *testing.T) {
 		t.Fatalf("expected exactly 2 record forms (before/after), got %d", got)
 	}
 }
+
+type channelsEPGAtSpyVDRMock struct {
+	channels []domain.Channel
+
+	gotChannelID string
+	gotAt        time.Time
+}
+
+func (m *channelsEPGAtSpyVDRMock) Connect(ctx context.Context) error { return nil }
+func (m *channelsEPGAtSpyVDRMock) Close() error                      { return nil }
+func (m *channelsEPGAtSpyVDRMock) Ping(ctx context.Context) error    { return nil }
+
+func (m *channelsEPGAtSpyVDRMock) GetChannels(ctx context.Context) ([]domain.Channel, error) {
+	return m.channels, nil
+}
+
+func (m *channelsEPGAtSpyVDRMock) GetEPG(ctx context.Context, channelID string, at time.Time) ([]domain.EPGEvent, error) {
+	m.gotChannelID = channelID
+	m.gotAt = at
+	return []domain.EPGEvent{}, nil
+}
+
+func (m *channelsEPGAtSpyVDRMock) GetTimers(ctx context.Context) ([]domain.Timer, error) {
+	return []domain.Timer{}, nil
+}
+
+func (m *channelsEPGAtSpyVDRMock) CreateTimer(ctx context.Context, timer *domain.Timer) error { return nil }
+func (m *channelsEPGAtSpyVDRMock) UpdateTimer(ctx context.Context, timer *domain.Timer) error { return nil }
+func (m *channelsEPGAtSpyVDRMock) DeleteTimer(ctx context.Context, timerID int) error         { return nil }
+
+func (m *channelsEPGAtSpyVDRMock) GetRecordings(ctx context.Context) ([]domain.Recording, error) {
+	return nil, nil
+}
+func (m *channelsEPGAtSpyVDRMock) DeleteRecording(ctx context.Context, path string) error { return nil }
+func (m *channelsEPGAtSpyVDRMock) GetCurrentChannel(ctx context.Context) (string, error)  { return "", nil }
+func (m *channelsEPGAtSpyVDRMock) SetCurrentChannel(ctx context.Context, channelID string) error {
+	return nil
+}
+func (m *channelsEPGAtSpyVDRMock) SendKey(ctx context.Context, key string) error { return nil }
+
+func TestChannels_AnchorsEPGRequestToSelectedDay(t *testing.T) {
+	loc := time.Local
+	now := time.Now().In(loc)
+	selectedDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).AddDate(0, 0, 2)
+	dayStr := selectedDay.Format("2006-01-02")
+
+	ch := domain.Channel{ID: "C-1-2-3", Number: 1, Name: "SWR BW HD"}
+	spy := &channelsEPGAtSpyVDRMock{channels: []domain.Channel{ch}}
+
+	epqService := services.NewEPGService(spy, 0)
+
+	parsed := template.Must(template.ParseFiles(
+		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
+		filepath.Join(repoRoot(t), "web", "templates", "channels.html"),
+	))
+
+	h := NewHandler(
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		parsed,
+		epqService,
+		nil,
+		nil,
+		nil,
+	)
+	h.SetUIThemeDefault("light")
+	h.SetTemplates(map[string]*template.Template{"channels.html": parsed})
+
+	req := httptest.NewRequest(http.MethodGet, "/channels?channel="+ch.ID+"&day="+dayStr, nil)
+	ctx := context.WithValue(req.Context(), "user", "admin")
+	ctx = context.WithValue(ctx, "role", "admin")
+	req = req.WithContext(ctx)
+
+	rw := httptest.NewRecorder()
+	h.Channels(rw, req)
+
+	if rw.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rw.Code)
+	}
+	if spy.gotChannelID != ch.ID {
+		t.Fatalf("expected GetEPG to be called with channel %q, got %q", ch.ID, spy.gotChannelID)
+	}
+	if spy.gotAt.IsZero() {
+		t.Fatalf("expected GetEPG to be called with a non-zero 'at' time")
+	}
+	if !spy.gotAt.Equal(selectedDay) {
+		t.Fatalf("expected GetEPG 'at' to equal selected day start %s, got %s", selectedDay.Format(time.RFC3339), spy.gotAt.Format(time.RFC3339))
+	}
+}
