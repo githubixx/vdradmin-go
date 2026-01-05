@@ -26,6 +26,43 @@
                     <a href="/configurations" {{if eq .Path "/configurations"}}class="active" aria-current="page"{{end}}>Configurations</a>
                 </div>
             </details>
+
+        <script>
+            (() => {
+                function setupBurgerCloseOnOutsideClick() {
+                    const burgers = Array.from(document.querySelectorAll('details.nav-burger'));
+                    if (burgers.length === 0) return;
+
+                    document.addEventListener(
+                        'click',
+                        (e) => {
+                            for (const d of burgers) {
+                                if (!d.open) continue;
+                                if (d.contains(e.target)) continue;
+                                d.open = false;
+                            }
+                        },
+                        true
+                    );
+
+                    document.addEventListener('keydown', (e) => {
+                        if (e.key !== 'Escape') return;
+                        for (const d of burgers) {
+                            if (!d.open) continue;
+                            d.open = false;
+                            const summary = d.querySelector('summary');
+                            if (summary && typeof summary.focus === 'function') summary.focus();
+                        }
+                    });
+                }
+
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', setupBurgerCloseOnOutsideClick);
+                } else {
+                    setupBurgerCloseOnOutsideClick();
+                }
+            })();
+        </script>
         </div>
     </nav>
 </header>
