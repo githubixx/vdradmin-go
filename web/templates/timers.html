@@ -20,6 +20,40 @@
         </div>
         {{end}}
 
+        {{if .TimelineDays}}
+        <div class="toolbar">
+            <form action="/timers" method="get" class="nav-channel-form" style="justify-content: space-between; flex-wrap: wrap;">
+                <div class="nav-select">
+                    <select id="day" name="day" onchange="this.form.submit()">
+                        {{range .TimelineDays}}
+                        <option value="{{.Value}}" {{if eq $.TimelineSelectedDay .Value}}selected{{end}}>{{.Label}}</option>
+                        {{end}}
+                    </select>
+                </div>
+            </form>
+
+            <div class="timer-timeline">
+                <div></div>
+                <div class="timeline-hours">
+                    {{range .TimelineHours}}
+                    <div>{{.}}</div>
+                    {{end}}
+                </div>
+
+                {{range .TimelineRows}}
+                <div class="timeline-channel">{{.ChannelName}}</div>
+                <div class="timeline-track">
+                    {{range .Blocks}}
+                    <div class="timeline-block {{.Class}}" style="left: {{printf "%.4f" .LeftPct}}%; width: {{printf "%.4f" .WidthPct}}%;" title="{{.StartLabel}}-{{.StopLabel}} {{.Title}}">
+                        <span class="timeline-block-text">{{.Title}}</span>
+                    </div>
+                    {{end}}
+                </div>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+
         <div class="timer-list">
             {{range .Timers}}
             <div class="timer-item {{if .IsRecording}}recording{{end}} {{if .IsCollision}}collision{{end}} {{if .IsCritical}}conflict{{end}} {{if .Active}}active{{else}}inactive{{end}}">

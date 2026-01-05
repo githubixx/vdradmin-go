@@ -1645,8 +1645,42 @@ func parseEPGSearchFromForm(form url.Values) config.EPGSearch {
 	return s
 }
 
+type timerTimelineDayOption struct {
+	Value string
+	Label string
+}
+
+type timerTimelineBlock struct {
+	Title      string
+	StartLabel string
+	StopLabel  string
+	LeftPct    float64
+	WidthPct   float64
+	Class      string
+}
+
+type timerTimelineRow struct {
+	ChannelName string
+	Blocks      []timerTimelineBlock
+}
+
 // TimerList shows all timers
 func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
+	loc := time.Local
+
+	today := time.Now().In(loc)
+	windowFrom := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, loc)
+	windowTo := windowFrom.Add(8 * 24 * time.Hour) // cover at least one full week for recurring timers
+
+	selectedDay := r.URL.Query().Get("day")
+	selectedDayStart := windowFrom
+	if selectedDay != "" {
+		if t, err := time.ParseInLocation("2006-01-02", selectedDay, loc); err == nil {
+			selectedDayStart = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
+		}
+	}
+	selectedDayEnd := selectedDayStart.Add(24 * time.Hour)
+
 	timers, err := h.timerService.GetAllTimers(r.Context())
 	if err != nil {
 		h.handleError(w, r, err)
@@ -1655,13 +1689,17 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 
 	channels, chErr := h.epgService.GetChannels(r.Context())
 	nameByID := map[string]string{}
+	orderByID := map[string]int{}
+	channelByNumber := map[int]domain.Channel{}
 	if chErr == nil {
-		for _, ch := range channels {
+		for i, ch := range channels {
 			if ch.ID != "" {
 				nameByID[ch.ID] = ch.Name
+				orderByID[ch.ID] = i + 1
 			}
 			if ch.Number != 0 {
 				nameByID[strconv.Itoa(ch.Number)] = ch.Name
+				channelByNumber[ch.Number] = ch
 			}
 		}
 	}
@@ -1693,11 +1731,8 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 	if h.cfg != nil && h.cfg.VDR.DVBCards > 0 {
 		dvbCards = h.cfg.VDR.DVBCards
 	}
-	from := time.Now().In(time.Local)
-	from = time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, time.Local)
-	to := from.Add(8 * 24 * time.Hour) // cover at least one full week for recurring timers
 
-	collisionIDs, criticalIDs := timerOverlapStates(timers, dvbCards, from, to, func(t domain.Timer) string {
+	collisionIDs, criticalIDs := timerOverlapStates(timers, dvbCards, windowFrom, windowTo, func(t domain.Timer) string {
 		return transponderKeyForTimer(t, channels)
 	})
 	for i := range views {
@@ -1751,8 +1786,164 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 		return views[i].ID < views[j].ID
 	})
 
+	// Build timeline day options from active timer occurrences within the same window.
+	daysByValue := map[string]time.Time{}
+	for _, t := range timers {
+		if !t.Active {
+			continue
+		}
+		for _, occ := range timerOccurrences(t, windowFrom, windowTo) {
+			start := occ.Start.In(loc)
+			stop := occ.Stop.In(loc)
+			if stop.Before(start) {
+				stop = start
+			}
+			// Include every day this occurrence touches (handles crossing midnight).
+			d := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, loc)
+			endDay := time.Date(stop.Year(), stop.Month(), stop.Day(), 0, 0, 0, 0, loc)
+			for !d.After(endDay) {
+				v := d.Format("2006-01-02")
+				daysByValue[v] = d
+				d = d.Add(24 * time.Hour)
+			}
+		}
+	}
+
+	availableDays := make([]time.Time, 0, len(daysByValue))
+	for _, d := range daysByValue {
+		availableDays = append(availableDays, d)
+	}
+	sort.SliceStable(availableDays, func(i, j int) bool { return availableDays[i].Before(availableDays[j]) })
+
+	// If the user didn't select a day (or selected a day without timers), pick the first available one.
+	if len(availableDays) > 0 {
+		if _, ok := daysByValue[selectedDayStart.Format("2006-01-02")]; !ok {
+			selectedDayStart = availableDays[0]
+			selectedDayEnd = selectedDayStart.Add(24 * time.Hour)
+		}
+	}
+
+	dayOptions := make([]timerTimelineDayOption, 0, len(availableDays))
+	for _, d := range availableDays {
+		dayOptions = append(dayOptions, timerTimelineDayOption{
+			Value: d.Format("2006-01-02"),
+			Label: d.Format("Mon 2006-01-02"),
+		})
+	}
+
+	resolveChannel := func(timer domain.Timer) (string, int) {
+		name := nameByID[timer.ChannelID]
+		order := 0
+		if chErr == nil {
+			if looksLikeVDRChannelID(timer.ChannelID) {
+				order = orderByID[timer.ChannelID]
+			}
+			if order == 0 {
+				if n, err := strconv.Atoi(strings.TrimSpace(timer.ChannelID)); err == nil {
+					if ch, ok := channelByNumber[n]; ok {
+						name = ch.Name
+						order = orderByID[ch.ID]
+					}
+				}
+			}
+		}
+		if strings.TrimSpace(name) == "" {
+			name = timer.ChannelID
+		}
+		return name, order
+	}
+
+	blocksByChannel := map[string][]timerTimelineBlock{}
+	rowOrder := map[string]int{}
+	if len(availableDays) > 0 {
+		for _, t := range timers {
+			if !t.Active {
+				continue
+			}
+			for _, occ := range timerOccurrences(t, windowFrom, windowTo) {
+				if occ.Stop.Before(selectedDayStart) || !occ.Start.Before(selectedDayEnd) {
+					continue
+				}
+
+				channelName, ord := resolveChannel(t)
+				if rowOrder[channelName] == 0 && ord != 0 {
+					rowOrder[channelName] = ord
+				}
+
+				start := occ.Start.In(loc)
+				stop := occ.Stop.In(loc)
+				if stop.Before(start) {
+					stop = start
+				}
+				if start.Before(selectedDayStart) {
+					start = selectedDayStart
+				}
+				if stop.After(selectedDayEnd) {
+					stop = selectedDayEnd
+				}
+				startMin := start.Sub(selectedDayStart).Minutes()
+				stopMin := stop.Sub(selectedDayStart).Minutes()
+				if stopMin < startMin {
+					stopMin = startMin
+				}
+				leftPct := (startMin / 1440.0) * 100.0
+				widthPct := ((stopMin - startMin) / 1440.0) * 100.0
+				if widthPct > 0 && widthPct < 0.25 {
+					widthPct = 0.25
+				}
+
+				cls := "ok"
+				if criticalIDs[t.ID] {
+					cls = "critical"
+				} else if collisionIDs[t.ID] {
+					cls = "collision"
+				}
+
+				blocksByChannel[channelName] = append(blocksByChannel[channelName], timerTimelineBlock{
+					Title:      t.Title,
+					StartLabel: start.Format("15:04"),
+					StopLabel:  stop.Format("15:04"),
+					LeftPct:    leftPct,
+					WidthPct:   widthPct,
+					Class:      cls,
+				})
+			}
+		}
+	}
+
+	rows := make([]timerTimelineRow, 0, len(blocksByChannel))
+	for channelName, blocks := range blocksByChannel {
+		sort.SliceStable(blocks, func(i, j int) bool {
+			if blocks[i].LeftPct != blocks[j].LeftPct {
+				return blocks[i].LeftPct < blocks[j].LeftPct
+			}
+			return blocks[i].Title < blocks[j].Title
+		})
+		rows = append(rows, timerTimelineRow{ChannelName: channelName, Blocks: blocks})
+	}
+	sort.SliceStable(rows, func(i, j int) bool {
+		oI := rowOrder[rows[i].ChannelName]
+		oJ := rowOrder[rows[j].ChannelName]
+		if oI != 0 && oJ != 0 && oI != oJ {
+			return oI < oJ
+		}
+		if oI != oJ {
+			return oI != 0
+		}
+		return rows[i].ChannelName < rows[j].ChannelName
+	})
+
+	hours := make([]int, 24)
+	for i := 0; i < 24; i++ {
+		hours[i] = i
+	}
+
 	data := map[string]any{
-		"Timers": views,
+		"Timers":              views,
+		"TimelineDays":        dayOptions,
+		"TimelineSelectedDay": selectedDayStart.Format("2006-01-02"),
+		"TimelineHours":       hours,
+		"TimelineRows":        rows,
 	}
 
 	h.renderTemplate(w, r, "timers.html", data)
