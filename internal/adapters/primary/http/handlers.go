@@ -1831,30 +1831,22 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	resolveChannel := func(timer domain.Timer) (string, int) {
+	resolveChannel := func(timer domain.Timer) string {
 		name := nameByID[timer.ChannelID]
-		order := 0
 		if chErr == nil {
-			if looksLikeVDRChannelID(timer.ChannelID) {
-				order = orderByID[timer.ChannelID]
-			}
-			if order == 0 {
-				if n, err := strconv.Atoi(strings.TrimSpace(timer.ChannelID)); err == nil {
-					if ch, ok := channelByNumber[n]; ok {
-						name = ch.Name
-						order = orderByID[ch.ID]
-					}
+			if n, err := strconv.Atoi(strings.TrimSpace(timer.ChannelID)); err == nil {
+				if ch, ok := channelByNumber[n]; ok {
+					name = ch.Name
 				}
 			}
 		}
 		if strings.TrimSpace(name) == "" {
 			name = timer.ChannelID
 		}
-		return name, order
+		return name
 	}
 
 	blocksByChannel := map[string][]timerTimelineBlock{}
-	rowOrder := map[string]int{}
 	if len(availableDays) > 0 {
 		for _, t := range timers {
 			if !t.Active {
@@ -1865,10 +1857,7 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 
-				channelName, ord := resolveChannel(t)
-				if rowOrder[channelName] == 0 && ord != 0 {
-					rowOrder[channelName] = ord
-				}
+				channelName := resolveChannel(t)
 
 				start := occ.Start.In(loc)
 				stop := occ.Stop.In(loc)
@@ -1922,15 +1911,7 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, timerTimelineRow{ChannelName: channelName, Blocks: blocks})
 	}
 	sort.SliceStable(rows, func(i, j int) bool {
-		oI := rowOrder[rows[i].ChannelName]
-		oJ := rowOrder[rows[j].ChannelName]
-		if oI != 0 && oJ != 0 && oI != oJ {
-			return oI < oJ
-		}
-		if oI != oJ {
-			return oI != 0
-		}
-		return rows[i].ChannelName < rows[j].ChannelName
+		return strings.ToLower(rows[i].ChannelName) < strings.ToLower(rows[j].ChannelName)
 	})
 
 	hours := make([]int, 24)
