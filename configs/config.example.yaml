@@ -57,3 +57,6 @@ epg:
 ui:
   # Default theme: system (auto), light, or dark
   theme: system
+  # Which page to show after login and when clicking the top-left "VDRAdmin-go" brand.
+  # Allowed values: /, /timers, /now, /recordings, /channels, /playing, /search, /epgsearch, /configurations
+  login_page: /timers

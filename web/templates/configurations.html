@@ -66,13 +66,25 @@
             </div>
 
             <div class="toolbar">
-                <h3>UI Defaults</h3>
+                <h3>General Settings</h3>
                 <div class="config-grid">
                     <label for="ui_theme">Default theme</label>
                     <select id="ui_theme" name="ui_theme">
                         <option value="system" {{if and .Config (eq .Config.UI.Theme "system")}}selected{{end}}>System</option>
                         <option value="light" {{if and .Config (eq .Config.UI.Theme "light")}}selected{{end}}>Light</option>
                         <option value="dark" {{if and .Config (eq .Config.UI.Theme "dark")}}selected{{end}}>Dark</option>
+                    </select>
+
+                    <label for="ui_login_page">Login Page</label>
+                    <select id="ui_login_page" name="ui_login_page">
+                        <option value="/timers" {{if and .Config (eq .Config.UI.LoginPage "/timers")}}selected{{end}}>Timers</option>
+                        <option value="/now" {{if and .Config (eq .Config.UI.LoginPage "/now")}}selected{{end}}>What's on now</option>
+                        <option value="/recordings" {{if and .Config (eq .Config.UI.LoginPage "/recordings")}}selected{{end}}>Recordings</option>
+                        <option value="/channels" {{if and .Config (eq .Config.UI.LoginPage "/channels")}}selected{{end}}>Channels</option>
+                        <option value="/playing" {{if and .Config (eq .Config.UI.LoginPage "/playing")}}selected{{end}}>Playing Today</option>
+                        <option value="/search" {{if and .Config (eq .Config.UI.LoginPage "/search")}}selected{{end}}>Search</option>
+                        <option value="/epgsearch" {{if and .Config (eq .Config.UI.LoginPage "/epgsearch")}}selected{{end}}>EPG Search</option>
+                        <option value="/configurations" {{if and .Config (eq .Config.UI.LoginPage "/configurations")}}selected{{end}}>Configurations</option>
                     </select>
                 </div>
             </div>

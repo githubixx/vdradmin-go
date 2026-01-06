@@ -83,6 +83,9 @@ func ValidateEPGSearch(s EPGSearch) error {
 type UIConfig struct {
 	// Theme controls the default theme: "system" (default), "light", or "dark".
 	Theme string `yaml:"theme"`
+	// LoginPage controls which page is shown after login / when clicking the top-left brand.
+	// It must be a known path like "/timers".
+	LoginPage string `yaml:"login_page"`
 }
 
 // ServerConfig contains HTTP server settings
@@ -181,7 +184,8 @@ func Load(path string) (*Config, error) {
 			Searches: []EPGSearch{},
 		},
 		UI: UIConfig{
-			Theme: "system",
+			Theme:     "system",
+			LoginPage: "/timers",
 		},
 	}
 
@@ -273,6 +277,18 @@ func (c *Config) Validate() error {
 		// ok
 	default:
 		return fmt.Errorf("invalid ui.theme: %q (must be system, light, or dark)", c.UI.Theme)
+	}
+
+	// Normalize/validate UI login page.
+	c.UI.LoginPage = strings.TrimSpace(c.UI.LoginPage)
+	if c.UI.LoginPage == "" {
+		c.UI.LoginPage = "/timers"
+	}
+	switch c.UI.LoginPage {
+	case "/", "/now", "/channels", "/playing", "/timers", "/recordings", "/search", "/epgsearch", "/configurations":
+		// ok
+	default:
+		return fmt.Errorf("invalid ui.login_page: %q", c.UI.LoginPage)
 	}
 
 	// Normalize/validate saved EPG searches.
