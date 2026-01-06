@@ -2,7 +2,7 @@
 <header>
     <nav class="container">
         <div class="nav-brand">
-            <h1><a href="/" style="color: inherit; text-decoration: none;">VDRAdmin-go</a></h1>
+            <h1><a href="{{if .BrandHref}}{{.BrandHref}}{{else}}/{{end}}" style="color: inherit; text-decoration: none;">VDRAdmin-go</a></h1>
         </div>
         <div class="nav-right">
             {{if eq .Role "admin"}}
@@ -16,7 +16,7 @@
                     <span class="burger-icon" aria-hidden="true"></span>
                 </summary>
                 <div class="nav-burger-menu" role="menu">
-                    <a href="/" {{if eq .Path "/"}}class="active" aria-current="page"{{end}}>Home</a>
+                    <a href="/now" {{if or (eq .Path "/") (eq .Path "/now")}}class="active" aria-current="page"{{end}}>What's on now</a>
                     <a href="/channels" {{if eq .Path "/channels"}}class="active" aria-current="page"{{end}}>Channels</a>
                     <a href="/playing" {{if eq .Path "/playing"}}class="active" aria-current="page"{{end}}>Playing Today</a>
                     <a href="/timers" {{if eq .Path "/timers"}}class="active" aria-current="page"{{end}}>Timers</a>

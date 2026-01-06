@@ -80,6 +80,17 @@ func (h *Handler) SetTemplates(templates map[string]*template.Template) {
 
 // Home renders the home page
 func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
+	// Treat "/" as an entry point: redirect to the configured landing page.
+	// When the landing page is explicitly set to "/", render the "What's on now" page.
+	if landing := h.landingPath(); landing != "/" {
+		http.Redirect(w, r, landing, http.StatusFound)
+		return
+	}
+	h.WhatsOnNow(w, r)
+}
+
+// WhatsOnNow renders the current-program overview.
+func (h *Handler) WhatsOnNow(w http.ResponseWriter, r *http.Request) {
 	events, err := h.epgService.GetCurrentPrograms(r.Context())
 	data := map[string]any{}
 	if err != nil {
@@ -92,6 +103,23 @@ func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.renderTemplate(w, r, "index.html", data)
+}
+
+func (h *Handler) landingPath() string {
+	if h.cfg == nil {
+		return "/"
+	}
+	// Config.Validate() normalizes/validates this, but keep a safe fallback.
+	p := strings.TrimSpace(h.cfg.UI.LoginPage)
+	if p == "" {
+		return "/"
+	}
+	switch p {
+	case "/", "/now", "/channels", "/playing", "/timers", "/recordings", "/search", "/epg", "/epgsearch", "/configurations":
+		return p
+	default:
+		return "/"
+	}
 }
 
 type channelsDayGroup struct {
@@ -479,6 +507,9 @@ func (h *Handler) buildConfigFromForm(form url.Values) (*config.Config, error) {
 	// UI theme default
 	if v := strings.TrimSpace(form.Get("ui_theme")); v != "" {
 		updated.UI.Theme = v
+	}
+	if v := strings.TrimSpace(form.Get("ui_login_page")); v != "" {
+		updated.UI.LoginPage = v
 	}
 
 	// VDR connection
@@ -2788,6 +2819,7 @@ func (h *Handler) renderTemplate(w http.ResponseWriter, r *http.Request, name st
 		m["Path"] = r.URL.Path
 		m["ThemeDefault"] = h.uiThemeDefault
 		m["ThemeMode"] = themeFromRequest(r, h.uiThemeDefault)
+		m["BrandHref"] = h.landingPath()
 	}
 
 	// Set Content-Type header
