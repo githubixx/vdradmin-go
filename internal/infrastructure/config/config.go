@@ -285,7 +285,7 @@ func (c *Config) Validate() error {
 		c.UI.LoginPage = "/timers"
 	}
 	switch c.UI.LoginPage {
-	case "/", "/now", "/channels", "/playing", "/timers", "/recordings", "/search", "/epg", "/epgsearch", "/configurations":
+	case "/", "/now", "/channels", "/playing", "/timers", "/recordings", "/search", "/epgsearch", "/configurations":
 		// ok
 	default:
 		return fmt.Errorf("invalid ui.login_page: %q", c.UI.LoginPage)

@@ -115,7 +115,7 @@ func (h *Handler) landingPath() string {
 		return "/"
 	}
 	switch p {
-	case "/", "/now", "/channels", "/playing", "/timers", "/recordings", "/search", "/epg", "/epgsearch", "/configurations":
+	case "/", "/now", "/channels", "/playing", "/timers", "/recordings", "/search", "/epgsearch", "/configurations":
 		return p
 	default:
 		return "/"
