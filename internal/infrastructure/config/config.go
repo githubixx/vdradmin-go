@@ -184,7 +184,7 @@ func Load(path string) (*Config, error) {
 			Searches: []EPGSearch{},
 		},
 		UI: UIConfig{
-			Theme: "system",
+			Theme:     "system",
 			LoginPage: "/timers",
 		},
 	}
