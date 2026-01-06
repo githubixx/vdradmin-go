@@ -122,6 +122,33 @@ func (h *Handler) landingPath() string {
 	}
 }
 
+func pageNameForPath(path string) string {
+	// Normalize common entry points.
+	if path == "" || path == "/" || path == "/now" {
+		return "What's on now"
+	}
+
+	// Group sub-pages under their main navigation entry.
+	switch {
+	case strings.HasPrefix(path, "/channels"):
+		return "Channels"
+	case strings.HasPrefix(path, "/playing"):
+		return "Playing Today"
+	case strings.HasPrefix(path, "/timers"):
+		return "Timers"
+	case strings.HasPrefix(path, "/recordings"):
+		return "Recordings"
+	case strings.HasPrefix(path, "/search"):
+		return "Search"
+	case strings.HasPrefix(path, "/epgsearch"):
+		return "EPG Search"
+	case strings.HasPrefix(path, "/configurations"):
+		return "Configurations"
+	default:
+		return ""
+	}
+}
+
 type channelsDayGroup struct {
 	Day    time.Time
 	Events []channelsEventView
@@ -2820,6 +2847,7 @@ func (h *Handler) renderTemplate(w http.ResponseWriter, r *http.Request, name st
 		m["ThemeDefault"] = h.uiThemeDefault
 		m["ThemeMode"] = themeFromRequest(r, h.uiThemeDefault)
 		m["BrandHref"] = h.landingPath()
+		m["PageName"] = pageNameForPath(r.URL.Path)
 	}
 
 	// Set Content-Type header

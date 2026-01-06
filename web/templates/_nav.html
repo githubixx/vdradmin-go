@@ -2,7 +2,10 @@
 <header>
     <nav class="container">
         <div class="nav-brand">
-            <h1><a href="{{if .BrandHref}}{{.BrandHref}}{{else}}/{{end}}" style="color: inherit; text-decoration: none;">VDRAdmin-go</a></h1>
+            <h1>
+                <a href="{{if .BrandHref}}{{.BrandHref}}{{else}}/{{end}}" style="color: inherit; text-decoration: none;">VDRAdmin-go</a>
+                {{if .PageName}} - {{.PageName}}{{end}}
+            </h1>
         </div>
         <div class="nav-right">
             {{if eq .Role "admin"}}
