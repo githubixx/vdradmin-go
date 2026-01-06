@@ -71,6 +71,25 @@ make build
 
 See `configs/config.example.yaml` for full configuration options.
 
+## Integration Tests (Docker)
+
+There is an optional integration test (build tag `integration`) that spins up:
+
+- an SVDRP stub container (fake VDR)
+- a `vdradmin-go` container (to mimic real deployment)
+
+and asserts that `/timers` renders the timer timeline with `ok`/`collision`/`critical` blocks.
+
+```bash
+# Requires Docker
+go test -tags=integration ./internal/integration -run TestContainers -count=1
+
+# Optional: reuse a prebuilt app image (faster)
+docker build -f deployments/Dockerfile -t vdradmin-go-it-app:local .
+VDRADMIN_GO_APP_IMAGE=vdradmin-go-it-app:local \
+	go test -tags=integration ./internal/integration -run TestContainers -count=1
+```
+
 ## License
 
 LGPL v2.1 (same as original [vdradmin-am](http://andreas.vdr-developer.org/vdradmin-am/index.html))
