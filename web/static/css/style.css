@@ -963,6 +963,18 @@ main {
         background: rgba(0, 0, 0, 0.04);
     }
 
+    .watchtv-now {
+        width: 100%;
+        margin-top: var(--spacing);
+    }
+
+    .watchtv-now-description {
+        color: var(--text-muted);
+        display: block;
+        overflow: visible;
+        word-break: break-word;
+    }
+
     .watchtv-channels-panel,
     .remote-panel {
         border-radius: var(--radius);

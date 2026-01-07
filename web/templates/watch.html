@@ -45,9 +45,6 @@
                     {{end}}
                 </div>
 
-                {{if not .NewWin}}
-                <a class="btn btn-secondary btn-menu" href="/watch?new_win=1&full_tv=1&interval={{.Interval}}&size={{.Size}}" target="_blank" rel="noopener">Open in separate window</a>
-                {{end}}
             </div>
         </div>
 
@@ -159,6 +156,13 @@
                 </div>
             </section>
         </div>
+
+        <div class="toolbar watchtv-now" id="watchtv-now" hidden>
+            <div><strong id="watchtv-now-title"></strong></div>
+            <div class="epg-duration" id="watchtv-now-time"></div>
+            <p class="epg-subtitle" id="watchtv-now-subtitle" hidden></p>
+            <p class="watchtv-now-description" id="watchtv-now-description" hidden></p>
+        </div>
     </main>
 
     <footer>
@@ -182,6 +186,12 @@
     const channelSel = document.getElementById('watchtv-channel');
         const video = document.getElementById('watchtv-video');
 
+    const nowBox = document.getElementById('watchtv-now');
+    const nowTitle = document.getElementById('watchtv-now-title');
+    const nowTime = document.getElementById('watchtv-now-time');
+    const nowSubtitle = document.getElementById('watchtv-now-subtitle');
+    const nowDescription = document.getElementById('watchtv-now-description');
+
     const streamTemplate = {{if .StreamURLTemplate}}{{.StreamURLTemplate | js}}{{else}}''{{end}};
     const streamEnabled = typeof streamTemplate === 'string' && streamTemplate.trim() !== '';
 
@@ -189,6 +199,63 @@
     let lastObjectURL = null;
     let currentStreamChannel = null; // Track current channel for cleanup
     let hls = null;
+    let nowTimer = null;
+
+    function formatHHMM(date) {
+        const d = (date instanceof Date) ? date : new Date(date);
+        if (!Number.isFinite(d.getTime())) return '';
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        return `${hh}:${mm}`;
+    }
+
+    async function refreshNowInfo(channelID) {
+        if (!nowBox || !nowTitle || !nowTime) return;
+        if (!channelID) {
+            nowBox.hidden = true;
+            return;
+        }
+        try {
+            const res = await fetch(`/watch/now?channel=${encodeURIComponent(channelID)}`, { cache: 'no-store' });
+            if (res.status === 204) {
+                nowBox.hidden = true;
+                return;
+            }
+            if (!res.ok) {
+                nowBox.hidden = true;
+                return;
+            }
+            const data = await res.json();
+            if (!data || typeof data.title !== 'string' || data.title.trim() === '') {
+                nowBox.hidden = true;
+                return;
+            }
+
+            nowTitle.textContent = data.title;
+
+            const start = data.start ? new Date(data.start) : null;
+            const stop = data.stop ? new Date(data.stop) : null;
+            const startStr = start ? formatHHMM(start) : '';
+            const stopStr = stop ? formatHHMM(stop) : '';
+            nowTime.textContent = (startStr && stopStr) ? `${startStr}-${stopStr}` : '';
+
+            if (nowSubtitle) {
+                const s = (typeof data.subtitle === 'string') ? data.subtitle.trim() : '';
+                nowSubtitle.textContent = s;
+                nowSubtitle.hidden = s === '';
+            }
+
+            if (nowDescription) {
+                const d = (typeof data.description === 'string') ? data.description.trim() : '';
+                nowDescription.textContent = d;
+                nowDescription.hidden = d === '';
+            }
+
+            nowBox.hidden = false;
+        } catch {
+            nowBox.hidden = true;
+        }
+    }
 
     function currentIntervalSeconds() {
         if (!intervalSel) return 0;
@@ -434,6 +501,9 @@
         // In stream mode this also frees tuners by stopping active ffmpeg streams.
         await postForm('/watch/channel', { channel: channelID });
 
+        // Update "Now" info after tuning.
+        refreshNowInfo(channelID).catch(() => {});
+
         if (streamEnabled) {
             applyStream(channelID);
         } else {
@@ -476,6 +546,13 @@
         setScreenWidth();
         refresh();
     }
+
+    // Load "Now" info for the initially selected channel and keep it fresh.
+    refreshNowInfo(selectedChannelID()).catch(() => {});
+    if (nowTimer) window.clearInterval(nowTimer);
+    nowTimer = window.setInterval(() => {
+        refreshNowInfo(selectedChannelID()).catch(() => {});
+    }, 30000);
 })();
 </script>
 </body>

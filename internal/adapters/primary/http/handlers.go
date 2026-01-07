@@ -319,6 +319,71 @@ func (h *Handler) WatchTVChannel(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type watchTVNowResponse struct {
+	ChannelID    string    `json:"channel_id"`
+	EventID      int       `json:"event_id"`
+	Title        string    `json:"title"`
+	Subtitle     string    `json:"subtitle"`
+	Description  string    `json:"description"`
+	Start        time.Time `json:"start"`
+	Stop         time.Time `json:"stop"`
+	MoreInfoURL  string    `json:"more_info_url"`
+}
+
+// WatchTVNow returns the currently-running EPG event for a channel.
+// The channel is identified by its channel id (same value used by POST /watch/channel).
+func (h *Handler) WatchTVNow(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.epgService == nil {
+		http.Error(w, "EPG service not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	channelID := strings.TrimSpace(r.URL.Query().Get("channel"))
+	if channelID == "" {
+		http.Error(w, "Missing channel", http.StatusBadRequest)
+		return
+	}
+
+	events, err := h.epgService.GetCurrentPrograms(r.Context())
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	var cur *domain.EPGEvent
+	for i := range events {
+		if strings.TrimSpace(events[i].ChannelID) == channelID {
+			cur = &events[i]
+			break
+		}
+	}
+	if cur == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	resp := watchTVNowResponse{
+		ChannelID:   cur.ChannelID,
+		EventID:     cur.EventID,
+		Title:       cur.Title,
+		Subtitle:    cur.Subtitle,
+		Description: cur.Description,
+		Start:       cur.Start,
+		Stop:        cur.Stop,
+	}
+	if cur.EventID > 0 {
+		resp.MoreInfoURL = fmt.Sprintf("/event?channel=%s&id=%d", cur.ChannelID, cur.EventID)
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
 var watchTVTransparentGIF = []byte{
 	0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0xff, 0xff, 0xff, 0x21, 0xf9, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x00,
