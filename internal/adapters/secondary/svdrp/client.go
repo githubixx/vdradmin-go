@@ -3,6 +3,7 @@ package svdrp
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +18,54 @@ import (
 
 	"github.com/githubixx/vdradmin-go/internal/domain"
 )
+
+// GrabJpeg captures a snapshot as JPEG via SVDRP GRAB.
+// This mirrors the classic vdradmin-am behavior (GRAB .jpg 80 <w> <h>) and expects
+// base64-encoded payload in the SVDRP response.
+func (c *Client) GrabJpeg(ctx context.Context, width int, height int) ([]byte, error) {
+	if width <= 0 || height <= 0 {
+		return nil, fmt.Errorf("invalid dimensions: %dx%d", width, height)
+	}
+
+	return withRetry(ctx, c, func() ([]byte, error) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+
+		cmd := fmt.Sprintf("GRAB .jpg 80 %d %d", width, height)
+		if err := c.sendCommandLocked(cmd); err != nil {
+			return nil, err
+		}
+
+		lines, err := c.readResponseLocked()
+		if err != nil {
+			return nil, err
+		}
+
+		var b strings.Builder
+		b.Grow(64 * 1024)
+		for _, ln := range lines {
+			if strings.Contains(ln, "Grab image failed") {
+				return nil, fmt.Errorf("grab image failed")
+			}
+			if strings.Contains(ln, "Grabbed image") {
+				continue
+			}
+			b.WriteString(strings.TrimSpace(ln))
+		}
+
+		payload := b.String()
+		payload = strings.Join(strings.Fields(payload), "")
+		if payload == "" {
+			return nil, fmt.Errorf("empty grab payload")
+		}
+
+		img, err := base64.StdEncoding.DecodeString(payload)
+		if err != nil {
+			return nil, fmt.Errorf("decode grab payload: %w", err)
+		}
+		return img, nil
+	})
+}
 
 var recordingPathTimestampRe = regexp.MustCompile(`\b(\d{4}-\d{2}-\d{2})\.(\d{2})\.(\d{2})\.(\d{2})\b`)
 var recordingListLeadingDateTimeRe = regexp.MustCompile(`^\s*(\d{4}-\d{2}-\d{2})\s+(\d{2}):(\d{2})\b`)

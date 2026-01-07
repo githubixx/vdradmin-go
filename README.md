@@ -71,6 +71,20 @@ make build
 
 See `configs/config.example.yaml` for full configuration options.
 
+## Watch TV
+
+The **Watch TV** page (`/watch`) provides:
+
+- a periodically refreshed **snapshot** (configurable interval + size)
+- a glossy **remote control** (SVDRP `HITK`)
+- a **channel list** restricted to channels configured in **Configurations** (wanted channels)
+
+### Requirements
+
+The snapshot feature uses the SVDRP `GRAB` command.
+
+- If your VDR does not support `GRAB` (or cannot grab a picture on the VDR host), the page will still load but snapshots will fail. This is common for headless/recording-only VDR instances that have tuners but no primary video output/decoder device.
+
 ## Integration Tests (Docker)
 
 There is an optional integration test (build tag `integration`) that spins up:

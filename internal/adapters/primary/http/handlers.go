@@ -1,6 +1,8 @@
 package http
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log/slog"
@@ -134,6 +136,8 @@ func pageNameForPath(path string) string {
 		return "Channels"
 	case strings.HasPrefix(path, "/playing"):
 		return "Playing Today"
+	case strings.HasPrefix(path, "/watch"):
+		return "Watch TV"
 	case strings.HasPrefix(path, "/timers"):
 		return "Timers"
 	case strings.HasPrefix(path, "/recordings"):
@@ -147,6 +151,171 @@ func pageNameForPath(path string) string {
 	default:
 		return ""
 	}
+}
+
+type vdrPictureGrabber interface {
+	GrabJpeg(ctx context.Context, width int, height int) ([]byte, error)
+}
+
+func parseWatchTVSize(size string) (width int, height int) {
+	const maxWidth = 1920
+	const maxHeight = 1080
+	// Keep behavior aligned with the classic vdradmin-am TV page.
+	switch strings.ToLower(strings.TrimSpace(size)) {
+	case "full":
+		return maxWidth, maxHeight
+	case "half", "":
+		return maxWidth / 2, maxHeight / 2
+	case "quarter":
+		return maxWidth / 4, maxHeight / 4
+	default:
+		return maxWidth / 4, maxHeight / 4
+	}
+}
+
+// WatchTV renders the snapshot-based TV page (SVDRP GRAB + remote control).
+func (h *Handler) WatchTV(w http.ResponseWriter, r *http.Request) {
+	data := map[string]any{}
+
+	interval := strings.TrimSpace(r.URL.Query().Get("interval"))
+	if interval == "" {
+		interval = "5"
+	}
+	data["Interval"] = interval
+
+	size := strings.TrimSpace(r.URL.Query().Get("size"))
+	if size == "" {
+		size = "half"
+	}
+	data["Size"] = size
+
+	data["NewWin"] = strings.TrimSpace(r.URL.Query().Get("new_win")) == "1"
+	data["FullTV"] = strings.TrimSpace(r.URL.Query().Get("full_tv")) == "1"
+
+	channels, err := h.epgService.GetChannels(r.Context())
+	if err != nil {
+		h.logger.Error("channels fetch error", slog.Any("error", err))
+		data["HomeError"] = err.Error()
+		data["Channels"] = []domain.Channel{}
+		h.renderTemplate(w, r, "watch.html", data)
+		return
+	}
+	data["Channels"] = channels
+
+	cur, err := h.vdrClient.GetCurrentChannel(r.Context())
+	if err != nil {
+		// Non-fatal; still render UI.
+		h.logger.Warn("current channel fetch error", slog.Any("error", err))
+	}
+	data["CurrentChannel"] = strings.TrimSpace(cur)
+
+	h.renderTemplate(w, r, "watch.html", data)
+}
+
+// WatchTVKey sends a remote control key via SVDRP HITK.
+func (h *Handler) WatchTVKey(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	key := strings.TrimSpace(r.FormValue("key"))
+	// Match classic vdradmin-am behavior.
+	switch key {
+	case "VolumePlus":
+		key = "Volume+"
+	case "VolumeMinus":
+		key = "Volume-"
+	}
+	if key == "" {
+		http.Error(w, "Missing key", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.vdrClient.SendKey(r.Context(), key); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// WatchTVChannel switches to a channel via SVDRP CHAN.
+func (h *Handler) WatchTVChannel(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ch := strings.TrimSpace(r.FormValue("channel"))
+	if ch == "" {
+		http.Error(w, "Missing channel", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.vdrClient.SetCurrentChannel(r.Context(), ch); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+var watchTVTransparentGIF = []byte{
+	0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0xff, 0xff, 0xff, 0x21, 0xf9, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x00,
+	0x01, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3b,
+}
+
+func writeWatchTVSnapshotError(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"error": msg,
+	})
+}
+
+func humanizeWatchTVSnapshotError(err error) string {
+	if err == nil {
+		return "unknown error"
+	}
+
+	msg := err.Error()
+	lower := strings.ToLower(msg)
+	if strings.Contains(lower, "grab image failed") {
+		return "Snapshot unavailable: this VDR cannot grab frames on the host (SVDRP GRAB needs a primary video output/decoder device; headless recording-only setups typically cannot support this)."
+	}
+
+	return msg
+}
+
+// WatchTVSnapshot returns a JPEG snapshot via SVDRP GRAB.
+func (h *Handler) WatchTVSnapshot(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	grabber, ok := h.vdrClient.(vdrPictureGrabber)
+	if !ok {
+		w.Header().Set("X-VDRAdmin-Error", "VDR client does not support GRAB")
+		writeWatchTVSnapshotError(w, http.StatusNotImplemented, "VDR does not support snapshot (SVDRP GRAB)")
+		return
+	}
+
+	width, height := parseWatchTVSize(r.URL.Query().Get("size"))
+	img, err := grabber.GrabJpeg(r.Context(), width, height)
+	if err != nil {
+		h.logger.Warn("grab snapshot failed", slog.Any("error", err))
+		w.Header().Set("X-VDRAdmin-Error", "grab failed")
+		writeWatchTVSnapshotError(w, http.StatusBadGateway, humanizeWatchTVSnapshotError(err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write(img)
 }
 
 type channelsDayGroup struct {

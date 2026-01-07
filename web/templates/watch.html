@@ -1,0 +1,300 @@
+{{define "watch.html"}}
+<!DOCTYPE html>
+<html lang="en" {{if eq .ThemeMode "dark"}}data-theme="dark"{{else if eq .ThemeMode "light"}}data-theme="light"{{end}} data-theme-default="{{.ThemeDefault}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watch TV - VDRAdmin-go</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/theme.js?v=20260104" defer></script>
+</head>
+<body>
+    {{template "nav_header" .}}
+
+    <main class="container">
+        <div class="toolbar">
+            <div class="watchtv-toolbar">
+                <div class="watchtv-controls">
+                    <strong>TV</strong>
+
+                    <label class="watchtv-label" for="watchtv-interval">Interval</label>
+                    <select id="watchtv-interval" class="watchtv-select">
+                        <option value="0" {{if eq .Interval "0"}}selected{{end}}>off</option>
+                        <option value="1" {{if eq .Interval "1"}}selected{{end}}>1 sec.</option>
+                        <option value="2" {{if eq .Interval "2"}}selected{{end}}>2 sec.</option>
+                        <option value="3" {{if eq .Interval "3"}}selected{{end}}>3 sec.</option>
+                        <option value="5" {{if eq .Interval "5"}}selected{{end}}>5 sec.</option>
+                        <option value="10" {{if eq .Interval "10"}}selected{{end}}>10 sec.</option>
+                        <option value="30" {{if eq .Interval "30"}}selected{{end}}>30 sec.</option>
+                        <option value="60" {{if eq .Interval "60"}}selected{{end}}>60 sec.</option>
+                    </select>
+                    <button type="button" class="btn btn-secondary btn-menu" id="watchtv-grab">G</button>
+
+                    <label class="watchtv-label" for="watchtv-size">Size</label>
+                    <select id="watchtv-size" class="watchtv-select">
+                        <option value="full" {{if eq .Size "full"}}selected{{end}}>1:1</option>
+                        <option value="half" {{if eq .Size "half"}}selected{{end}}>1:2</option>
+                        <option value="quarter" {{if eq .Size "quarter"}}selected{{end}}>1:4</option>
+                    </select>
+                    <button type="button" class="btn btn-secondary btn-menu" id="watchtv-grab-2">G</button>
+                </div>
+
+                {{if not .NewWin}}
+                <a class="btn btn-secondary btn-menu" href="/watch?new_win=1&full_tv=1&interval={{.Interval}}&size={{.Size}}" target="_blank" rel="noopener">Open in separate window</a>
+                {{end}}
+            </div>
+        </div>
+
+        {{if .HomeError}}
+        <div class="toolbar">
+            <strong>VDR connection error:</strong> {{.HomeError}}
+        </div>
+        {{end}}
+
+        <div class="watchtv-grid">
+            <section class="watchtv-screen">
+                <div class="watchtv-screen-inner" id="watchtv-screen">
+                    <div class="watchtv-overlay" id="watchtv-overlay" hidden>
+                        <div class="watchtv-overlay-card">
+                            <div class="watchtv-overlay-title">Snapshot unavailable</div>
+                            <div class="watchtv-overlay-body" id="watchtv-overlay-body"></div>
+                            <div class="watchtv-overlay-hint">This uses SVDRP <strong>GRAB</strong> on the VDR host.</div>
+                        </div>
+                    </div>
+                    <img id="watchtv-image" class="watchtv-image" alt="TV snapshot" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" />
+                </div>
+            </section>
+
+            <section class="watchtv-remote" aria-label="Remote control">
+                <div class="remote-panel">
+                    <div class="remote-row remote-row-right">
+                        <button class="remote-btn remote-btn-power" data-key="power" type="button">Power</button>
+                    </div>
+
+                    <div class="remote-grid remote-grid-nums">
+                        <button class="remote-btn" data-key="1" type="button">1</button>
+                        <button class="remote-btn" data-key="2" type="button">2</button>
+                        <button class="remote-btn" data-key="3" type="button">3</button>
+                        <button class="remote-btn" data-key="4" type="button">4</button>
+                        <button class="remote-btn" data-key="5" type="button">5</button>
+                        <button class="remote-btn" data-key="6" type="button">6</button>
+                        <button class="remote-btn" data-key="7" type="button">7</button>
+                        <button class="remote-btn" data-key="8" type="button">8</button>
+                        <button class="remote-btn" data-key="9" type="button">9</button>
+                        <span></span>
+                        <button class="remote-btn" data-key="0" type="button">0</button>
+                        <span></span>
+                    </div>
+
+                    <div class="remote-grid remote-grid-top">
+                        <button class="remote-btn" data-key="menu" type="button">Menu</button>
+                        <span></span>
+                        <button class="remote-btn" data-key="back" type="button">Back</button>
+                    </div>
+
+                    <div class="remote-grid remote-grid-colors">
+                        <button class="remote-btn remote-btn-red" data-key="red" type="button"></button>
+                        <button class="remote-btn remote-btn-green" data-key="green" type="button"></button>
+                        <button class="remote-btn remote-btn-yellow" data-key="yellow" type="button"></button>
+                        <button class="remote-btn remote-btn-blue" data-key="blue" type="button"></button>
+                    </div>
+
+                    <div class="remote-grid remote-grid-nav">
+                        <span></span>
+                        <button class="remote-btn" data-key="up" type="button">▲</button>
+                        <span></span>
+
+                        <button class="remote-btn" data-key="left" type="button">◀</button>
+                        <button class="remote-btn remote-btn-ok" data-key="ok" type="button">OK</button>
+                        <button class="remote-btn" data-key="right" type="button">▶</button>
+
+                        <span></span>
+                        <button class="remote-btn" data-key="down" type="button">▼</button>
+                        <span></span>
+                    </div>
+
+                    <div class="remote-grid remote-grid-transport">
+                        <button class="remote-btn" data-key="rec" type="button">●</button>
+                        <button class="remote-btn" data-key="stop" type="button">■</button>
+                        <button class="remote-btn" data-key="fastrew" type="button">⏪</button>
+                        <button class="remote-btn" data-key="play" type="button">▶︎</button>
+                        <button class="remote-btn" data-key="fastfwd" type="button">⏩</button>
+                        <button class="remote-btn" data-key="prev" type="button">⏮</button>
+                        <button class="remote-btn" data-key="pause" type="button">⏸</button>
+                        <button class="remote-btn" data-key="next" type="button">⏭</button>
+                    </div>
+
+                    <div class="remote-grid remote-grid-volume reopening">
+                        <button class="remote-btn" data-key="VolumeMinus" type="button">Volume-</button>
+                        <button class="remote-btn" data-key="mute" type="button">Mute</button>
+                        <button class="remote-btn" data-key="VolumePlus" type="button">Volume+</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="watchtv-channels" aria-label="Channels">
+                <div class="watchtv-channels-panel">
+                    <div class="watchtv-channels-title">Channels</div>
+                    <select id="watchtv-channel" size="32" class="watchtv-channel-list">
+                        {{range .Channels}}
+                        <option value="{{.ID}}" {{if eq $.CurrentChannel .ID}}selected{{end}}>{{.Name}}</option>
+                        {{end}}
+                    </select>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; {{.Year}} vdradmin-go | <a href="https://github.com/githubixx/vdradmin-go">GitHub</a></p>
+        </div>
+    </footer>
+
+<script>
+(() => {
+    const img = document.getElementById('watchtv-image');
+    const overlay = document.getElementById('watchtv-overlay');
+    const overlayBody = document.getElementById('watchtv-overlay-body');
+    const intervalSel = document.getElementById('watchtv-interval');
+    const sizeSel = document.getElementById('watchtv-size');
+    const grabBtn = document.getElementById('watchtv-grab');
+    const grabBtn2 = document.getElementById('watchtv-grab-2');
+    const channelSel = document.getElementById('watchtv-channel');
+
+    let timer = null;
+    let lastObjectURL = null;
+
+    function currentIntervalSeconds() {
+        const v = parseInt(intervalSel.value, 10);
+        return Number.isFinite(v) ? v : 0;
+    }
+
+    function snapshotURL() {
+        const size = encodeURIComponent(sizeSel.value);
+        return `/watch/snapshot?size=${size}&rand=${Date.now()}`;
+    }
+
+    function setScreenWidth() {
+        const size = sizeSel.value;
+        const w = (size === 'full' ? 1920 : (size === 'half' ? 960 : 480));
+        const screen = document.getElementById('watchtv-screen');
+        if (screen) screen.style.width = w + 'px';
+    }
+
+    function stop() {
+        if (timer) {
+            window.clearTimeout(timer);
+            timer = null;
+        }
+    }
+
+    function showOverlay(message) {
+        if (!overlay || !overlayBody) return;
+        overlayBody.textContent = message || 'Unknown error';
+        overlay.hidden = false;
+    }
+
+    function hideOverlay() {
+        if (!overlay) return;
+        overlay.hidden = true;
+    }
+
+    async function loadSnapshotOnce() {
+        const url = snapshotURL();
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) {
+            let msg = `HTTP ${res.status}`;
+            try {
+                const data = await res.json();
+                if (data && typeof data.error === 'string' && data.error.trim() !== '') {
+                    msg = data.error;
+                }
+            } catch {
+                // ignore
+            }
+            throw new Error(msg);
+        }
+        const blob = await res.blob();
+        const obj = URL.createObjectURL(blob);
+        if (lastObjectURL) URL.revokeObjectURL(lastObjectURL);
+        lastObjectURL = obj;
+        img.src = obj;
+    }
+
+    async function refresh() {
+        setScreenWidth();
+        try {
+            await loadSnapshotOnce();
+            hideOverlay();
+        } catch (e) {
+            // Stop auto-refresh on errors to avoid spamming logs.
+            stop();
+            showOverlay(e && e.message ? e.message : 'Grab image failed');
+            return;
+        }
+
+        const sec = currentIntervalSeconds();
+        if (sec > 0) {
+            stop();
+            timer = window.setTimeout(refresh, sec * 1000);
+        }
+    }
+
+    async function postForm(url, data) {
+        const body = new URLSearchParams(data);
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body,
+        });
+        if (!res.ok) throw new Error(`${url}: ${res.status}`);
+    }
+
+    async function sendKey(key) {
+        stop();
+        await postForm('/watch/key', { key });
+        window.setTimeout(refresh, 500);
+    }
+
+    async function switchChannel(channelID) {
+        stop();
+        await postForm('/watch/channel', { channel: channelID });
+        window.setTimeout(refresh, 500);
+    }
+
+    intervalSel?.addEventListener('change', () => {
+        const sec = currentIntervalSeconds();
+        stop();
+        if (sec > 0) refresh();
+    });
+
+    sizeSel?.addEventListener('change', () => {
+        stop();
+        refresh();
+    });
+
+    grabBtn?.addEventListener('click', () => { stop(); refresh(); });
+    grabBtn2?.addEventListener('click', () => { stop(); refresh(); });
+
+    channelSel?.addEventListener('change', () => {
+        const opt = channelSel.options[channelSel.selectedIndex];
+        if (opt && opt.value) switchChannel(opt.value).catch(() => {});
+    });
+
+    document.querySelectorAll('[data-key]')?.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const key = btn.getAttribute('data-key');
+            if (!key) return;
+            sendKey(key).catch(() => {});
+        });
+    });
+
+    // Initial load
+    setScreenWidth();
+    refresh();
+})();
+</script>
+</body>
+</html>
+{{end}}
