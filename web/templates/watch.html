@@ -200,6 +200,17 @@
     let currentStreamChannel = null; // Track current channel for cleanup
     let hls = null;
     let nowTimer = null;
+    let hlsFatalErrorCount = 0;
+
+    let lastSuccessfulChannelID = '';
+    let lastSuccessfulChannelNum = '';
+    let lastSuccessfulChannelIndex = -1;
+
+    let channelSwitchController = null;
+
+    let digitBuffer = '';
+    let digitTimer = null;
+    const digitCommitDelayMs = 1200;
 
     function formatHHMM(date) {
         const d = (date instanceof Date) ? date : new Date(date);
@@ -346,6 +357,7 @@
 
         hideOverlay();
             if (video) {
+                hlsFatalErrorCount = 0;
                 // Properly reset video element for new stream
                 // Add cache-busting timestamp to force fresh playlist load
                 let newSrc = url.startsWith('/') ? window.location.origin + url : url;
@@ -403,9 +415,36 @@
                 });
 
                 hls.on(window.Hls.Events.ERROR, (event, data) => {
-                    // hls.js emits lots of recoverable errors while tuning; only show fatal ones.
-                    if (data && data.fatal) {
-                        console.error('hls.js fatal error:', data);
+                    if (!data || !data.fatal) return;
+
+                    // hls.js can mark some early tuning hiccups as fatal. Try to recover
+                    // instead of immediately bailing out, otherwise the UI gets stuck on
+                    // "Stream unavailable" even though segments start flowing shortly after.
+                    hlsFatalErrorCount++;
+                    console.error('hls.js fatal error:', data);
+
+                    const type = data.type;
+                    if (type === window.Hls.ErrorTypes.NETWORK_ERROR) {
+                        // Try to restart loading.
+                        try {
+                            hls.startLoad();
+                            return;
+                        } catch {
+                            // fall through
+                        }
+                    }
+                    if (type === window.Hls.ErrorTypes.MEDIA_ERROR) {
+                        // Try to recover from media errors (decoder/demux).
+                        try {
+                            hls.recoverMediaError();
+                            return;
+                        } catch {
+                            // fall through
+                        }
+                    }
+
+                    // If we keep hitting fatal errors, show overlay and give up.
+                    if (hlsFatalErrorCount >= 3) {
                         showOverlay('Stream failed to load.');
                         try { hls.destroy(); } catch { /* ignore */ }
                         hls = null;
@@ -478,14 +517,42 @@
         }
     }
 
-    async function postForm(url, data) {
+    async function postForm(url, data, opts) {
         const body = new URLSearchParams(data);
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body,
-        });
-        if (!res.ok) throw new Error(`${url}: ${res.status}`);
+        let res;
+        try {
+            res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body,
+                signal: opts?.signal,
+            });
+        } catch (e) {
+            if (e && e.name === 'AbortError') {
+                const err = new Error('aborted');
+                err.isAbort = true;
+                throw err;
+            }
+            throw e;
+        }
+
+
+        if (!res.ok) {
+            let text = '';
+            try { text = (await res.text()) || ''; } catch { /* ignore */ }
+            text = (text || '').trim();
+            const msg = text !== '' ? text : `${url}: ${res.status}`;
+            const err = new Error(msg);
+            err.status = res.status;
+            const ra = res.headers.get('Retry-After');
+            if (ra) {
+                const sec = parseFloat(ra);
+                if (Number.isFinite(sec) && sec > 0) {
+                    err.retryAfterMs = Math.round(sec * 1000);
+                }
+            }
+            throw err;
+        }
     }
 
     async function sendKey(key) {
@@ -494,20 +561,118 @@
         if (!streamEnabled) window.setTimeout(refresh, 500);
     }
 
+    function selectChannelByNumber(channelNumber) {
+        if (!channelSel) return null;
+        const wanted = String(parseInt(channelNumber, 10));
+        if (!wanted || wanted === 'NaN') return null;
+        for (let i = 0; i < channelSel.options.length; i++) {
+            const opt = channelSel.options[i];
+            const num = opt?.getAttribute('data-number');
+            if (num && String(parseInt(num, 10)) === wanted) {
+                channelSel.selectedIndex = i;
+                return opt;
+            }
+        }
+        return null;
+    }
+
+    function stepChannel(delta) {
+        if (!channelSel || channelSel.options.length === 0) return;
+        const idx = channelSel.selectedIndex >= 0 ? channelSel.selectedIndex : 0;
+        const next = Math.max(0, Math.min(channelSel.options.length - 1, idx + delta));
+        channelSel.selectedIndex = next;
+        const opt = channelSel.options[next];
+        if (opt && opt.value) switchChannel(opt.value).catch(() => {});
+    }
+
+    function commitDigitBuffer() {
+        if (digitTimer) {
+            window.clearTimeout(digitTimer);
+            digitTimer = null;
+        }
+        const buf = digitBuffer;
+        digitBuffer = '';
+        const opt = selectChannelByNumber(buf);
+        if (opt && opt.value) {
+            switchChannel(opt.value).catch(() => {});
+        }
+    }
+
+    function pushDigit(d) {
+        if (!/^[0-9]$/.test(d)) return;
+        digitBuffer = (digitBuffer + d).replace(/^0+(?=\d)/, '');
+        if (digitBuffer.length > 4) {
+            digitBuffer = d;
+        }
+        if (digitTimer) window.clearTimeout(digitTimer);
+        digitTimer = window.setTimeout(commitDigitBuffer, digitCommitDelayMs);
+    }
+
     async function switchChannel(channelID) {
         stop();
 
+        // Abort any in-flight switch so rapid clicks don't queue up and keep killing streams.
+        if (channelSwitchController) {
+            try { channelSwitchController.abort(); } catch { /* ignore */ }
+        }
+        channelSwitchController = new AbortController();
+
+        const opt = channelSel?.options[channelSel.selectedIndex];
+        const channelNum = opt?.getAttribute('data-number') || '';
+
+        // Keep track of what was last working, so we can revert selection if tuning fails.
+        const prevNum = lastSuccessfulChannelNum;
+
         // Always tell VDR to switch channels.
         // In stream mode this also frees tuners by stopping active ffmpeg streams.
-        await postForm('/watch/channel', { channel: channelID });
 
-        // Update "Now" info after tuning.
-        refreshNowInfo(channelID).catch(() => {});
+        const maxAttempts = 3;
+        let attempt = 0;
+        while (true) {
+            attempt++;
+            try {
+                await postForm('/watch/channel', { channel: channelID, channel_num: channelNum, prev_channel_num: prevNum }, { signal: channelSwitchController.signal });
+                break;
+            } catch (e) {
+                if (e && e.isAbort) return;
+                const status = e && typeof e.status === 'number' ? e.status : 0;
+                // 409 means SVDRP 554 (tuner busy). Retry a couple of times before surfacing.
+                if (status === 409 && attempt < maxAttempts) {
+                    const delay = (e && typeof e.retryAfterMs === 'number' && e.retryAfterMs > 0) ? e.retryAfterMs : 900;
+                    await new Promise((resolve) => window.setTimeout(resolve, delay));
+                    continue;
+                }
+                throw e;
+            }
+        }
 
-        if (streamEnabled) {
-            applyStream(channelID);
-        } else {
-            window.setTimeout(refresh, 500);
+        try {
+
+            lastSuccessfulChannelID = channelID;
+            lastSuccessfulChannelNum = channelNum;
+            lastSuccessfulChannelIndex = channelSel ? channelSel.selectedIndex : -1;
+
+            // Update "Now" info after tuning.
+            refreshNowInfo(channelID).catch(() => {});
+
+            if (streamEnabled) {
+                applyStream(channelID);
+            } else {
+                window.setTimeout(refresh, 500);
+            }
+        } catch (e) {
+            // Surface the error and keep the UI consistent with what's actually playing.
+            const msg = (e && e.message) ? e.message : 'Channel switch failed';
+            showOverlay(msg);
+
+            if (channelSel && lastSuccessfulChannelIndex >= 0) {
+                channelSel.selectedIndex = lastSuccessfulChannelIndex;
+            }
+
+            if (streamEnabled && lastSuccessfulChannelID) {
+                applyStream(lastSuccessfulChannelID);
+                refreshNowInfo(lastSuccessfulChannelID).catch(() => {});
+            }
         }
     }
 
@@ -534,12 +699,34 @@
         btn.addEventListener('click', () => {
             const key = btn.getAttribute('data-key');
             if (!key) return;
+
+            // Channel switching via remote buttons.
+            if (/^[0-9]$/.test(key)) {
+                pushDigit(key);
+                return;
+            }
+            if (key === 'up') {
+                stepChannel(-1);
+                return;
+            }
+            if (key === 'down') {
+                stepChannel(1);
+                return;
+            }
+
+            // Everything else goes through SVDRP HITK.
             sendKey(key).catch(() => {});
         });
     });
 
     // Initial load
     if (streamEnabled) {
+        // Initialize "last successful" to the server-selected channel.
+        lastSuccessfulChannelID = selectedChannelID();
+        const opt = channelSel?.options[channelSel.selectedIndex];
+        lastSuccessfulChannelNum = opt?.getAttribute('data-number') || '';
+        lastSuccessfulChannelIndex = channelSel ? channelSel.selectedIndex : -1;
+
         // Ensure VDR is tuned first (and server-side streams are reset), then attach player.
         switchChannel(selectedChannelID()).catch(() => {});
     } else {

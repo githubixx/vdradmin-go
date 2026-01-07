@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -35,6 +36,14 @@ type hlsStream struct {
 	lastAccess time.Time
 	ready      chan struct{} // signals when first segment is ready
 	mu         sync.Mutex
+	stopping   atomic.Bool
+}
+
+func truncateString(s string, max int) string {
+	if max <= 0 || len(s) <= max {
+		return s
+	}
+	return s[:max] + "…"
 }
 
 // NewHLSProxy creates a new HLS proxy instance.
@@ -60,11 +69,24 @@ func NewHLSProxy(logger *slog.Logger, backendTemplate string) (*HLSProxy, error)
 	return p, nil
 }
 
+// Start ensures an ffmpeg stream exists for a channel number.
+// This is intended to be called by the /watch/channel handler after tuning,
+// so that stale client requests for the previous channel can't restart old streams.
+func (p *HLSProxy) Start(channelNum string) error {
+	channelNum = strings.TrimSpace(channelNum)
+	if channelNum == "" {
+		return fmt.Errorf("missing channel")
+	}
+	_, err := p.ensureStream(channelNum)
+	return err
+}
+
 // GetPlaylist serves the HLS playlist for a channel.
 func (p *HLSProxy) GetPlaylist(w http.ResponseWriter, r *http.Request, channelNum string) {
-	stream, err := p.ensureStream(channelNum)
+	stream, err := p.getStream(channelNum)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Stream error: %v", err), http.StatusInternalServerError)
+		w.Header().Set("Retry-After", "1")
+		http.Error(w, "Stream not ready", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -139,10 +161,37 @@ func (p *HLSProxy) GetSegment(w http.ResponseWriter, r *http.Request, channelNum
 
 	stream.touch()
 
-	segmentPath := filepath.Join(stream.hlsDir, segmentName)
-	if _, err := os.Stat(segmentPath); err != nil {
-		http.Error(w, "Segment not found", http.StatusNotFound)
+	// Basic hardening: segmentName comes from the URL path.
+	// Only allow simple file names like "segment-12.ts".
+	if segmentName == "" || strings.Contains(segmentName, "/") || strings.Contains(segmentName, "\\") || strings.Contains(segmentName, "..") {
+		http.Error(w, "Invalid segment name", http.StatusBadRequest)
 		return
+	}
+
+	segmentPath := filepath.Join(stream.hlsDir, segmentName)
+
+	// ffmpeg can update the playlist before the segment has been fully materialized on disk.
+	// hls.js reacts badly to bursts of 404s here (it will hammer the playlist), so wait a bit.
+	const maxWait = 1500 * time.Millisecond
+	deadline := time.NewTimer(maxWait)
+	defer deadline.Stop()
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		if st, err := os.Stat(segmentPath); err == nil && st.Size() > 0 {
+			break
+		}
+
+		select {
+		case <-r.Context().Done():
+			return
+		case <-deadline.C:
+			w.Header().Set("Retry-After", "1")
+			http.Error(w, "Segment not ready", http.StatusServiceUnavailable)
+			return
+		case <-ticker.C:
+		}
 	}
 
 	w.Header().Set("Content-Type", "video/MP2T")
@@ -154,7 +203,8 @@ func (p *HLSProxy) GetSegment(w http.ResponseWriter, r *http.Request, channelNum
 
 	f, err := os.Open(segmentPath)
 	if err != nil {
-		http.Error(w, "Segment not found", http.StatusNotFound)
+		w.Header().Set("Retry-After", "1")
+		http.Error(w, "Segment not available", http.StatusServiceUnavailable)
 		return
 	}
 	defer f.Close()
@@ -231,8 +281,8 @@ func (p *HLSProxy) ensureStream(channelNum string) (*hlsStream, error) {
 		"-b:a", "128k",
 		"-f", "hls",
 		"-hls_time", "2",
-		"-hls_list_size", "5",
-		"-hls_flags", "omit_endlist",
+		"-hls_list_size", "8",
+		"-hls_flags", "omit_endlist+temp_file",
 		"-hls_allow_cache", "0",
 		"-start_number", "0",
 		"-hls_segment_filename", filepath.Join(hlsDir, "segment-%d.ts"),
@@ -300,9 +350,16 @@ func (p *HLSProxy) ensureStream(channelNum string) (*hlsStream, error) {
 			io.Copy(&stderrBuf, stderrPipe)
 		}
 
-		if err := cmd.Wait(); err != nil {
+		err := cmd.Wait()
+		if err != nil {
 			errMsg := strings.TrimSpace(stderrBuf.String())
-			if errMsg != "" {
+			errMsg = truncateString(errMsg, 2000)
+
+			// If we intentionally stopped the stream (e.g. channel switch), SIGKILL is expected.
+			// Don't log this as an error; it confuses users and produces huge stderr spam.
+			if stream.stopping.Load() || ctx.Err() != nil {
+				p.logger.Info("ffmpeg stopped", slog.String("channel", channelNum))
+			} else if errMsg != "" {
 				p.logger.Error("ffmpeg error", slog.String("channel", channelNum), slog.String("stderr", errMsg), slog.Any("exit_error", err))
 			} else {
 				p.logger.Warn("ffmpeg exited", slog.String("channel", channelNum), slog.Any("error", err))
@@ -368,6 +425,7 @@ func (s *hlsStream) touch() {
 }
 
 func (s *hlsStream) stop() {
+	s.stopping.Store(true)
 	s.cancel()
 	if s.cmd != nil && s.cmd.Process != nil {
 		// Prefer killing the whole process group to avoid leaving children around.

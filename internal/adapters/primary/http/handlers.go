@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/githubixx/vdradmin-go/internal/application/services"
@@ -33,6 +34,7 @@ type Handler struct {
 	autoTimerService *services.AutoTimerService
 	uiThemeDefault   string
 	hlsProxy         *HLSProxy
+	watchTVChannelMu sync.Mutex
 }
 
 // NewHandler creates a new HTTP handler
@@ -271,12 +273,24 @@ func (h *Handler) WatchTVKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	key := strings.TrimSpace(r.FormValue("key"))
+	keyLower := strings.ToLower(key)
 	// Match classic vdradmin-am behavior.
 	switch key {
 	case "VolumePlus":
 		key = "Volume+"
 	case "VolumeMinus":
 		key = "Volume-"
+	}
+	// Be liberal in what we accept from the UI.
+	switch keyLower {
+	case "mute":
+		key = "Mute"
+	case "pause":
+		key = "Pause"
+	case "volumeminus", "volume-":
+		key = "Volume-"
+	case "volumeplus", "volume+":
+		key = "Volume+"
 	}
 	if key == "" {
 		http.Error(w, "Missing key", http.StatusBadRequest)
@@ -298,36 +312,129 @@ func (h *Handler) WatchTVChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sleepCtx := func(ctx context.Context, d time.Duration) bool {
+		t := time.NewTimer(d)
+		defer t.Stop()
+		select {
+		case <-ctx.Done():
+			return false
+		case <-t.C:
+			return true
+		}
+	}
+
+	// Serialize channel switching to avoid overlapping StopAll/CHAN sequences which can
+	// cause tuner contention and intermittent SVDRP 554 responses.
+	h.watchTVChannelMu.Lock()
+	defer h.watchTVChannelMu.Unlock()
+	if r.Context().Err() != nil {
+		return
+	}
+
 	ch := strings.TrimSpace(r.FormValue("channel"))
 	if ch == "" {
 		http.Error(w, "Missing channel", http.StatusBadRequest)
 		return
 	}
 
+	// For stream mode we need the numeric channel number to start the HLS proxy.
+	// The value posted in "channel" is the VDR channel id (or a numeric id), which may
+	// not be safe to use in the streamdev URL template.
+	channelNum := strings.TrimSpace(r.FormValue("channel_num"))
+	prevChannelNum := strings.TrimSpace(r.FormValue("prev_channel_num"))
+
 	// If streaming is enabled, stop any active ffmpeg process first to free tuners.
 	if h.hlsProxy != nil {
 		h.hlsProxy.StopAll()
 		// Give VDR/streamdev a moment to release tuner resources.
-		time.Sleep(300 * time.Millisecond)
+		if !sleepCtx(r.Context(), 600*time.Millisecond) {
+			return
+		}
 	}
 
-	if err := h.vdrClient.SetCurrentChannel(r.Context(), ch); err != nil {
-		h.handleError(w, r, err)
+	// VDR can sometimes reject a fast switch with SVDRP 554 (e.g. tuner still busy).
+	// Retry a few times with a small backoff to make switching more resilient.
+	var lastErr error
+	for attempt := 1; attempt <= 5; attempt++ {
+		if r.Context().Err() != nil {
+			return
+		}
+		if err := h.vdrClient.SetCurrentChannel(r.Context(), ch); err == nil {
+			lastErr = nil
+			break
+		} else {
+			lastErr = err
+			msg := strings.ToLower(err.Error())
+			if !strings.Contains(msg, "svdrp error 554") {
+				break
+			}
+			// backoff: 250ms, 500ms, 800ms, 1200ms
+			switch attempt {
+			case 1:
+				if !sleepCtx(r.Context(), 250*time.Millisecond) {
+					return
+				}
+			case 2:
+				if !sleepCtx(r.Context(), 500*time.Millisecond) {
+					return
+				}
+			case 3:
+				if !sleepCtx(r.Context(), 800*time.Millisecond) {
+					return
+				}
+			case 4:
+				if !sleepCtx(r.Context(), 1200*time.Millisecond) {
+					return
+				}
+			}
+		}
+	}
+	if r.Context().Err() != nil {
 		return
+	}
+	if lastErr != nil {
+		// If we killed the old stream already, try to bring it back so the UI keeps playing.
+		if h.hlsProxy != nil && prevChannelNum != "" {
+			_ = h.hlsProxy.Start(prevChannelNum)
+		}
+
+		msg := lastErr.Error()
+		status := http.StatusInternalServerError
+		if strings.Contains(strings.ToLower(msg), "svdrp error 554") {
+			status = http.StatusConflict
+		}
+		h.logger.Warn("watch channel switch failed", slog.String("channel", ch), slog.String("error", msg))
+		if status == http.StatusConflict {
+			w.Header().Set("Retry-After", "1")
+		}
+		http.Error(w, msg, status)
+		return
+	}
+
+	// Start the HLS proxy for the newly tuned channel so stale playlist requests from the
+	// previous channel can't restart the old ffmpeg process.
+	if h.hlsProxy != nil {
+		if channelNum != "" {
+			if err := h.hlsProxy.Start(channelNum); err != nil {
+				h.logger.Error("failed to start HLS stream", slog.String("channel_num", channelNum), slog.Any("error", err))
+				http.Error(w, "Failed to start stream", http.StatusInternalServerError)
+				return
+			}
+		}
 	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
 type watchTVNowResponse struct {
-	ChannelID    string    `json:"channel_id"`
-	EventID      int       `json:"event_id"`
-	Title        string    `json:"title"`
-	Subtitle     string    `json:"subtitle"`
-	Description  string    `json:"description"`
-	Start        time.Time `json:"start"`
-	Stop         time.Time `json:"stop"`
-	MoreInfoURL  string    `json:"more_info_url"`
+	ChannelID   string    `json:"channel_id"`
+	EventID     int       `json:"event_id"`
+	Title       string    `json:"title"`
+	Subtitle    string    `json:"subtitle"`
+	Description string    `json:"description"`
+	Start       time.Time `json:"start"`
+	Stop        time.Time `json:"stop"`
+	MoreInfoURL string    `json:"more_info_url"`
 }
 
 // WatchTVNow returns the currently-running EPG event for a channel.
