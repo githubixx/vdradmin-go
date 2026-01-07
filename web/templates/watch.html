@@ -17,6 +17,10 @@
                 <div class="watchtv-controls">
                     <strong>TV</strong>
 
+                    {{if .StreamURLTemplate}}
+                    <span class="watchtv-label">Stream</span>
+                    {{else}}
+
                     <label class="watchtv-label" for="watchtv-interval">Interval</label>
                     <select id="watchtv-interval" class="watchtv-select">
                         <option value="0" {{if eq .Interval "0"}}selected{{end}}>off</option>
@@ -37,6 +41,8 @@
                         <option value="quarter" {{if eq .Size "quarter"}}selected{{end}}>1:4</option>
                     </select>
                     <button type="button" class="btn btn-secondary btn-menu" id="watchtv-grab-2">G</button>
+
+                    {{end}}
                 </div>
 
                 {{if not .NewWin}}
@@ -56,12 +62,22 @@
                 <div class="watchtv-screen-inner" id="watchtv-screen">
                     <div class="watchtv-overlay" id="watchtv-overlay" hidden>
                         <div class="watchtv-overlay-card">
-                            <div class="watchtv-overlay-title">Snapshot unavailable</div>
+                            <div class="watchtv-overlay-title">{{if .StreamURLTemplate}}Stream unavailable{{else}}Snapshot unavailable{{end}}</div>
                             <div class="watchtv-overlay-body" id="watchtv-overlay-body"></div>
-                            <div class="watchtv-overlay-hint">This uses SVDRP <strong>GRAB</strong> on the VDR host.</div>
+                            <div class="watchtv-overlay-hint">
+                                {{if .StreamURLTemplate}}
+                                {{if .StreamHint}}{{.StreamHint}}{{else}}Streaming is enabled.{{end}}
+                                {{else}}
+                                This uses SVDRP <strong>GRAB</strong> on the VDR host.
+                                {{end}}
+                            </div>
                         </div>
                     </div>
+                    {{if .StreamURLTemplate}}
+                    <video id="watchtv-video" class="watchtv-video" controls autoplay muted playsinline></video>
+                    {{else}}
                     <img id="watchtv-image" class="watchtv-image" alt="TV snapshot" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" />
+                    {{end}}
                 </div>
             </section>
 
@@ -137,7 +153,7 @@
                     <div class="watchtv-channels-title">Channels</div>
                     <select id="watchtv-channel" size="32" class="watchtv-channel-list">
                         {{range .Channels}}
-                        <option value="{{.ID}}" {{if eq $.CurrentChannel .ID}}selected{{end}}>{{.Name}}</option>
+                        <option value="{{.ID}}" data-number="{{.Number}}" {{if eq $.CurrentChannel .ID}}selected{{end}}>{{.Name}}</option>
                         {{end}}
                     </select>
                 </div>
@@ -151,6 +167,9 @@
         </div>
     </footer>
 
+    {{/* hls.js is needed for reliable HLS playback in Chromium/Firefox */}}
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+
 <script>
 (() => {
     const img = document.getElementById('watchtv-image');
@@ -161,21 +180,30 @@
     const grabBtn = document.getElementById('watchtv-grab');
     const grabBtn2 = document.getElementById('watchtv-grab-2');
     const channelSel = document.getElementById('watchtv-channel');
+        const video = document.getElementById('watchtv-video');
+
+    const streamTemplate = {{if .StreamURLTemplate}}{{.StreamURLTemplate | js}}{{else}}''{{end}};
+    const streamEnabled = typeof streamTemplate === 'string' && streamTemplate.trim() !== '';
 
     let timer = null;
     let lastObjectURL = null;
+    let currentStreamChannel = null; // Track current channel for cleanup
+    let hls = null;
 
     function currentIntervalSeconds() {
+        if (!intervalSel) return 0;
         const v = parseInt(intervalSel.value, 10);
         return Number.isFinite(v) ? v : 0;
     }
 
     function snapshotURL() {
+        if (!sizeSel) return `/watch/snapshot?rand=${Date.now()}`;
         const size = encodeURIComponent(sizeSel.value);
         return `/watch/snapshot?size=${size}&rand=${Date.now()}`;
     }
 
     function setScreenWidth() {
+        if (!sizeSel) return;
         const size = sizeSel.value;
         const w = (size === 'full' ? 1920 : (size === 'half' ? 960 : 480));
         const screen = document.getElementById('watchtv-screen');
@@ -193,11 +221,149 @@
         if (!overlay || !overlayBody) return;
         overlayBody.textContent = message || 'Unknown error';
         overlay.hidden = false;
+        overlay.removeAttribute('hidden');
     }
 
     function hideOverlay() {
         if (!overlay) return;
         overlay.hidden = true;
+        overlay.setAttribute('hidden', '');
+    }
+
+    function selectedChannelID() {
+        if (!channelSel) return '';
+        const opt = channelSel.options[channelSel.selectedIndex];
+        return opt && opt.value ? opt.value : '';
+    }
+
+    function buildStreamURL(channelID) {
+        if (!streamEnabled) return '';
+        let url = streamTemplate;
+        // Extract channel number from the select option's data attribute.
+        const opt = channelSel?.options[channelSel.selectedIndex];
+        const channelNum = opt?.getAttribute('data-number') || '';
+        if (channelNum !== '') {
+            // Don't encode if it's an internal path (starts with /)
+            if (url.startsWith('/')) {
+                url = url.split('{channel}').join(channelNum);
+            } else {
+                url = url.split('{channel}').join(encodeURIComponent(channelNum));
+            }
+        }
+        return url;
+    }
+
+    function applyStream(channelID) {
+            if (!img && !video) return;
+        const url = buildStreamURL(channelID);
+        if (!url) {
+            showOverlay('Stream URL is not configured.');
+            return;
+        }
+
+        // Skip if already on this channel
+        if (currentStreamChannel === channelID) {
+            console.log('Already on channel', channelID);
+            return;
+        }
+
+        console.log('Switching from', currentStreamChannel, 'to', channelID);
+        currentStreamChannel = channelID;
+
+        // Stop any snapshot timer and release object URLs from snapshot mode.
+        stop();
+        if (lastObjectURL) {
+            URL.revokeObjectURL(lastObjectURL);
+            lastObjectURL = null;
+        }
+
+        hideOverlay();
+            if (video) {
+                // Properly reset video element for new stream
+                // Add cache-busting timestamp to force fresh playlist load
+                let newSrc = url.startsWith('/') ? window.location.origin + url : url;
+                newSrc = newSrc + '?t=' + Date.now();
+                
+                console.log('Loading new stream:', newSrc);
+
+                // Tear down any existing hls.js instance to stop old requests.
+                if (hls) {
+                    try { hls.destroy(); } catch { /* ignore */ }
+                    hls = null;
+                }
+                
+                // Remove error handler first
+                video.onerror = null;
+                
+                // Clear and reset video element
+                video.pause();
+                video.removeAttribute('src');
+                while (video.firstChild) {
+                    video.removeChild(video.firstChild);
+                }
+                video.load();
+                
+                // Prefer hls.js when available (Chromium/Firefox). Only fall back to native
+                // HLS for Safari/iOS or environments where hls.js isn't supported.
+                const canUseHlsJs = typeof window.Hls !== 'undefined' && window.Hls.isSupported && window.Hls.isSupported();
+                const canPlayNative = video.canPlayType('application/vnd.apple.mpegurl') !== '';
+
+                if (!canUseHlsJs && canPlayNative) {
+                    video.src = newSrc;
+                    video.onerror = (e) => {
+                        console.error('Video error:', e, video.error);
+                        const msg = video.error ? `Stream error: ${video.error.message || video.error.code}` : 'Stream failed to load';
+                        showOverlay(msg);
+                    };
+                    video.load();
+                    const playPromise = video.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch((err) => {
+                            console.log('Autoplay prevented or failed:', err);
+                        });
+                    }
+                    return;
+                }
+
+                if (!canUseHlsJs) {
+                    showOverlay('Streaming not supported (hls.js not available).');
+                    return;
+                }
+
+                hls = new window.Hls({
+                    // Keep defaults; we want stability, not extra tuning.
+                    enableWorker: true,
+                });
+
+                hls.on(window.Hls.Events.ERROR, (event, data) => {
+                    // hls.js emits lots of recoverable errors while tuning; only show fatal ones.
+                    if (data && data.fatal) {
+                        console.error('hls.js fatal error:', data);
+                        showOverlay('Stream failed to load.');
+                        try { hls.destroy(); } catch { /* ignore */ }
+                        hls = null;
+                    }
+                });
+
+                hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+                    hideOverlay();
+                    const playPromise = video.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch((err) => {
+                            console.log('Autoplay prevented or failed:', err);
+                        });
+                    }
+                });
+
+                // If playback starts, ensure any stale overlay is hidden.
+                video.onplaying = () => hideOverlay();
+                video.oncanplay = () => hideOverlay();
+
+                hls.loadSource(newSrc);
+                hls.attachMedia(video);
+            } else if (img) {
+                img.src = url;
+            }
     }
 
     async function loadSnapshotOnce() {
@@ -219,10 +385,14 @@
         const obj = URL.createObjectURL(blob);
         if (lastObjectURL) URL.revokeObjectURL(lastObjectURL);
         lastObjectURL = obj;
-        img.src = obj;
+            if (img) img.src = obj;
     }
 
     async function refresh() {
+        if (streamEnabled) {
+            applyStream(selectedChannelID());
+            return;
+        }
         setScreenWidth();
         try {
             await loadSnapshotOnce();
@@ -254,13 +424,21 @@
     async function sendKey(key) {
         stop();
         await postForm('/watch/key', { key });
-        window.setTimeout(refresh, 500);
+        if (!streamEnabled) window.setTimeout(refresh, 500);
     }
 
     async function switchChannel(channelID) {
         stop();
+
+        // Always tell VDR to switch channels.
+        // In stream mode this also frees tuners by stopping active ffmpeg streams.
         await postForm('/watch/channel', { channel: channelID });
-        window.setTimeout(refresh, 500);
+
+        if (streamEnabled) {
+            applyStream(channelID);
+        } else {
+            window.setTimeout(refresh, 500);
+        }
     }
 
     intervalSel?.addEventListener('change', () => {
@@ -291,8 +469,13 @@
     });
 
     // Initial load
-    setScreenWidth();
-    refresh();
+    if (streamEnabled) {
+        // Ensure VDR is tuned first (and server-side streams are reset), then attach player.
+        switchChannel(selectedChannelID()).catch(() => {});
+    } else {
+        setScreenWidth();
+        refresh();
+    }
 })();
 </script>
 </body>

@@ -143,6 +143,22 @@
 
                     <label for="vdr_reconnect_delay">Reconnect delay</label>
                     <input id="vdr_reconnect_delay" name="vdr_reconnect_delay" type="text" value="{{if .Config}}{{.Config.VDR.ReconnectDelay}}{{end}}">
+
+                    <label for="vdr_stream_url_template">Stream URL template</label>
+                    <div>
+                        <input id="vdr_stream_url_template" name="vdr_stream_url_template" type="text" value="{{if .Config}}{{.Config.VDR.StreamURLTemplate}}{{end}}" placeholder="http://127.0.0.1:3000/{channel}">
+                        <p class="empty-state" style="padding: 0.5rem 0 0 0; text-align: left;">
+                            Optional external stream URL for /watch. Use <code>{channel}</code> as a placeholder for channel number. Leave empty to use SVDRP GRAB snapshots or HLS proxy (below).
+                        </p>
+                    </div>
+
+                    <label for="vdr_streamdev_backend_url">Streamdev backend URL (HLS proxy)</label>
+                    <div>
+                        <input id="vdr_streamdev_backend_url" name="vdr_streamdev_backend_url" type="text" value="{{if .Config}}{{.Config.VDR.StreamdevBackendURL}}{{end}}" placeholder="http://127.0.0.1:3000/{channel}">
+                        <p class="empty-state" style="padding: 0.5rem 0 0 0; text-align: left;">
+                            <strong>Recommended for browser playback.</strong> If set, vdradmin-go will transcode streams from streamdev to HLS using ffmpeg. Requires ffmpeg installed. Use <code>{channel}</code> as placeholder. Example: <code>http://127.0.0.1:3000/{channel}</code>
+                        </p>
+                    </div>
                 </div>
             </div>
 

@@ -88,6 +88,8 @@ func SetupRoutes(handler *Handler, authCfg *config.AuthConfig, logger *slog.Logg
 	mux.Handle("POST /watch/key", chain(handler.WatchTVKey, commonMiddleware...))
 	mux.Handle("POST /watch/channel", chain(handler.WatchTVChannel, commonMiddleware...))
 	mux.Handle("GET /watch/snapshot", chain(handler.WatchTVSnapshot, commonMiddleware...))
+	mux.Handle("GET /watch/stream/{channel}/index.m3u8", chain(handler.WatchTVStreamPlaylist, commonMiddleware...))
+	mux.Handle("GET /watch/stream/{channel}/{segment}", chain(handler.WatchTVStreamSegment, commonMiddleware...))
 	mux.Handle("GET /epg", chain(handler.EPGList, commonMiddleware...))
 	mux.Handle("GET /event", chain(handler.EventInfo, commonMiddleware...))
 	mux.Handle("GET /search", chain(handler.EPGSearch, commonMiddleware...))

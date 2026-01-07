@@ -32,6 +32,7 @@ type Handler struct {
 	recordingService *services.RecordingService
 	autoTimerService *services.AutoTimerService
 	uiThemeDefault   string
+	hlsProxy         *HLSProxy
 }
 
 // NewHandler creates a new HTTP handler
@@ -63,6 +64,20 @@ func NewHandler(
 func (h *Handler) SetConfig(cfg *config.Config, configPath string) {
 	h.cfg = cfg
 	h.configPath = configPath
+
+	// Initialize HLS proxy if streamdev backend is configured
+	if IsHLSProxyEnabled(cfg.VDR.StreamdevBackendURL) {
+		if h.hlsProxy != nil {
+			h.hlsProxy.Shutdown()
+		}
+		proxy, err := NewHLSProxy(h.logger, cfg.VDR.StreamdevBackendURL)
+		if err != nil {
+			h.logger.Error("failed to initialize HLS proxy", slog.Any("error", err))
+		} else {
+			h.hlsProxy = proxy
+			h.logger.Info("HLS proxy enabled", slog.String("backend", cfg.VDR.StreamdevBackendURL))
+		}
+	}
 }
 
 // SetVDRClient provides the VDR client so we can apply VDR connection changes immediately.
@@ -173,6 +188,26 @@ func parseWatchTVSize(size string) (width int, height int) {
 	}
 }
 
+func watchTVCurrentChannelIDFromSVDRPChan(cur string, channels []domain.Channel) string {
+	cur = strings.TrimSpace(cur)
+	if cur == "" {
+		return ""
+	}
+	// VDR's "CHAN" response is typically "<number> <name>".
+	fields := strings.Fields(cur)
+	if len(fields) > 0 {
+		if n, err := strconv.Atoi(fields[0]); err == nil {
+			for _, ch := range channels {
+				if ch.Number == n {
+					return ch.ID
+				}
+			}
+		}
+	}
+	// If cur is already a channel ID (or we can't map it), return as-is.
+	return cur
+}
+
 // WatchTV renders the snapshot-based TV page (SVDRP GRAB + remote control).
 func (h *Handler) WatchTV(w http.ResponseWriter, r *http.Request) {
 	data := map[string]any{}
@@ -202,12 +237,28 @@ func (h *Handler) WatchTV(w http.ResponseWriter, r *http.Request) {
 	}
 	data["Channels"] = channels
 
+	// If HLS proxy is enabled, use internal proxy URL; otherwise use stream_url_template if set
+	streamTemplate := ""
+	if h.cfg != nil {
+		if IsHLSProxyEnabled(h.cfg.VDR.StreamdevBackendURL) && h.hlsProxy != nil {
+			// HLS proxy mode: build internal proxy URL with {channel} placeholder
+			streamTemplate = "/watch/stream/{channel}/index.m3u8"
+			data["StreamHint"] = "This uses the built-in HLS proxy."
+		} else {
+			streamTemplate = strings.TrimSpace(h.cfg.VDR.StreamURLTemplate)
+			if streamTemplate != "" {
+				data["StreamHint"] = "This uses a configured stream URL template."
+			}
+		}
+	}
+	data["StreamURLTemplate"] = streamTemplate
+
 	cur, err := h.vdrClient.GetCurrentChannel(r.Context())
 	if err != nil {
 		// Non-fatal; still render UI.
 		h.logger.Warn("current channel fetch error", slog.Any("error", err))
 	}
-	data["CurrentChannel"] = strings.TrimSpace(cur)
+	data["CurrentChannel"] = watchTVCurrentChannelIDFromSVDRPChan(cur, channels)
 
 	h.renderTemplate(w, r, "watch.html", data)
 }
@@ -251,6 +302,13 @@ func (h *Handler) WatchTVChannel(w http.ResponseWriter, r *http.Request) {
 	if ch == "" {
 		http.Error(w, "Missing channel", http.StatusBadRequest)
 		return
+	}
+
+	// If streaming is enabled, stop any active ffmpeg process first to free tuners.
+	if h.hlsProxy != nil {
+		h.hlsProxy.StopAll()
+		// Give VDR/streamdev a moment to release tuner resources.
+		time.Sleep(300 * time.Millisecond)
 	}
 
 	if err := h.vdrClient.SetCurrentChannel(r.Context(), ch); err != nil {
@@ -316,6 +374,39 @@ func (h *Handler) WatchTVSnapshot(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Cache-Control", "no-store")
 	_, _ = w.Write(img)
+}
+
+// WatchTVStreamPlaylist serves HLS playlist for a channel via HLS proxy.
+func (h *Handler) WatchTVStreamPlaylist(w http.ResponseWriter, r *http.Request) {
+	if h.hlsProxy == nil {
+		http.Error(w, "HLS proxy not enabled", http.StatusNotImplemented)
+		return
+	}
+
+	channelNum := r.PathValue("channel")
+	if channelNum == "" {
+		http.Error(w, "Missing channel", http.StatusBadRequest)
+		return
+	}
+
+	h.hlsProxy.GetPlaylist(w, r, channelNum)
+}
+
+// WatchTVStreamSegment serves HLS segment for a channel via HLS proxy.
+func (h *Handler) WatchTVStreamSegment(w http.ResponseWriter, r *http.Request) {
+	if h.hlsProxy == nil {
+		http.Error(w, "HLS proxy not enabled", http.StatusNotImplemented)
+		return
+	}
+
+	channelNum := r.PathValue("channel")
+	segmentName := r.PathValue("segment")
+	if channelNum == "" || segmentName == "" {
+		http.Error(w, "Missing channel or segment", http.StatusBadRequest)
+		return
+	}
+
+	h.hlsProxy.GetSegment(w, r, channelNum, segmentName)
 }
 
 type channelsDayGroup struct {
@@ -747,6 +838,10 @@ func (h *Handler) buildConfigFromForm(form url.Values) (*config.Config, error) {
 		}
 		updated.VDR.ReconnectDelay = d
 	}
+	// Stream URL template (optional, can be empty)
+	updated.VDR.StreamURLTemplate = strings.TrimSpace(form.Get("vdr_stream_url_template"))
+	// Streamdev backend URL for HLS proxy (optional, can be empty)
+	updated.VDR.StreamdevBackendURL = strings.TrimSpace(form.Get("vdr_streamdev_backend_url"))
 
 	// Cache
 	if v := strings.TrimSpace(form.Get("cache_epg_expiry")); v != "" {

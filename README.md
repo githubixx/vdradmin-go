@@ -85,6 +85,29 @@ The snapshot feature uses the SVDRP `GRAB` command.
 
 - If your VDR does not support `GRAB` (or cannot grab a picture on the VDR host), the page will still load but snapshots will fail. This is common for headless/recording-only VDR instances that have tuners but no primary video output/decoder device.
 
+For troubleshooting and background, see `docs/WATCHTV.md`.
+
+### Optional: stream URL mode (headless setups)
+
+If you run VDR headless (recording-only) and `GRAB` cannot work, you can enable streaming for `/watch`.
+
+**Recommended: HLS proxy (built-in transcoding)**
+
+Configure `vdr.streamdev_backend_url` in Configurations:
+- Example: `http://127.0.0.1:3000/{channel}`
+- Requires: `ffmpeg` installed on the vdradmin-go host
+- vdradmin-go will transcode streamdev MPEG-TS to browser-playable HLS automatically
+- `/watch` uses internal proxy endpoint `/watch/stream/{channel}/index.m3u8`
+
+**Alternative: Direct external stream URL**
+
+- Configure `vdr.stream_url_template` if you have a pre-existing HLS/MJPEG/WebM endpoint
+- The template may contain `{channel}`, which will be replaced with the selected VDR channel **number** (e.g. `1`, `2`, `3`).
+- `/watch` embeds the URL into an HTML5 `<video>` element. The URL must point to a format your browser can play (for example HLS `.m3u8` or a browser-supported MP4/WebM stream).
+
+If you use `vdr-plugin-streamdev-server`, its HTTP server commonly runs on port `3000` and can serve channels by number, e.g. `http://127.0.0.1:3000/1`.
+Note: streamdev’s default outputs are typically TS/PES/ES, which most browsers do not play directly; you may need an external remux/transcode step to get true in-browser playback.
+
 ## Integration Tests (Docker)
 
 There is an optional integration test (build tag `integration`) that spins up:
