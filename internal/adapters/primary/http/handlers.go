@@ -1372,9 +1372,129 @@ func (h *Handler) EPGSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	type searchEventView struct {
+		domain.EPGEvent
+		TimerActive bool
+	}
+
+	views := make([]searchEventView, 0, len(events))
+	if len(events) == 0 || h.timerService == nil {
+		for _, ev := range events {
+			views = append(views, searchEventView{EPGEvent: ev})
+		}
+	} else {
+		// Build channel mappings needed for timer overlap lookups.
+		channels, chErr := h.epgService.GetChannels(r.Context())
+		numberByID := make(map[string]int, len(channels))
+		idByNumber := make(map[int]string, len(channels))
+		nameByID := make(map[string]string, len(channels))
+		if chErr == nil {
+			for _, ch := range channels {
+				if ch.ID != "" {
+					numberByID[ch.ID] = ch.Number
+					nameByID[ch.ID] = ch.Name
+				}
+				if ch.Number > 0 && ch.ID != "" {
+					idByNumber[ch.Number] = ch.ID
+				}
+			}
+		}
+
+		// Determine a time window that covers the search results (+ margin for recurring timers).
+		minStart := events[0].Start
+		maxStop := events[0].Stop
+		for i := 1; i < len(events); i++ {
+			if events[i].Start.Before(minStart) {
+				minStart = events[i].Start
+			}
+			if maxStop.Before(events[i].Stop) {
+				maxStop = events[i].Stop
+			}
+		}
+		from := minStart.Add(-24 * time.Hour)
+		to := maxStop.Add(24 * time.Hour)
+		if from.After(to) {
+			from, to = to, from
+		}
+
+		occByChannelNumber := map[int][]timerOccurrence{}
+		occByChannelID := map[string][]timerOccurrence{}
+		timersByID := map[int]domain.Timer{}
+		if timers, tErr := h.timerService.GetAllTimers(r.Context()); tErr == nil {
+			for _, t := range timers {
+				// Disable "Record" if any timer exists for the event window, even if inactive.
+				if strings.TrimSpace(t.ChannelID) == "" {
+					continue
+				}
+				timersByID[t.ID] = t
+
+				occs := timerOccurrences(t, from, to)
+				if len(occs) == 0 {
+					continue
+				}
+				occByChannelID[t.ChannelID] = append(occByChannelID[t.ChannelID], occs...)
+
+				timerChNum := 0
+				if n, err := strconv.Atoi(strings.TrimSpace(t.ChannelID)); err == nil {
+					timerChNum = n
+				} else if n := numberByID[t.ChannelID]; n > 0 {
+					timerChNum = n
+				}
+				if timerChNum > 0 {
+					occByChannelNumber[timerChNum] = append(occByChannelNumber[timerChNum], occs...)
+				}
+			}
+
+			for ch := range occByChannelID {
+				occs := occByChannelID[ch]
+				sort.SliceStable(occs, func(i, j int) bool {
+					if occs[i].Start.Equal(occs[j].Start) {
+						return occs[i].TimerID < occs[j].TimerID
+					}
+					return occs[i].Start.Before(occs[j].Start)
+				})
+				occByChannelID[ch] = occs
+			}
+			for n := range occByChannelNumber {
+				occs := occByChannelNumber[n]
+				sort.SliceStable(occs, func(i, j int) bool {
+					if occs[i].Start.Equal(occs[j].Start) {
+						return occs[i].TimerID < occs[j].TimerID
+					}
+					return occs[i].Start.Before(occs[j].Start)
+				})
+				occByChannelNumber[n] = occs
+			}
+		} else {
+			h.logger.Warn("timers fetch error for search", slog.Any("error", tErr))
+		}
+
+		loc := time.Now().Location()
+		hasOverlappingTimer := func(ev domain.EPGEvent) bool {
+			_, ok := scheduledTimerForEvent(ev, loc, occByChannelNumber, occByChannelID, numberByID, idByNumber, timersByID)
+			return ok
+		}
+
+		for _, ev := range events {
+			// Normalize missing channel metadata for better overlap detection.
+			if strings.TrimSpace(ev.ChannelID) == "" && ev.ChannelNumber > 0 {
+				if id := idByNumber[ev.ChannelNumber]; id != "" {
+					ev.ChannelID = id
+				}
+			}
+			if ev.ChannelNumber <= 0 && ev.ChannelID != "" {
+				ev.ChannelNumber = numberByID[ev.ChannelID]
+			}
+			if strings.TrimSpace(ev.ChannelName) == "" && ev.ChannelID != "" {
+				ev.ChannelName = nameByID[ev.ChannelID]
+			}
+			views = append(views, searchEventView{EPGEvent: ev, TimerActive: hasOverlappingTimer(ev)})
+		}
+	}
+
 	data := map[string]any{
 		"Query":  query,
-		"Events": events,
+		"Events": views,
 	}
 
 	if isHTMX {

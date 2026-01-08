@@ -20,11 +20,15 @@
         </div>
         {{if eq $.Role "admin"}}
         <div class="epg-actions">
+            {{if or .TimerActive (le .EventID 0)}}
+            <button type="button" class="btn btn-sm btn-secondary" disabled>Scheduled</button>
+            {{else}}
             <button
                 hx-post="/timers/create?channel={{.ChannelID}}&event_id={{.EventID}}"
                 class="btn btn-sm btn-primary">
                 Record
             </button>
+            {{end}}
         </div>
         {{end}}
     </div>
