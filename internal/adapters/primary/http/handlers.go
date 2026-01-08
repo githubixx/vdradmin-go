@@ -1673,6 +1673,104 @@ type epgSearchResultDayGroup struct {
 	Events   []epgSearchResultEventView
 }
 
+func overlappingTimerForEvent(
+	ev domain.EPGEvent,
+	loc *time.Location,
+	occByChannelNumber map[int][]timerOccurrence,
+	occByChannelID map[string][]timerOccurrence,
+	numberByID map[string]int,
+	idByNumber map[int]string,
+	timersByID map[int]domain.Timer,
+) (domain.Timer, bool) {
+	if loc == nil {
+		loc = time.Local
+	}
+
+	lookupOccs := func() []timerOccurrence {
+		if ev.ChannelNumber > 0 {
+			if occs := occByChannelNumber[ev.ChannelNumber]; len(occs) > 0 {
+				return occs
+			}
+		}
+		if ev.ChannelID != "" {
+			if ev.ChannelNumber <= 0 {
+				if n := numberByID[ev.ChannelID]; n > 0 {
+					if occs := occByChannelNumber[n]; len(occs) > 0 {
+						return occs
+					}
+				}
+			}
+			if occs := occByChannelID[ev.ChannelID]; len(occs) > 0 {
+				return occs
+			}
+			if ev.ChannelNumber > 0 {
+				if occs := occByChannelID[strconv.Itoa(ev.ChannelNumber)]; len(occs) > 0 {
+					return occs
+				}
+			}
+		}
+		if ev.ChannelNumber > 0 {
+			if id := idByNumber[ev.ChannelNumber]; id != "" {
+				if occs := occByChannelID[id]; len(occs) > 0 {
+					return occs
+				}
+			}
+		}
+		return nil
+	}
+
+	occs := lookupOccs()
+	if len(occs) == 0 {
+		return domain.Timer{}, false
+	}
+
+	evStart := ev.Start.In(loc)
+	evStop := ev.Stop.In(loc)
+	if evStop.Before(evStart) {
+		evStop = evStart
+	}
+
+	// Guard against falsely marking adjacent programs as scheduled due to small
+	// recording margins. Require that the overlap covers most of the event.
+	evDur := evStop.Sub(evStart)
+	if evDur <= 0 {
+		return domain.Timer{}, false
+	}
+
+	overlapEnough := func(aStart, aStop, bStart, bStop time.Time) bool {
+		start := aStart
+		if bStart.After(start) {
+			start = bStart
+		}
+		stop := aStop
+		if bStop.Before(stop) {
+			stop = bStop
+		}
+		overlap := stop.Sub(start)
+		if overlap <= 0 {
+			return false
+		}
+		// overlap >= 60% of event duration
+		return overlap*5 >= evDur*3
+	}
+
+	for _, occ := range occs {
+		if !occ.Start.Before(evStop) || !evStart.Before(occ.Stop) {
+			continue
+		}
+		if !overlapEnough(evStart, evStop, occ.Start.In(loc), occ.Stop.In(loc)) {
+			continue
+		}
+		t, ok := timersByID[occ.TimerID]
+		if !ok {
+			continue
+		}
+		return t, true
+	}
+
+	return domain.Timer{}, false
+}
+
 // EPGSearchExecute runs selected searches and renders matching events.
 func (h *Handler) EPGSearchExecute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -1900,7 +1998,7 @@ func (h *Handler) EPGSearchExecute(w http.ResponseWriter, r *http.Request) {
 
 		label := "---"
 		active := false
-		if t, ok := scheduledTimerForEvent(ev, loc, occByChannelNumber, occByChannelID, numberByID, idByNumber, timersByID); ok {
+		if t, ok := overlappingTimerForEvent(ev, loc, occByChannelNumber, occByChannelID, numberByID, idByNumber, timersByID); ok {
 			active = true
 			if strings.TrimSpace(t.Title) != "" {
 				label = t.Title
@@ -2113,7 +2211,7 @@ func (h *Handler) renderEPGSearchRun(w http.ResponseWriter, r *http.Request, sea
 		if strings.TrimSpace(ev.ChannelName) == "" && strings.TrimSpace(ev.ChannelID) != "" {
 			ev.ChannelName = nameByID[ev.ChannelID]
 		}
-		_, active := scheduledTimerForEvent(ev, loc, occByChannelNumber, occByChannelID, numberByID, idByNumber, timersByID)
+		_, active := overlappingTimerForEvent(ev, loc, occByChannelNumber, occByChannelID, numberByID, idByNumber, timersByID)
 
 		dayGroups[currentIdx].Events = append(dayGroups[currentIdx].Events, epgSearchResultEventView{
 			EPGEvent:    ev,
