@@ -2465,22 +2465,30 @@ type timerTimelineRow struct {
 func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 	loc := time.Local
 
-	today := time.Now().In(loc)
-	windowFrom := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, loc)
-	windowTo := windowFrom.Add(8 * 24 * time.Hour) // cover at least one full week for recurring timers
+	localNow := time.Now().In(loc)
+	todayStart := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 0, 0, 0, 0, loc)
 
-	selectedDay := r.URL.Query().Get("day")
-	selectedDayStart := windowFrom
+	// Keep collision/critical computation stable (do not shift based on UI day selection).
+	collisionWindowFrom := todayStart
+	collisionWindowTo := collisionWindowFrom.Add(8 * 24 * time.Hour) // cover at least one full week for recurring timers
+
+	// Parse selected day (may be empty/invalid or outside the available days).
+	selectedDay := strings.TrimSpace(r.URL.Query().Get("day"))
+	selectedDayStart := todayStart
 	if selectedDay != "" {
 		if t, err := time.ParseInLocation("2006-01-02", selectedDay, loc); err == nil {
 			selectedDayStart = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
-			// When the user explicitly selects a day, build the timeline window around that day
-			// so the timeline renders deterministically even for past/future dates.
-			windowFrom = selectedDayStart
-			windowTo = windowFrom.Add(8 * 24 * time.Hour)
 		}
 	}
 	selectedDayEnd := selectedDayStart.Add(24 * time.Hour)
+
+	// Build day dropdown options from active timer occurrences, but never include days
+	// in the past ("already gone"). Keep the horizon stable so it doesn't jump.
+	optionsFrom := todayStart
+	optionsTo := todayStart.Add(180 * 24 * time.Hour)
+	if selectedDayStart.After(optionsTo) {
+		optionsTo = selectedDayStart.Add(30 * 24 * time.Hour)
+	}
 
 	timers, err := h.timerService.GetAllTimers(r.Context())
 	if err != nil {
@@ -2533,7 +2541,7 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 		dvbCards = h.cfg.VDR.DVBCards
 	}
 
-	collisionIDs, criticalIDs := timerOverlapStates(timers, dvbCards, windowFrom, windowTo, func(t domain.Timer) string {
+	collisionIDs, criticalIDs := timerOverlapStates(timers, dvbCards, collisionWindowFrom, collisionWindowTo, func(t domain.Timer) string {
 		return transponderKeyForTimer(t, channels)
 	})
 	for i := range views {
@@ -2587,21 +2595,34 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 		return views[i].ID < views[j].ID
 	})
 
-	// Build timeline day options from active timer occurrences within the same window.
+	// Build timeline day options from active timer occurrences in the stable horizon.
 	daysByValue := map[string]time.Time{}
+	recurringHorizonTo := todayStart.Add(8 * 24 * time.Hour)
 	for _, t := range timers {
 		if !t.Active {
 			continue
 		}
-		for _, occ := range timerOccurrences(t, windowFrom, windowTo) {
+		occFrom := optionsFrom
+		occTo := optionsTo
+		if isWeekdayMaskHTTP(t.DaySpec) {
+			occFrom = todayStart
+			occTo = recurringHorizonTo
+		}
+		for _, occ := range timerOccurrences(t, occFrom, occTo) {
 			start := occ.Start.In(loc)
 			stop := occ.Stop.In(loc)
 			if stop.Before(start) {
 				stop = start
 			}
+			// Only include days with actual timer time. In particular, a timer that ends
+			// exactly at 00:00 should not make the next day selectable.
+			if !stop.After(start) {
+				continue
+			}
+			effectiveStop := stop.Add(-time.Nanosecond)
 			// Include every day this occurrence touches (handles crossing midnight).
 			d := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, loc)
-			endDay := time.Date(stop.Year(), stop.Month(), stop.Day(), 0, 0, 0, 0, loc)
+			endDay := time.Date(effectiveStop.Year(), effectiveStop.Month(), effectiveStop.Day(), 0, 0, 0, 0, loc)
 			for !d.After(endDay) {
 				v := d.Format("2006-01-02")
 				daysByValue[v] = d
@@ -2616,10 +2637,26 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.SliceStable(availableDays, func(i, j int) bool { return availableDays[i].Before(availableDays[j]) })
 
-	// If the user didn't select a day (or selected a day without timers), pick the first available one.
+	// If the user didn't select a day (or selected a day without timers), snap to the nearest day
+	// that actually has an active timer occurrence. This keeps the dropdown + timeline consistent.
 	if len(availableDays) > 0 {
 		if _, ok := daysByValue[selectedDayStart.Format("2006-01-02")]; !ok {
-			selectedDayStart = availableDays[0]
+			chosen := availableDays[0]
+			best := chosen.Sub(selectedDayStart)
+			if best < 0 {
+				best = -best
+			}
+			for _, d := range availableDays[1:] {
+				diff := d.Sub(selectedDayStart)
+				if diff < 0 {
+					diff = -diff
+				}
+				if diff < best {
+					best = diff
+					chosen = d
+				}
+			}
+			selectedDayStart = chosen
 			selectedDayEnd = selectedDayStart.Add(24 * time.Hour)
 		}
 	}
@@ -2649,11 +2686,28 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 
 	blocksByChannel := map[string][]timerTimelineBlock{}
 	if len(availableDays) > 0 {
+		// Only generate occurrences around the selected day; this keeps rendering fast
+		// while still handling timers that cross midnight.
+		blockWindowFrom := selectedDayStart.Add(-24 * time.Hour)
+		blockWindowTo := selectedDayEnd.Add(24 * time.Hour)
 		for _, t := range timers {
 			if !t.Active {
 				continue
 			}
-			for _, occ := range timerOccurrences(t, windowFrom, windowTo) {
+			occFrom := blockWindowFrom
+			occTo := blockWindowTo
+			if isWeekdayMaskHTTP(t.DaySpec) {
+				if occFrom.Before(todayStart) {
+					occFrom = todayStart
+				}
+				if occTo.After(recurringHorizonTo) {
+					occTo = recurringHorizonTo
+				}
+				if !occFrom.Before(occTo) {
+					continue
+				}
+			}
+			for _, occ := range timerOccurrences(t, occFrom, occTo) {
 				if occ.Stop.Before(selectedDayStart) || !occ.Start.Before(selectedDayEnd) {
 					continue
 				}
@@ -2673,8 +2727,9 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 				}
 				startMin := start.Sub(selectedDayStart).Minutes()
 				stopMin := stop.Sub(selectedDayStart).Minutes()
-				if stopMin < startMin {
-					stopMin = startMin
+				if stopMin <= startMin {
+					// No time on this day (e.g., timer ends exactly at 00:00).
+					continue
 				}
 				leftPct := (startMin / 1440.0) * 100.0
 				widthPct := ((stopMin - startMin) / 1440.0) * 100.0
@@ -2995,6 +3050,37 @@ func isWeekdayMaskHTTP(daySpec string) bool {
 	return true
 }
 
+func formatClockFromMinutes(min int) string {
+	if min < 0 {
+		return ""
+	}
+	h := (min / 60) % 24
+	m := min % 60
+	if h < 0 {
+		h += 24
+	}
+	if m < 0 {
+		m += 60
+	}
+	return fmt.Sprintf("%02d:%02d", h, m)
+}
+
+func weekdayMaskFromForm(form url.Values) (string, bool) {
+	letters := []rune{'M', 'T', 'W', 'T', 'F', 'S', 'S'}
+	keys := []string{"wd_mon", "wd_tue", "wd_wed", "wd_thu", "wd_fri", "wd_sat", "wd_sun"}
+	mask := make([]rune, 7)
+	any := false
+	for i := range mask {
+		if strings.TrimSpace(form.Get(keys[i])) != "" {
+			mask[i] = letters[i]
+			any = true
+		} else {
+			mask[i] = '-'
+		}
+	}
+	return string(mask), any
+}
+
 func weekdayMaskAllowsHTTP(daySpec string, wd time.Weekday) bool {
 	idx := 0
 	switch wd {
@@ -3025,6 +3111,14 @@ type timerFormModel struct {
 	Active    bool
 	ChannelID string
 	Day       string
+	DayMode   string
+	WDMon     bool
+	WDTue     bool
+	WDWed     bool
+	WDThu     bool
+	WDFri     bool
+	WDSat     bool
+	WDSun     bool
 	Start     string
 	Stop      string
 	Priority  int
@@ -3047,6 +3141,7 @@ func (h *Handler) timerNewFormModel(now time.Time, channels []domain.Channel) (t
 		Active:    true,
 		ChannelID: selectedChannel,
 		Day:       day.Format("2006-01-02"),
+		DayMode:   "single",
 		Start:     localNow.Format("15:04"),
 		Stop:      "00:00",
 		Priority:  99,
@@ -3187,10 +3282,9 @@ func (h *Handler) timerFromCreateForm(r *http.Request) (domain.Timer, error) {
 		return domain.Timer{}, domain.ErrInvalidInput
 	}
 
-	dayStr := strings.TrimSpace(form.Get("day"))
-	day, err := time.ParseInLocation("2006-01-02", dayStr, time.Local)
-	if err != nil {
-		return domain.Timer{}, domain.ErrInvalidInput
+	dayMode := strings.TrimSpace(form.Get("day_mode"))
+	if dayMode == "" {
+		dayMode = "single"
 	}
 
 	startStr := strings.TrimSpace(form.Get("start"))
@@ -3200,11 +3294,35 @@ func (h *Handler) timerFromCreateForm(r *http.Request) (domain.Timer, error) {
 	if err1 != nil || err2 != nil {
 		return domain.Timer{}, domain.ErrInvalidInput
 	}
+	startMinutes := startClock.Hour()*60 + startClock.Minute()
+	stopMinutes := stopClock.Hour()*60 + stopClock.Minute()
 
-	start := time.Date(day.Year(), day.Month(), day.Day(), startClock.Hour(), startClock.Minute(), 0, 0, time.Local)
-	stop := time.Date(day.Year(), day.Month(), day.Day(), stopClock.Hour(), stopClock.Minute(), 0, 0, time.Local)
-	if stop.Before(start) {
-		stop = stop.Add(24 * time.Hour)
+	day := time.Time{}
+	start := time.Time{}
+	stop := time.Time{}
+	daySpec := ""
+	if dayMode == "weekly" {
+		mask, any := weekdayMaskFromForm(form)
+		if !any {
+			return domain.Timer{}, domain.ErrInvalidInput
+		}
+		daySpec = mask
+	} else {
+		dayStr := strings.TrimSpace(form.Get("day"))
+		parsedDay, err := time.ParseInLocation("2006-01-02", dayStr, time.Local)
+		if err != nil {
+			return domain.Timer{}, domain.ErrInvalidInput
+		}
+		day = parsedDay
+		start = time.Date(day.Year(), day.Month(), day.Day(), startClock.Hour(), startClock.Minute(), 0, 0, time.Local)
+		stop = time.Date(day.Year(), day.Month(), day.Day(), stopClock.Hour(), stopClock.Minute(), 0, 0, time.Local)
+		if stop.Before(start) {
+			stop = stop.Add(24 * time.Hour)
+		}
+		// Ensure this is treated as a one-time timer.
+		daySpec = ""
+		startMinutes = -1
+		stopMinutes = -1
 	}
 
 	priority, err := strconv.Atoi(strings.TrimSpace(form.Get("priority")))
@@ -3227,6 +3345,10 @@ func (h *Handler) timerFromCreateForm(r *http.Request) (domain.Timer, error) {
 		Day:       day,
 		Start:     start,
 		Stop:      stop,
+		DaySpec:   daySpec,
+		// For repeating timers, these clocks are required.
+		StartMinutes: startMinutes,
+		StopMinutes:  stopMinutes,
 		Priority:  priority,
 		Lifetime:  lifetime,
 		Title:     title,
@@ -3307,13 +3429,44 @@ func (h *Handler) timerToFormModel(t domain.Timer) timerFormModel {
 		dayStr = day.In(time.Local).Format("2006-01-02")
 	}
 
+	dayMode := "single"
+	daySpec := strings.TrimSpace(t.DaySpec)
+	if isWeekdayMaskHTTP(daySpec) {
+		dayMode = "weekly"
+	}
+
 	startStr := ""
 	stopStr := ""
-	if !t.Start.IsZero() {
+	if dayMode == "weekly" {
+		if t.StartMinutes >= 0 {
+			startStr = formatClockFromMinutes(t.StartMinutes)
+		}
+		if t.StopMinutes >= 0 {
+			stopStr = formatClockFromMinutes(t.StopMinutes)
+		}
+	}
+	if startStr == "" && !t.Start.IsZero() {
 		startStr = t.Start.In(time.Local).Format("15:04")
 	}
-	if !t.Stop.IsZero() {
+	if stopStr == "" && !t.Stop.IsZero() {
 		stopStr = t.Stop.In(time.Local).Format("15:04")
+	}
+
+	wdMon := false
+	wdTue := false
+	wdWed := false
+	wdThu := false
+	wdFri := false
+	wdSat := false
+	wdSun := false
+	if dayMode == "weekly" && len(daySpec) == 7 {
+		wdMon = daySpec[0] != '-' && daySpec[0] != '.'
+		wdTue = daySpec[1] != '-' && daySpec[1] != '.'
+		wdWed = daySpec[2] != '-' && daySpec[2] != '.'
+		wdThu = daySpec[3] != '-' && daySpec[3] != '.'
+		wdFri = daySpec[4] != '-' && daySpec[4] != '.'
+		wdSat = daySpec[5] != '-' && daySpec[5] != '.'
+		wdSun = daySpec[6] != '-' && daySpec[6] != '.'
 	}
 
 	return timerFormModel{
@@ -3321,6 +3474,14 @@ func (h *Handler) timerToFormModel(t domain.Timer) timerFormModel {
 		Active:    t.Active,
 		ChannelID: t.ChannelID,
 		Day:       dayStr,
+		DayMode:   dayMode,
+		WDMon:     wdMon,
+		WDTue:     wdTue,
+		WDWed:     wdWed,
+		WDThu:     wdThu,
+		WDFri:     wdFri,
+		WDSat:     wdSat,
+		WDSun:     wdSun,
 		Start:     startStr,
 		Stop:      stopStr,
 		Priority:  t.Priority,
@@ -3343,10 +3504,9 @@ func (h *Handler) timerFromForm(r *http.Request) (domain.Timer, error) {
 		return domain.Timer{}, domain.ErrInvalidInput
 	}
 
-	dayStr := strings.TrimSpace(form.Get("day"))
-	day, err := time.ParseInLocation("2006-01-02", dayStr, time.Local)
-	if err != nil {
-		return domain.Timer{}, domain.ErrInvalidInput
+	dayMode := strings.TrimSpace(form.Get("day_mode"))
+	if dayMode == "" {
+		dayMode = "single"
 	}
 
 	startStr := strings.TrimSpace(form.Get("start"))
@@ -3356,11 +3516,34 @@ func (h *Handler) timerFromForm(r *http.Request) (domain.Timer, error) {
 	if err1 != nil || err2 != nil {
 		return domain.Timer{}, domain.ErrInvalidInput
 	}
+	startMinutes := startClock.Hour()*60 + startClock.Minute()
+	stopMinutes := stopClock.Hour()*60 + stopClock.Minute()
 
-	start := time.Date(day.Year(), day.Month(), day.Day(), startClock.Hour(), startClock.Minute(), 0, 0, time.Local)
-	stop := time.Date(day.Year(), day.Month(), day.Day(), stopClock.Hour(), stopClock.Minute(), 0, 0, time.Local)
-	if stop.Before(start) {
-		stop = stop.Add(24 * time.Hour)
+	day := time.Time{}
+	start := time.Time{}
+	stop := time.Time{}
+	daySpec := ""
+	if dayMode == "weekly" {
+		mask, any := weekdayMaskFromForm(form)
+		if !any {
+			return domain.Timer{}, domain.ErrInvalidInput
+		}
+		daySpec = mask
+	} else {
+		dayStr := strings.TrimSpace(form.Get("day"))
+		parsedDay, err := time.ParseInLocation("2006-01-02", dayStr, time.Local)
+		if err != nil {
+			return domain.Timer{}, domain.ErrInvalidInput
+		}
+		day = parsedDay
+		start = time.Date(day.Year(), day.Month(), day.Day(), startClock.Hour(), startClock.Minute(), 0, 0, time.Local)
+		stop = time.Date(day.Year(), day.Month(), day.Day(), stopClock.Hour(), stopClock.Minute(), 0, 0, time.Local)
+		if stop.Before(start) {
+			stop = stop.Add(24 * time.Hour)
+		}
+		daySpec = ""
+		startMinutes = -1
+		stopMinutes = -1
 	}
 
 	priority, err := strconv.Atoi(strings.TrimSpace(form.Get("priority")))
@@ -3387,6 +3570,9 @@ func (h *Handler) timerFromForm(r *http.Request) (domain.Timer, error) {
 		Day:       day,
 		Start:     start,
 		Stop:      stop,
+		DaySpec:   daySpec,
+		StartMinutes: startMinutes,
+		StopMinutes:  stopMinutes,
 		Priority:  priority,
 		Lifetime:  lifetime,
 		Title:     title,
