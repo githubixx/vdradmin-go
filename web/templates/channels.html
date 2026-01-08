@@ -62,7 +62,7 @@
                 </div>
                 <div class="epg-actions">
                     {{if gt .EventID 0}}
-                    <a class="btn btn-sm btn-secondary" href="/event?channel={{.ChannelID}}&id={{.EventID}}" onclick="window.open(this.href,'vdradmin_moreinfo','width=560,height=420,scrollbars=yes,resizable=yes'); return false;">More information</a>
+                    <a class="btn btn-sm btn-secondary" href="/event?channel={{.ChannelID}}&id={{.EventID}}" onclick="window.open(this.href,'vdradmin_moreinfo','width=560,height=420,scrollbars=yes,resizable=yes'); return false;">Information</a>
                     {{end}}
                     {{if eq $.Role "admin"}}
                     {{if or .TimerActive (le .EventID 0)}}
