@@ -915,6 +915,7 @@ main {
         display: grid;
         place-items: center;
         text-align: center;
+        pointer-events: none;
     }
 
     .watchtv-overlay-card {
