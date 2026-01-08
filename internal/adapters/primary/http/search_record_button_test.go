@@ -42,7 +42,9 @@ func (m *searchVDRMock) CreateTimer(ctx context.Context, timer *domain.Timer) er
 func (m *searchVDRMock) UpdateTimer(ctx context.Context, timer *domain.Timer) error { return nil }
 func (m *searchVDRMock) DeleteTimer(ctx context.Context, timerID int) error         { return nil }
 
-func (m *searchVDRMock) GetRecordings(ctx context.Context) ([]domain.Recording, error) { return nil, nil }
+func (m *searchVDRMock) GetRecordings(ctx context.Context) ([]domain.Recording, error) {
+	return nil, nil
+}
 func (m *searchVDRMock) DeleteRecording(ctx context.Context, path string) error        { return nil }
 func (m *searchVDRMock) GetCurrentChannel(ctx context.Context) (string, error)         { return "", nil }
 func (m *searchVDRMock) SetCurrentChannel(ctx context.Context, channelID string) error { return nil }

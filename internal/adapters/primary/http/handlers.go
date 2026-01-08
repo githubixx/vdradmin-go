@@ -1441,6 +1441,11 @@ func (h *Handler) EPGSearch(w http.ResponseWriter, r *http.Request) {
 		TimerActive bool
 	}
 
+	type searchDayGroup struct {
+		DayLabel string
+		Events   []searchEventView
+	}
+
 	views := make([]searchEventView, 0, len(events))
 	if len(events) == 0 || h.timerService == nil {
 		for _, ev := range events {
@@ -1556,9 +1561,25 @@ func (h *Handler) EPGSearch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Group results by local day, like the /epgsearch results view.
+	loc := time.Local
+	dayGroups := make([]searchDayGroup, 0)
+	var currentDay time.Time
+	currentIdx := -1
+	for _, v := range views {
+		s := v.Start.In(loc)
+		day := time.Date(s.Year(), s.Month(), s.Day(), 0, 0, 0, 0, loc)
+		if currentIdx == -1 || !day.Equal(currentDay) {
+			dayGroups = append(dayGroups, searchDayGroup{DayLabel: day.Format("Mon 2006-01-02")})
+			currentDay = day
+			currentIdx = len(dayGroups) - 1
+		}
+		dayGroups[currentIdx].Events = append(dayGroups[currentIdx].Events, v)
+	}
+
 	data := map[string]any{
-		"Query":  query,
-		"Events": views,
+		"Query":     query,
+		"DayGroups": dayGroups,
 	}
 
 	if isHTMX {

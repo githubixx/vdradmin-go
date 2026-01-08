@@ -838,13 +838,14 @@ main {
 .epg-time {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
     min-width: 80px;
 }
 
 .epg-time time {
     font-size: 1.25rem;
     font-weight: 600;
+    line-height: 1.05;
 }
 
 .epg-duration {

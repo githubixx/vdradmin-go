@@ -25,19 +25,25 @@ func (m *whatsOnVDRMock) Connect(ctx context.Context) error { return nil }
 func (m *whatsOnVDRMock) Close() error                      { return nil }
 func (m *whatsOnVDRMock) Ping(ctx context.Context) error    { return nil }
 
-func (m *whatsOnVDRMock) GetChannels(ctx context.Context) ([]domain.Channel, error) { return m.channels, nil }
+func (m *whatsOnVDRMock) GetChannels(ctx context.Context) ([]domain.Channel, error) {
+	return m.channels, nil
+}
 func (m *whatsOnVDRMock) GetEPG(ctx context.Context, channelID string, at time.Time) ([]domain.EPGEvent, error) {
 	return m.epg, nil
 }
 
-func (m *whatsOnVDRMock) GetTimers(ctx context.Context) ([]domain.Timer, error) { return []domain.Timer{}, nil }
+func (m *whatsOnVDRMock) GetTimers(ctx context.Context) ([]domain.Timer, error) {
+	return []domain.Timer{}, nil
+}
 func (m *whatsOnVDRMock) CreateTimer(ctx context.Context, timer *domain.Timer) error {
 	return nil
 }
 func (m *whatsOnVDRMock) UpdateTimer(ctx context.Context, timer *domain.Timer) error { return nil }
 func (m *whatsOnVDRMock) DeleteTimer(ctx context.Context, timerID int) error         { return nil }
 
-func (m *whatsOnVDRMock) GetRecordings(ctx context.Context) ([]domain.Recording, error) { return nil, nil }
+func (m *whatsOnVDRMock) GetRecordings(ctx context.Context) ([]domain.Recording, error) {
+	return nil, nil
+}
 func (m *whatsOnVDRMock) DeleteRecording(ctx context.Context, path string) error        { return nil }
 func (m *whatsOnVDRMock) GetCurrentChannel(ctx context.Context) (string, error)         { return "", nil }
 func (m *whatsOnVDRMock) SetCurrentChannel(ctx context.Context, channelID string) error { return nil }
