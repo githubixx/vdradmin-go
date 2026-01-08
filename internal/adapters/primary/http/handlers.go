@@ -3349,10 +3349,10 @@ func (h *Handler) timerFromCreateForm(r *http.Request) (domain.Timer, error) {
 		// For repeating timers, these clocks are required.
 		StartMinutes: startMinutes,
 		StopMinutes:  stopMinutes,
-		Priority:  priority,
-		Lifetime:  lifetime,
-		Title:     title,
-		Aux:       aux,
+		Priority:     priority,
+		Lifetime:     lifetime,
+		Title:        title,
+		Aux:          aux,
 	}, nil
 }
 
@@ -3564,19 +3564,19 @@ func (h *Handler) timerFromForm(r *http.Request) (domain.Timer, error) {
 	aux := form.Get("aux")
 
 	return domain.Timer{
-		ID:        id,
-		Active:    active,
-		ChannelID: channelID,
-		Day:       day,
-		Start:     start,
-		Stop:      stop,
-		DaySpec:   daySpec,
+		ID:           id,
+		Active:       active,
+		ChannelID:    channelID,
+		Day:          day,
+		Start:        start,
+		Stop:         stop,
+		DaySpec:      daySpec,
 		StartMinutes: startMinutes,
 		StopMinutes:  stopMinutes,
-		Priority:  priority,
-		Lifetime:  lifetime,
-		Title:     title,
-		Aux:       aux,
+		Priority:     priority,
+		Lifetime:     lifetime,
+		Title:        title,
+		Aux:          aux,
 	}, nil
 }
 

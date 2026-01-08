@@ -843,9 +843,14 @@ main {
 }
 
 .epg-time time {
-    font-size: 1.25rem;
+    font-size: 1.05rem;
     font-weight: 600;
-    line-height: 1.05;
+    line-height: 1.2;
+}
+
+/* Align time range baseline with the show title. */
+.epg-time {
+    padding-top: 0.25rem;
 }
 
 .epg-duration {
@@ -867,6 +872,7 @@ main {
 .epg-header h3,
 .epg-header h4 {
     margin: 0;
+    font-size: 1.05rem;
 }
 
     /* Watch TV (snapshot + remote) */
@@ -1571,6 +1577,7 @@ footer a:hover {
         flex-direction: row;
         justify-content: space-between;
         width: 100%;
+        padding-top: 0;
     }
 
     .search-form {
