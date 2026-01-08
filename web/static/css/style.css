@@ -603,6 +603,34 @@ details.nav-burger:not([open]) .nav-burger-menu {
     transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
 }
 
+/* Match the glossy select styling for the "What's on" time input. */
+.nav-time,
+.nav-channel-form input[type="time"] {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    font-size: 0.875rem;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.02)), var(--surface-color);
+    color: var(--text-color);
+    box-shadow: var(--shadow);
+    transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+.nav-time:hover,
+.nav-channel-form input[type="time"]:hover {
+    border-color: var(--nav-active-border);
+}
+
+.nav-time:focus-visible,
+.nav-channel-form input[type="time"]:focus-visible {
+    outline: 2px solid var(--nav-active-border);
+    outline-offset: 2px;
+    box-shadow: var(--shadow-lg);
+}
+
 .nav-channel-form select:hover {
     border-color: var(--nav-active-border);
 }

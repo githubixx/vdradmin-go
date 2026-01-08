@@ -110,18 +110,82 @@ func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
 
 // WhatsOnNow renders the current-program overview.
 func (h *Handler) WhatsOnNow(w http.ResponseWriter, r *http.Request) {
-	events, err := h.epgService.GetCurrentPrograms(r.Context())
+	loc := time.Local
 	data := map[string]any{}
+
+	selectedPreset, atValue, atTime, atErr := parseWhatsOnAtParam(r, loc)
+	data["SelectedHour"] = selectedPreset
+	data["SelectedAt"] = atValue
+	if atErr != nil {
+		data["HomeError"] = atErr.Error()
+	}
+
+	// Build hour preset options: "now" + 00..23.
+	hourOptions := make([]string, 0, 25)
+	hourOptions = append(hourOptions, "now")
+	for i := 0; i < 24; i++ {
+		hourOptions = append(hourOptions, fmt.Sprintf("%02d", i))
+	}
+	data["HourOptions"] = hourOptions
+
+	events, err := h.epgService.GetProgramsAt(r.Context(), atTime)
 	if err != nil {
 		// Keep the UI reachable even if VDR/SVDRP is unavailable.
 		h.logger.Error("EPG fetch error on home", slog.Any("error", err))
-		data["HomeError"] = err.Error()
+		if data["HomeError"] == nil {
+			data["HomeError"] = err.Error()
+		}
 		data["Events"] = []domain.EPGEvent{}
 	} else {
 		data["Events"] = events
 	}
 
 	h.renderTemplate(w, r, "index.html", data)
+}
+
+func parseWhatsOnAtParam(r *http.Request, loc *time.Location) (selectedPreset string, atValue string, atTime time.Time, err error) {
+	if loc == nil {
+		loc = time.Local
+	}
+
+	selectedPreset = strings.TrimSpace(r.URL.Query().Get("h"))
+	if selectedPreset == "" {
+		selectedPreset = "now"
+	}
+
+	atValue = strings.TrimSpace(r.URL.Query().Get("at"))
+	localNow := time.Now().In(loc)
+
+	// If no explicit time is provided, derive a default from the preset.
+	if atValue == "" {
+		if selectedPreset == "now" {
+			atValue = localNow.Format("15:04")
+		} else {
+			h, convErr := strconv.Atoi(selectedPreset)
+			if convErr != nil || h < 0 || h > 23 {
+				selectedPreset = "now"
+				atValue = localNow.Format("15:04")
+				err = fmt.Errorf("invalid hour preset")
+			} else {
+				atValue = fmt.Sprintf("%02d:00", h)
+			}
+		}
+	}
+
+	// Validate HH:MM strictly.
+	parsed, parseErr := time.Parse("15:04", atValue)
+	if parseErr != nil {
+		// Fall back to now, but surface the error.
+		selectedPreset = "now"
+		atValue = localNow.Format("15:04")
+		parsed, _ = time.Parse("15:04", atValue)
+		if err == nil {
+			err = fmt.Errorf("invalid time (expected HH:MM)")
+		}
+	}
+
+	atTime = time.Date(localNow.Year(), localNow.Month(), localNow.Day(), parsed.Hour(), parsed.Minute(), 0, 0, loc)
+	return selectedPreset, atValue, atTime, err
 }
 
 func (h *Handler) landingPath() string {
@@ -2291,6 +2355,10 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 	if selectedDay != "" {
 		if t, err := time.ParseInLocation("2006-01-02", selectedDay, loc); err == nil {
 			selectedDayStart = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
+			// When the user explicitly selects a day, build the timeline window around that day
+			// so the timeline renders deterministically even for past/future dates.
+			windowFrom = selectedDayStart
+			windowTo = windowFrom.Add(8 * 24 * time.Hour)
 		}
 	}
 	selectedDayEnd := selectedDayStart.Add(24 * time.Hour)
