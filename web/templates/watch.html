@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/static/css/style.css">
     <script src="/static/js/theme.js?v=20260104" defer></script>
 </head>
-<body>
+<body{{if .StreamURLTemplate}} data-stream-template="{{.StreamURLTemplate}}"{{end}}>
     {{template "nav_header" .}}
 
     <main class="container">
@@ -192,8 +192,8 @@
     const nowSubtitle = document.getElementById('watchtv-now-subtitle');
     const nowDescription = document.getElementById('watchtv-now-description');
 
-    const streamTemplate = {{if .StreamURLTemplate}}{{.StreamURLTemplate | js}}{{else}}''{{end}};
-    const streamEnabled = typeof streamTemplate === 'string' && streamTemplate.trim() !== '';
+    const streamTemplate = document.body?.dataset?.streamTemplate || '';
+    const streamEnabled = streamTemplate.trim() !== '';
 
     let timer = null;
     let lastObjectURL = null;
