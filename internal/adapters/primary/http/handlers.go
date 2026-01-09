@@ -2515,10 +2515,10 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 
 	type timerView struct {
 		domain.Timer
-		ChannelName string
-		IsRecording bool
-		IsCritical  bool
-		IsCollision bool
+		ChannelName     string
+		IsRecording     bool
+		IsCritical      bool
+		IsCollision     bool
 		NextOccurrences []string
 	}
 
