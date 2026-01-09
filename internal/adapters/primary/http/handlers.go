@@ -2519,6 +2519,7 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 		IsRecording bool
 		IsCritical  bool
 		IsCollision bool
+		NextOccurrences []string
 	}
 
 	views := make([]timerView, 0, len(timers))
@@ -2529,10 +2530,26 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 		}
 		isRec := false
 		if !t.Start.IsZero() && !t.Stop.IsZero() {
-			now := time.Now()
-			isRec = (t.Start.Before(now) || t.Start.Equal(now)) && t.Stop.After(now)
+			isRec = (t.Start.Before(localNow) || t.Start.Equal(localNow)) && t.Stop.After(localNow)
 		}
-		views = append(views, timerView{Timer: t, ChannelName: name, IsRecording: isRec})
+
+		// For recurring timers, show all upcoming occurrences within the next-week horizon.
+		// This matches user expectations for weekday masks (e.g. Thu+Fri at midnight).
+		var nextOcc []string
+		if t.Active && isWeekdayMaskHTTP(t.DaySpec) {
+			occFrom := todayStart
+			occTo := todayStart.Add(8 * 24 * time.Hour)
+			for _, occ := range timerOccurrences(t, occFrom, occTo) {
+				// Keep occurrences that haven't fully ended yet.
+				if !occ.Stop.After(localNow) {
+					continue
+				}
+				s := occ.Start.In(loc).Format("2006-01-02 15:04") + " - " + occ.Stop.In(loc).Format("15:04")
+				nextOcc = append(nextOcc, s)
+			}
+		}
+
+		views = append(views, timerView{Timer: t, ChannelName: name, IsRecording: isRec, NextOccurrences: nextOcc})
 	}
 
 	// Mark overlapping timers (yellow) and critical timers (red) based on configured DVB cards.

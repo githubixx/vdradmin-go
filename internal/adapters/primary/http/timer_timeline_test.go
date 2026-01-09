@@ -383,3 +383,71 @@ func TestTimerList_RecurringTimerDaysCappedToNextWeek_OneTimeBeyondWeekStillIncl
 		t.Fatalf("did not expect recurring occurrence beyond next-week horizon to be present in dropdown")
 	}
 }
+
+func TestTimerList_RecurringThuFriMidnight_ShowsBothUpcomingOccurrencesInList(t *testing.T) {
+	loc := time.Local
+	now := time.Now().In(loc)
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+
+	// Find the next Thursday and Friday (including today if it matches).
+	daysUntilThu := (int(time.Thursday) - int(todayStart.Weekday()) + 7) % 7
+	daysUntilFri := (int(time.Friday) - int(todayStart.Weekday()) + 7) % 7
+	thu := todayStart.Add(time.Duration(daysUntilThu) * 24 * time.Hour)
+	fri := todayStart.Add(time.Duration(daysUntilFri) * 24 * time.Hour)
+	// Ensure Friday is after Thursday in the normal Thu/Fri pair.
+	if !fri.After(thu) {
+		fri = fri.Add(7 * 24 * time.Hour)
+	}
+
+	ch := domain.Channel{ID: "S19.2E-1-100-10", Number: 1, Name: "ROCK ANTENNE"}
+
+	// Recurring weekly timer (Thu+Fri 00:00-01:00).
+	weekly := domain.Timer{ID: 1, Active: true, ChannelID: ch.ID, Title: "Lange Nacht der ganzen Alben", DaySpec: "---TF--", StartMinutes: 0, StopMinutes: 60}
+
+	mock := &timersTimelineVDRMock{
+		channels: []domain.Channel{ch},
+		timers:   []domain.Timer{weekly},
+	}
+
+	epqService := services.NewEPGService(mock, 0)
+	timerService := services.NewTimerService(mock)
+
+	parsed := template.Must(template.ParseFiles(
+		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
+		filepath.Join(repoRoot(t), "web", "templates", "timers.html"),
+	))
+
+	h := NewHandler(
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		parsed,
+		epqService,
+		timerService,
+		nil,
+		nil,
+	)
+	h.SetUIThemeDefault("light")
+	h.SetTemplates(map[string]*template.Template{"timers.html": parsed})
+	h.SetConfig(&config.Config{VDR: config.VDRConfig{DVBCards: 2}}, "")
+
+	req := httptest.NewRequest(http.MethodGet, "/timers?day="+todayStart.Format("2006-01-02"), nil)
+	ctx := context.WithValue(req.Context(), "user", "admin")
+	ctx = context.WithValue(ctx, "role", "admin")
+	req = req.WithContext(ctx)
+
+	rw := httptest.NewRecorder()
+	h.TimerList(rw, req)
+	if rw.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rw.Code)
+	}
+	body := rw.Body.String()
+
+	expThu := thu.Format("2006-01-02") + " 00:00 - 01:00"
+	expFri := fri.Format("2006-01-02") + " 00:00 - 01:00"
+
+	if !strings.Contains(body, expThu) {
+		t.Fatalf("expected Thursday occurrence %q to be present", expThu)
+	}
+	if !strings.Contains(body, expFri) {
+		t.Fatalf("expected Friday occurrence %q to be present", expFri)
+	}
+}
