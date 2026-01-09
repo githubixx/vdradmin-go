@@ -1,6 +1,8 @@
 package http
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log/slog"
@@ -9,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/githubixx/vdradmin-go/internal/application/services"
@@ -30,6 +33,8 @@ type Handler struct {
 	recordingService *services.RecordingService
 	autoTimerService *services.AutoTimerService
 	uiThemeDefault   string
+	hlsProxy         *HLSProxy
+	watchTVChannelMu sync.Mutex
 }
 
 // NewHandler creates a new HTTP handler
@@ -61,6 +66,20 @@ func NewHandler(
 func (h *Handler) SetConfig(cfg *config.Config, configPath string) {
 	h.cfg = cfg
 	h.configPath = configPath
+
+	// Initialize HLS proxy if streamdev backend is configured
+	if IsHLSProxyEnabled(cfg.VDR.StreamdevBackendURL) {
+		if h.hlsProxy != nil {
+			h.hlsProxy.Shutdown()
+		}
+		proxy, err := NewHLSProxy(h.logger, cfg.VDR.StreamdevBackendURL)
+		if err != nil {
+			h.logger.Error("failed to initialize HLS proxy", slog.Any("error", err))
+		} else {
+			h.hlsProxy = proxy
+			h.logger.Info("HLS proxy enabled", slog.String("backend", cfg.VDR.StreamdevBackendURL))
+		}
+	}
 }
 
 // SetVDRClient provides the VDR client so we can apply VDR connection changes immediately.
@@ -91,18 +110,82 @@ func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
 
 // WhatsOnNow renders the current-program overview.
 func (h *Handler) WhatsOnNow(w http.ResponseWriter, r *http.Request) {
-	events, err := h.epgService.GetCurrentPrograms(r.Context())
+	loc := time.Local
 	data := map[string]any{}
+
+	selectedPreset, atValue, atTime, atErr := parseWhatsOnAtParam(r, loc)
+	data["SelectedHour"] = selectedPreset
+	data["SelectedAt"] = atValue
+	if atErr != nil {
+		data["HomeError"] = atErr.Error()
+	}
+
+	// Build hour preset options: "now" + 00..23.
+	hourOptions := make([]string, 0, 25)
+	hourOptions = append(hourOptions, "now")
+	for i := 0; i < 24; i++ {
+		hourOptions = append(hourOptions, fmt.Sprintf("%02d", i))
+	}
+	data["HourOptions"] = hourOptions
+
+	events, err := h.epgService.GetProgramsAt(r.Context(), atTime)
 	if err != nil {
 		// Keep the UI reachable even if VDR/SVDRP is unavailable.
 		h.logger.Error("EPG fetch error on home", slog.Any("error", err))
-		data["HomeError"] = err.Error()
+		if data["HomeError"] == nil {
+			data["HomeError"] = err.Error()
+		}
 		data["Events"] = []domain.EPGEvent{}
 	} else {
 		data["Events"] = events
 	}
 
 	h.renderTemplate(w, r, "index.html", data)
+}
+
+func parseWhatsOnAtParam(r *http.Request, loc *time.Location) (selectedPreset string, atValue string, atTime time.Time, err error) {
+	if loc == nil {
+		loc = time.Local
+	}
+
+	selectedPreset = strings.TrimSpace(r.URL.Query().Get("h"))
+	if selectedPreset == "" {
+		selectedPreset = "now"
+	}
+
+	atValue = strings.TrimSpace(r.URL.Query().Get("at"))
+	localNow := time.Now().In(loc)
+
+	// If no explicit time is provided, derive a default from the preset.
+	if atValue == "" {
+		if selectedPreset == "now" {
+			atValue = localNow.Format("15:04")
+		} else {
+			h, convErr := strconv.Atoi(selectedPreset)
+			if convErr != nil || h < 0 || h > 23 {
+				selectedPreset = "now"
+				atValue = localNow.Format("15:04")
+				err = fmt.Errorf("invalid hour preset")
+			} else {
+				atValue = fmt.Sprintf("%02d:00", h)
+			}
+		}
+	}
+
+	// Validate HH:MM strictly.
+	parsed, parseErr := time.Parse("15:04", atValue)
+	if parseErr != nil {
+		// Fall back to now, but surface the error.
+		selectedPreset = "now"
+		atValue = localNow.Format("15:04")
+		parsed, _ = time.Parse("15:04", atValue)
+		if err == nil {
+			err = fmt.Errorf("invalid time (expected HH:MM)")
+		}
+	}
+
+	atTime = time.Date(localNow.Year(), localNow.Month(), localNow.Day(), parsed.Hour(), parsed.Minute(), 0, 0, loc)
+	return selectedPreset, atValue, atTime, err
 }
 
 func (h *Handler) landingPath() string {
@@ -134,6 +217,8 @@ func pageNameForPath(path string) string {
 		return "Channels"
 	case strings.HasPrefix(path, "/playing"):
 		return "Playing Today"
+	case strings.HasPrefix(path, "/watch"):
+		return "Watch TV"
 	case strings.HasPrefix(path, "/timers"):
 		return "Timers"
 	case strings.HasPrefix(path, "/recordings"):
@@ -147,6 +232,417 @@ func pageNameForPath(path string) string {
 	default:
 		return ""
 	}
+}
+
+type vdrPictureGrabber interface {
+	GrabJpeg(ctx context.Context, width int, height int) ([]byte, error)
+}
+
+func parseWatchTVSize(size string) (width int, height int) {
+	const maxWidth = 1920
+	const maxHeight = 1080
+	// Keep behavior aligned with the classic vdradmin-am TV page.
+	switch strings.ToLower(strings.TrimSpace(size)) {
+	case "full":
+		return maxWidth, maxHeight
+	case "half", "":
+		return maxWidth / 2, maxHeight / 2
+	case "quarter":
+		return maxWidth / 4, maxHeight / 4
+	default:
+		return maxWidth / 4, maxHeight / 4
+	}
+}
+
+func watchTVCurrentChannelIDFromSVDRPChan(cur string, channels []domain.Channel) string {
+	cur = strings.TrimSpace(cur)
+	if cur == "" {
+		return ""
+	}
+	// VDR's "CHAN" response is typically "<number> <name>".
+	fields := strings.Fields(cur)
+	if len(fields) > 0 {
+		if n, err := strconv.Atoi(fields[0]); err == nil {
+			for _, ch := range channels {
+				if ch.Number == n {
+					return ch.ID
+				}
+			}
+		}
+	}
+	// If cur is already a channel ID (or we can't map it), return as-is.
+	return cur
+}
+
+// WatchTV renders the snapshot-based TV page (SVDRP GRAB + remote control).
+func (h *Handler) WatchTV(w http.ResponseWriter, r *http.Request) {
+	data := map[string]any{}
+
+	interval := strings.TrimSpace(r.URL.Query().Get("interval"))
+	if interval == "" {
+		interval = "5"
+	}
+	data["Interval"] = interval
+
+	size := strings.TrimSpace(r.URL.Query().Get("size"))
+	if size == "" {
+		size = "half"
+	}
+	data["Size"] = size
+
+	data["NewWin"] = strings.TrimSpace(r.URL.Query().Get("new_win")) == "1"
+	data["FullTV"] = strings.TrimSpace(r.URL.Query().Get("full_tv")) == "1"
+
+	channels, err := h.epgService.GetChannels(r.Context())
+	if err != nil {
+		h.logger.Error("channels fetch error", slog.Any("error", err))
+		data["HomeError"] = err.Error()
+		data["Channels"] = []domain.Channel{}
+		h.renderTemplate(w, r, "watch.html", data)
+		return
+	}
+	data["Channels"] = channels
+
+	// If HLS proxy is enabled, use internal proxy URL; otherwise use stream_url_template if set
+	streamTemplate := ""
+	if h.cfg != nil {
+		if IsHLSProxyEnabled(h.cfg.VDR.StreamdevBackendURL) && h.hlsProxy != nil {
+			// HLS proxy mode: build internal proxy URL with {channel} placeholder
+			streamTemplate = "/watch/stream/{channel}/index.m3u8"
+			data["StreamHint"] = "This uses the built-in HLS proxy."
+		} else {
+			streamTemplate = strings.TrimSpace(h.cfg.VDR.StreamURLTemplate)
+			if streamTemplate != "" {
+				data["StreamHint"] = "This uses a configured stream URL template."
+			}
+		}
+	}
+	data["StreamURLTemplate"] = streamTemplate
+
+	cur, err := h.vdrClient.GetCurrentChannel(r.Context())
+	if err != nil {
+		// Non-fatal; still render UI.
+		h.logger.Warn("current channel fetch error", slog.Any("error", err))
+	}
+	data["CurrentChannel"] = watchTVCurrentChannelIDFromSVDRPChan(cur, channels)
+
+	h.renderTemplate(w, r, "watch.html", data)
+}
+
+// WatchTVKey sends a remote control key via SVDRP HITK.
+func (h *Handler) WatchTVKey(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	key := strings.TrimSpace(r.FormValue("key"))
+	keyLower := strings.ToLower(key)
+	// Match classic vdradmin-am behavior.
+	switch key {
+	case "VolumePlus":
+		key = "Volume+"
+	case "VolumeMinus":
+		key = "Volume-"
+	}
+	// Be liberal in what we accept from the UI.
+	switch keyLower {
+	case "mute":
+		key = "Mute"
+	case "pause":
+		key = "Pause"
+	case "volumeminus", "volume-":
+		key = "Volume-"
+	case "volumeplus", "volume+":
+		key = "Volume+"
+	}
+	if key == "" {
+		http.Error(w, "Missing key", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.vdrClient.SendKey(r.Context(), key); err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// WatchTVChannel switches to a channel via SVDRP CHAN.
+func (h *Handler) WatchTVChannel(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	sleepCtx := func(ctx context.Context, d time.Duration) bool {
+		t := time.NewTimer(d)
+		defer t.Stop()
+		select {
+		case <-ctx.Done():
+			return false
+		case <-t.C:
+			return true
+		}
+	}
+
+	// Serialize channel switching to avoid overlapping StopAll/CHAN sequences which can
+	// cause tuner contention and intermittent SVDRP 554 responses.
+	h.watchTVChannelMu.Lock()
+	defer h.watchTVChannelMu.Unlock()
+	if r.Context().Err() != nil {
+		return
+	}
+
+	ch := strings.TrimSpace(r.FormValue("channel"))
+	if ch == "" {
+		http.Error(w, "Missing channel", http.StatusBadRequest)
+		return
+	}
+
+	// For stream mode we need the numeric channel number to start the HLS proxy.
+	// The value posted in "channel" is the VDR channel id (or a numeric id), which may
+	// not be safe to use in the streamdev URL template.
+	channelNum := strings.TrimSpace(r.FormValue("channel_num"))
+	prevChannelNum := strings.TrimSpace(r.FormValue("prev_channel_num"))
+
+	// If streaming is enabled, stop any active ffmpeg process first to free tuners.
+	if h.hlsProxy != nil {
+		h.hlsProxy.StopAll()
+		// Give VDR/streamdev a moment to release tuner resources.
+		if !sleepCtx(r.Context(), 600*time.Millisecond) {
+			return
+		}
+	}
+
+	// VDR can sometimes reject a fast switch with SVDRP 554 (e.g. tuner still busy).
+	// Retry a few times with a small backoff to make switching more resilient.
+	var lastErr error
+	for attempt := 1; attempt <= 5; attempt++ {
+		if r.Context().Err() != nil {
+			return
+		}
+		if err := h.vdrClient.SetCurrentChannel(r.Context(), ch); err == nil {
+			lastErr = nil
+			break
+		} else {
+			lastErr = err
+			msg := strings.ToLower(err.Error())
+			if !strings.Contains(msg, "svdrp error 554") {
+				break
+			}
+			// backoff: 250ms, 500ms, 800ms, 1200ms
+			switch attempt {
+			case 1:
+				if !sleepCtx(r.Context(), 250*time.Millisecond) {
+					return
+				}
+			case 2:
+				if !sleepCtx(r.Context(), 500*time.Millisecond) {
+					return
+				}
+			case 3:
+				if !sleepCtx(r.Context(), 800*time.Millisecond) {
+					return
+				}
+			case 4:
+				if !sleepCtx(r.Context(), 1200*time.Millisecond) {
+					return
+				}
+			}
+		}
+	}
+	if r.Context().Err() != nil {
+		return
+	}
+	if lastErr != nil {
+		// If we killed the old stream already, try to bring it back so the UI keeps playing.
+		if h.hlsProxy != nil && prevChannelNum != "" {
+			_ = h.hlsProxy.Start(prevChannelNum)
+		}
+
+		msg := lastErr.Error()
+		status := http.StatusInternalServerError
+		if strings.Contains(strings.ToLower(msg), "svdrp error 554") {
+			status = http.StatusConflict
+		}
+		h.logger.Warn("watch channel switch failed", slog.String("channel", ch), slog.String("error", msg))
+		if status == http.StatusConflict {
+			w.Header().Set("Retry-After", "1")
+		}
+		http.Error(w, msg, status)
+		return
+	}
+
+	// Start the HLS proxy for the newly tuned channel so stale playlist requests from the
+	// previous channel can't restart the old ffmpeg process.
+	if h.hlsProxy != nil {
+		if channelNum != "" {
+			if err := h.hlsProxy.Start(channelNum); err != nil {
+				h.logger.Error("failed to start HLS stream", slog.String("channel_num", channelNum), slog.Any("error", err))
+				http.Error(w, "Failed to start stream", http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type watchTVNowResponse struct {
+	ChannelID   string    `json:"channel_id"`
+	EventID     int       `json:"event_id"`
+	Title       string    `json:"title"`
+	Subtitle    string    `json:"subtitle"`
+	Description string    `json:"description"`
+	Start       time.Time `json:"start"`
+	Stop        time.Time `json:"stop"`
+	MoreInfoURL string    `json:"more_info_url"`
+}
+
+// WatchTVNow returns the currently-running EPG event for a channel.
+// The channel is identified by its channel id (same value used by POST /watch/channel).
+func (h *Handler) WatchTVNow(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.epgService == nil {
+		http.Error(w, "EPG service not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	channelID := strings.TrimSpace(r.URL.Query().Get("channel"))
+	if channelID == "" {
+		http.Error(w, "Missing channel", http.StatusBadRequest)
+		return
+	}
+
+	events, err := h.epgService.GetCurrentPrograms(r.Context())
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+
+	var cur *domain.EPGEvent
+	for i := range events {
+		if strings.TrimSpace(events[i].ChannelID) == channelID {
+			cur = &events[i]
+			break
+		}
+	}
+	if cur == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	resp := watchTVNowResponse{
+		ChannelID:   cur.ChannelID,
+		EventID:     cur.EventID,
+		Title:       cur.Title,
+		Subtitle:    cur.Subtitle,
+		Description: cur.Description,
+		Start:       cur.Start,
+		Stop:        cur.Stop,
+	}
+	if cur.EventID > 0 {
+		resp.MoreInfoURL = fmt.Sprintf("/event?channel=%s&id=%d", cur.ChannelID, cur.EventID)
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+var watchTVTransparentGIF = []byte{
+	0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0xff, 0xff, 0xff, 0x21, 0xf9, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x00,
+	0x01, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3b,
+}
+
+func writeWatchTVSnapshotError(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"error": msg,
+	})
+}
+
+func humanizeWatchTVSnapshotError(err error) string {
+	if err == nil {
+		return "unknown error"
+	}
+
+	msg := err.Error()
+	lower := strings.ToLower(msg)
+	if strings.Contains(lower, "grab image failed") {
+		return "Snapshot unavailable: this VDR cannot grab frames on the host (SVDRP GRAB needs a primary video output/decoder device; headless recording-only setups typically cannot support this)."
+	}
+
+	return msg
+}
+
+// WatchTVSnapshot returns a JPEG snapshot via SVDRP GRAB.
+func (h *Handler) WatchTVSnapshot(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	grabber, ok := h.vdrClient.(vdrPictureGrabber)
+	if !ok {
+		w.Header().Set("X-VDRAdmin-Error", "VDR client does not support GRAB")
+		writeWatchTVSnapshotError(w, http.StatusNotImplemented, "VDR does not support snapshot (SVDRP GRAB)")
+		return
+	}
+
+	width, height := parseWatchTVSize(r.URL.Query().Get("size"))
+	img, err := grabber.GrabJpeg(r.Context(), width, height)
+	if err != nil {
+		h.logger.Warn("grab snapshot failed", slog.Any("error", err))
+		w.Header().Set("X-VDRAdmin-Error", "grab failed")
+		writeWatchTVSnapshotError(w, http.StatusBadGateway, humanizeWatchTVSnapshotError(err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write(img)
+}
+
+// WatchTVStreamPlaylist serves HLS playlist for a channel via HLS proxy.
+func (h *Handler) WatchTVStreamPlaylist(w http.ResponseWriter, r *http.Request) {
+	if h.hlsProxy == nil {
+		http.Error(w, "HLS proxy not enabled", http.StatusNotImplemented)
+		return
+	}
+
+	channelNum := r.PathValue("channel")
+	if channelNum == "" {
+		http.Error(w, "Missing channel", http.StatusBadRequest)
+		return
+	}
+
+	h.hlsProxy.GetPlaylist(w, r, channelNum)
+}
+
+// WatchTVStreamSegment serves HLS segment for a channel via HLS proxy.
+func (h *Handler) WatchTVStreamSegment(w http.ResponseWriter, r *http.Request) {
+	if h.hlsProxy == nil {
+		http.Error(w, "HLS proxy not enabled", http.StatusNotImplemented)
+		return
+	}
+
+	channelNum := r.PathValue("channel")
+	segmentName := r.PathValue("segment")
+	if channelNum == "" || segmentName == "" {
+		http.Error(w, "Missing channel or segment", http.StatusBadRequest)
+		return
+	}
+
+	h.hlsProxy.GetSegment(w, r, channelNum, segmentName)
 }
 
 type channelsDayGroup struct {
@@ -578,6 +1074,10 @@ func (h *Handler) buildConfigFromForm(form url.Values) (*config.Config, error) {
 		}
 		updated.VDR.ReconnectDelay = d
 	}
+	// Stream URL template (optional, can be empty)
+	updated.VDR.StreamURLTemplate = strings.TrimSpace(form.Get("vdr_stream_url_template"))
+	// Streamdev backend URL for HLS proxy (optional, can be empty)
+	updated.VDR.StreamdevBackendURL = strings.TrimSpace(form.Get("vdr_streamdev_backend_url"))
 
 	// Cache
 	if v := strings.TrimSpace(form.Get("cache_epg_expiry")); v != "" {
@@ -936,9 +1436,150 @@ func (h *Handler) EPGSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	type searchEventView struct {
+		domain.EPGEvent
+		TimerActive bool
+	}
+
+	type searchDayGroup struct {
+		DayLabel string
+		Events   []searchEventView
+	}
+
+	views := make([]searchEventView, 0, len(events))
+	if len(events) == 0 || h.timerService == nil {
+		for _, ev := range events {
+			views = append(views, searchEventView{EPGEvent: ev})
+		}
+	} else {
+		// Build channel mappings needed for timer overlap lookups.
+		channels, chErr := h.epgService.GetChannels(r.Context())
+		numberByID := make(map[string]int, len(channels))
+		idByNumber := make(map[int]string, len(channels))
+		nameByID := make(map[string]string, len(channels))
+		if chErr == nil {
+			for _, ch := range channels {
+				if ch.ID != "" {
+					numberByID[ch.ID] = ch.Number
+					nameByID[ch.ID] = ch.Name
+				}
+				if ch.Number > 0 && ch.ID != "" {
+					idByNumber[ch.Number] = ch.ID
+				}
+			}
+		}
+
+		// Determine a time window that covers the search results (+ margin for recurring timers).
+		minStart := events[0].Start
+		maxStop := events[0].Stop
+		for i := 1; i < len(events); i++ {
+			if events[i].Start.Before(minStart) {
+				minStart = events[i].Start
+			}
+			if maxStop.Before(events[i].Stop) {
+				maxStop = events[i].Stop
+			}
+		}
+		from := minStart.Add(-24 * time.Hour)
+		to := maxStop.Add(24 * time.Hour)
+		if from.After(to) {
+			from, to = to, from
+		}
+
+		occByChannelNumber := map[int][]timerOccurrence{}
+		occByChannelID := map[string][]timerOccurrence{}
+		timersByID := map[int]domain.Timer{}
+		if timers, tErr := h.timerService.GetAllTimers(r.Context()); tErr == nil {
+			for _, t := range timers {
+				// Disable "Record" if any timer exists for the event window, even if inactive.
+				if strings.TrimSpace(t.ChannelID) == "" {
+					continue
+				}
+				timersByID[t.ID] = t
+
+				occs := timerOccurrences(t, from, to)
+				if len(occs) == 0 {
+					continue
+				}
+				occByChannelID[t.ChannelID] = append(occByChannelID[t.ChannelID], occs...)
+
+				timerChNum := 0
+				if n, err := strconv.Atoi(strings.TrimSpace(t.ChannelID)); err == nil {
+					timerChNum = n
+				} else if n := numberByID[t.ChannelID]; n > 0 {
+					timerChNum = n
+				}
+				if timerChNum > 0 {
+					occByChannelNumber[timerChNum] = append(occByChannelNumber[timerChNum], occs...)
+				}
+			}
+
+			for ch := range occByChannelID {
+				occs := occByChannelID[ch]
+				sort.SliceStable(occs, func(i, j int) bool {
+					if occs[i].Start.Equal(occs[j].Start) {
+						return occs[i].TimerID < occs[j].TimerID
+					}
+					return occs[i].Start.Before(occs[j].Start)
+				})
+				occByChannelID[ch] = occs
+			}
+			for n := range occByChannelNumber {
+				occs := occByChannelNumber[n]
+				sort.SliceStable(occs, func(i, j int) bool {
+					if occs[i].Start.Equal(occs[j].Start) {
+						return occs[i].TimerID < occs[j].TimerID
+					}
+					return occs[i].Start.Before(occs[j].Start)
+				})
+				occByChannelNumber[n] = occs
+			}
+		} else {
+			h.logger.Warn("timers fetch error for search", slog.Any("error", tErr))
+		}
+
+		loc := time.Now().Location()
+		hasOverlappingTimer := func(ev domain.EPGEvent) bool {
+			_, ok := scheduledTimerForEvent(ev, loc, occByChannelNumber, occByChannelID, numberByID, idByNumber, timersByID)
+			return ok
+		}
+
+		for _, ev := range events {
+			// Normalize missing channel metadata for better overlap detection.
+			if strings.TrimSpace(ev.ChannelID) == "" && ev.ChannelNumber > 0 {
+				if id := idByNumber[ev.ChannelNumber]; id != "" {
+					ev.ChannelID = id
+				}
+			}
+			if ev.ChannelNumber <= 0 && ev.ChannelID != "" {
+				ev.ChannelNumber = numberByID[ev.ChannelID]
+			}
+			if strings.TrimSpace(ev.ChannelName) == "" && ev.ChannelID != "" {
+				ev.ChannelName = nameByID[ev.ChannelID]
+			}
+			views = append(views, searchEventView{EPGEvent: ev, TimerActive: hasOverlappingTimer(ev)})
+		}
+	}
+
+	// Group results by local day, like the /epgsearch results view.
+	loc := time.Local
+	dayGroups := make([]searchDayGroup, 0)
+	var currentDay time.Time
+	currentIdx := -1
+	for _, v := range views {
+		s := v.Start.In(loc)
+		day := time.Date(s.Year(), s.Month(), s.Day(), 0, 0, 0, 0, loc)
+		if currentIdx == -1 || !day.Equal(currentDay) {
+			dayGroups = append(dayGroups, searchDayGroup{DayLabel: day.Format("Mon 2006-01-02")})
+			currentDay = day
+			currentIdx = len(dayGroups) - 1
+		}
+		dayGroups[currentIdx].Events = append(dayGroups[currentIdx].Events, v)
+	}
+
 	data := map[string]any{
-		"Query":  query,
-		"Events": events,
+		"Query":     query,
+		"DayGroups": dayGroups,
 	}
 
 	if isHTMX {
@@ -1030,6 +1671,104 @@ type epgSearchResultEventView struct {
 type epgSearchResultDayGroup struct {
 	DayLabel string
 	Events   []epgSearchResultEventView
+}
+
+func overlappingTimerForEvent(
+	ev domain.EPGEvent,
+	loc *time.Location,
+	occByChannelNumber map[int][]timerOccurrence,
+	occByChannelID map[string][]timerOccurrence,
+	numberByID map[string]int,
+	idByNumber map[int]string,
+	timersByID map[int]domain.Timer,
+) (domain.Timer, bool) {
+	if loc == nil {
+		loc = time.Local
+	}
+
+	lookupOccs := func() []timerOccurrence {
+		if ev.ChannelNumber > 0 {
+			if occs := occByChannelNumber[ev.ChannelNumber]; len(occs) > 0 {
+				return occs
+			}
+		}
+		if ev.ChannelID != "" {
+			if ev.ChannelNumber <= 0 {
+				if n := numberByID[ev.ChannelID]; n > 0 {
+					if occs := occByChannelNumber[n]; len(occs) > 0 {
+						return occs
+					}
+				}
+			}
+			if occs := occByChannelID[ev.ChannelID]; len(occs) > 0 {
+				return occs
+			}
+			if ev.ChannelNumber > 0 {
+				if occs := occByChannelID[strconv.Itoa(ev.ChannelNumber)]; len(occs) > 0 {
+					return occs
+				}
+			}
+		}
+		if ev.ChannelNumber > 0 {
+			if id := idByNumber[ev.ChannelNumber]; id != "" {
+				if occs := occByChannelID[id]; len(occs) > 0 {
+					return occs
+				}
+			}
+		}
+		return nil
+	}
+
+	occs := lookupOccs()
+	if len(occs) == 0 {
+		return domain.Timer{}, false
+	}
+
+	evStart := ev.Start.In(loc)
+	evStop := ev.Stop.In(loc)
+	if evStop.Before(evStart) {
+		evStop = evStart
+	}
+
+	// Guard against falsely marking adjacent programs as scheduled due to small
+	// recording margins. Require that the overlap covers most of the event.
+	evDur := evStop.Sub(evStart)
+	if evDur <= 0 {
+		return domain.Timer{}, false
+	}
+
+	overlapEnough := func(aStart, aStop, bStart, bStop time.Time) bool {
+		start := aStart
+		if bStart.After(start) {
+			start = bStart
+		}
+		stop := aStop
+		if bStop.Before(stop) {
+			stop = bStop
+		}
+		overlap := stop.Sub(start)
+		if overlap <= 0 {
+			return false
+		}
+		// overlap >= 60% of event duration
+		return overlap*5 >= evDur*3
+	}
+
+	for _, occ := range occs {
+		if !occ.Start.Before(evStop) || !evStart.Before(occ.Stop) {
+			continue
+		}
+		if !overlapEnough(evStart, evStop, occ.Start.In(loc), occ.Stop.In(loc)) {
+			continue
+		}
+		t, ok := timersByID[occ.TimerID]
+		if !ok {
+			continue
+		}
+		return t, true
+	}
+
+	return domain.Timer{}, false
 }
 
 // EPGSearchExecute runs selected searches and renders matching events.
@@ -1259,7 +1998,7 @@ func (h *Handler) EPGSearchExecute(w http.ResponseWriter, r *http.Request) {
 
 		label := "---"
 		active := false
-		if t, ok := scheduledTimerForEvent(ev, loc, occByChannelNumber, occByChannelID, numberByID, idByNumber, timersByID); ok {
+		if t, ok := overlappingTimerForEvent(ev, loc, occByChannelNumber, occByChannelID, numberByID, idByNumber, timersByID); ok {
 			active = true
 			if strings.TrimSpace(t.Title) != "" {
 				label = t.Title
@@ -1472,7 +2211,7 @@ func (h *Handler) renderEPGSearchRun(w http.ResponseWriter, r *http.Request, sea
 		if strings.TrimSpace(ev.ChannelName) == "" && strings.TrimSpace(ev.ChannelID) != "" {
 			ev.ChannelName = nameByID[ev.ChannelID]
 		}
-		_, active := scheduledTimerForEvent(ev, loc, occByChannelNumber, occByChannelID, numberByID, idByNumber, timersByID)
+		_, active := overlappingTimerForEvent(ev, loc, occByChannelNumber, occByChannelID, numberByID, idByNumber, timersByID)
 
 		dayGroups[currentIdx].Events = append(dayGroups[currentIdx].Events, epgSearchResultEventView{
 			EPGEvent:    ev,
@@ -1726,18 +2465,30 @@ type timerTimelineRow struct {
 func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 	loc := time.Local
 
-	today := time.Now().In(loc)
-	windowFrom := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, loc)
-	windowTo := windowFrom.Add(8 * 24 * time.Hour) // cover at least one full week for recurring timers
+	localNow := time.Now().In(loc)
+	todayStart := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 0, 0, 0, 0, loc)
 
-	selectedDay := r.URL.Query().Get("day")
-	selectedDayStart := windowFrom
+	// Keep collision/critical computation stable (do not shift based on UI day selection).
+	collisionWindowFrom := todayStart
+	collisionWindowTo := collisionWindowFrom.Add(8 * 24 * time.Hour) // cover at least one full week for recurring timers
+
+	// Parse selected day (may be empty/invalid or outside the available days).
+	selectedDay := strings.TrimSpace(r.URL.Query().Get("day"))
+	selectedDayStart := todayStart
 	if selectedDay != "" {
 		if t, err := time.ParseInLocation("2006-01-02", selectedDay, loc); err == nil {
 			selectedDayStart = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
 		}
 	}
 	selectedDayEnd := selectedDayStart.Add(24 * time.Hour)
+
+	// Build day dropdown options from active timer occurrences, but never include days
+	// in the past ("already gone"). Keep the horizon stable so it doesn't jump.
+	optionsFrom := todayStart
+	optionsTo := todayStart.Add(180 * 24 * time.Hour)
+	if selectedDayStart.After(optionsTo) {
+		optionsTo = selectedDayStart.Add(30 * 24 * time.Hour)
+	}
 
 	timers, err := h.timerService.GetAllTimers(r.Context())
 	if err != nil {
@@ -1768,6 +2519,7 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 		IsRecording bool
 		IsCritical  bool
 		IsCollision bool
+		NextOccurrences []string
 	}
 
 	views := make([]timerView, 0, len(timers))
@@ -1778,10 +2530,26 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 		}
 		isRec := false
 		if !t.Start.IsZero() && !t.Stop.IsZero() {
-			now := time.Now()
-			isRec = (t.Start.Before(now) || t.Start.Equal(now)) && t.Stop.After(now)
+			isRec = (t.Start.Before(localNow) || t.Start.Equal(localNow)) && t.Stop.After(localNow)
 		}
-		views = append(views, timerView{Timer: t, ChannelName: name, IsRecording: isRec})
+
+		// For recurring timers, show all upcoming occurrences within the next-week horizon.
+		// This matches user expectations for weekday masks (e.g. Thu+Fri at midnight).
+		var nextOcc []string
+		if t.Active && isWeekdayMaskHTTP(t.DaySpec) {
+			occFrom := todayStart
+			occTo := todayStart.Add(8 * 24 * time.Hour)
+			for _, occ := range timerOccurrences(t, occFrom, occTo) {
+				// Keep occurrences that haven't fully ended yet.
+				if !occ.Stop.After(localNow) {
+					continue
+				}
+				s := occ.Start.In(loc).Format("2006-01-02 15:04") + " - " + occ.Stop.In(loc).Format("15:04")
+				nextOcc = append(nextOcc, s)
+			}
+		}
+
+		views = append(views, timerView{Timer: t, ChannelName: name, IsRecording: isRec, NextOccurrences: nextOcc})
 	}
 
 	// Mark overlapping timers (yellow) and critical timers (red) based on configured DVB cards.
@@ -1790,7 +2558,7 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 		dvbCards = h.cfg.VDR.DVBCards
 	}
 
-	collisionIDs, criticalIDs := timerOverlapStates(timers, dvbCards, windowFrom, windowTo, func(t domain.Timer) string {
+	collisionIDs, criticalIDs := timerOverlapStates(timers, dvbCards, collisionWindowFrom, collisionWindowTo, func(t domain.Timer) string {
 		return transponderKeyForTimer(t, channels)
 	})
 	for i := range views {
@@ -1844,21 +2612,34 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 		return views[i].ID < views[j].ID
 	})
 
-	// Build timeline day options from active timer occurrences within the same window.
+	// Build timeline day options from active timer occurrences in the stable horizon.
 	daysByValue := map[string]time.Time{}
+	recurringHorizonTo := todayStart.Add(8 * 24 * time.Hour)
 	for _, t := range timers {
 		if !t.Active {
 			continue
 		}
-		for _, occ := range timerOccurrences(t, windowFrom, windowTo) {
+		occFrom := optionsFrom
+		occTo := optionsTo
+		if isWeekdayMaskHTTP(t.DaySpec) {
+			occFrom = todayStart
+			occTo = recurringHorizonTo
+		}
+		for _, occ := range timerOccurrences(t, occFrom, occTo) {
 			start := occ.Start.In(loc)
 			stop := occ.Stop.In(loc)
 			if stop.Before(start) {
 				stop = start
 			}
+			// Only include days with actual timer time. In particular, a timer that ends
+			// exactly at 00:00 should not make the next day selectable.
+			if !stop.After(start) {
+				continue
+			}
+			effectiveStop := stop.Add(-time.Nanosecond)
 			// Include every day this occurrence touches (handles crossing midnight).
 			d := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, loc)
-			endDay := time.Date(stop.Year(), stop.Month(), stop.Day(), 0, 0, 0, 0, loc)
+			endDay := time.Date(effectiveStop.Year(), effectiveStop.Month(), effectiveStop.Day(), 0, 0, 0, 0, loc)
 			for !d.After(endDay) {
 				v := d.Format("2006-01-02")
 				daysByValue[v] = d
@@ -1873,10 +2654,26 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.SliceStable(availableDays, func(i, j int) bool { return availableDays[i].Before(availableDays[j]) })
 
-	// If the user didn't select a day (or selected a day without timers), pick the first available one.
+	// If the user didn't select a day (or selected a day without timers), snap to the nearest day
+	// that actually has an active timer occurrence. This keeps the dropdown + timeline consistent.
 	if len(availableDays) > 0 {
 		if _, ok := daysByValue[selectedDayStart.Format("2006-01-02")]; !ok {
-			selectedDayStart = availableDays[0]
+			chosen := availableDays[0]
+			best := chosen.Sub(selectedDayStart)
+			if best < 0 {
+				best = -best
+			}
+			for _, d := range availableDays[1:] {
+				diff := d.Sub(selectedDayStart)
+				if diff < 0 {
+					diff = -diff
+				}
+				if diff < best {
+					best = diff
+					chosen = d
+				}
+			}
+			selectedDayStart = chosen
 			selectedDayEnd = selectedDayStart.Add(24 * time.Hour)
 		}
 	}
@@ -1906,11 +2703,28 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 
 	blocksByChannel := map[string][]timerTimelineBlock{}
 	if len(availableDays) > 0 {
+		// Only generate occurrences around the selected day; this keeps rendering fast
+		// while still handling timers that cross midnight.
+		blockWindowFrom := selectedDayStart.Add(-24 * time.Hour)
+		blockWindowTo := selectedDayEnd.Add(24 * time.Hour)
 		for _, t := range timers {
 			if !t.Active {
 				continue
 			}
-			for _, occ := range timerOccurrences(t, windowFrom, windowTo) {
+			occFrom := blockWindowFrom
+			occTo := blockWindowTo
+			if isWeekdayMaskHTTP(t.DaySpec) {
+				if occFrom.Before(todayStart) {
+					occFrom = todayStart
+				}
+				if occTo.After(recurringHorizonTo) {
+					occTo = recurringHorizonTo
+				}
+				if !occFrom.Before(occTo) {
+					continue
+				}
+			}
+			for _, occ := range timerOccurrences(t, occFrom, occTo) {
 				if occ.Stop.Before(selectedDayStart) || !occ.Start.Before(selectedDayEnd) {
 					continue
 				}
@@ -1930,8 +2744,9 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 				}
 				startMin := start.Sub(selectedDayStart).Minutes()
 				stopMin := stop.Sub(selectedDayStart).Minutes()
-				if stopMin < startMin {
-					stopMin = startMin
+				if stopMin <= startMin {
+					// No time on this day (e.g., timer ends exactly at 00:00).
+					continue
 				}
 				leftPct := (startMin / 1440.0) * 100.0
 				widthPct := ((stopMin - startMin) / 1440.0) * 100.0
@@ -2252,6 +3067,37 @@ func isWeekdayMaskHTTP(daySpec string) bool {
 	return true
 }
 
+func formatClockFromMinutes(min int) string {
+	if min < 0 {
+		return ""
+	}
+	h := (min / 60) % 24
+	m := min % 60
+	if h < 0 {
+		h += 24
+	}
+	if m < 0 {
+		m += 60
+	}
+	return fmt.Sprintf("%02d:%02d", h, m)
+}
+
+func weekdayMaskFromForm(form url.Values) (string, bool) {
+	letters := []rune{'M', 'T', 'W', 'T', 'F', 'S', 'S'}
+	keys := []string{"wd_mon", "wd_tue", "wd_wed", "wd_thu", "wd_fri", "wd_sat", "wd_sun"}
+	mask := make([]rune, 7)
+	any := false
+	for i := range mask {
+		if strings.TrimSpace(form.Get(keys[i])) != "" {
+			mask[i] = letters[i]
+			any = true
+		} else {
+			mask[i] = '-'
+		}
+	}
+	return string(mask), any
+}
+
 func weekdayMaskAllowsHTTP(daySpec string, wd time.Weekday) bool {
 	idx := 0
 	switch wd {
@@ -2282,6 +3128,14 @@ type timerFormModel struct {
 	Active    bool
 	ChannelID string
 	Day       string
+	DayMode   string
+	WDMon     bool
+	WDTue     bool
+	WDWed     bool
+	WDThu     bool
+	WDFri     bool
+	WDSat     bool
+	WDSun     bool
 	Start     string
 	Stop      string
 	Priority  int
@@ -2304,6 +3158,7 @@ func (h *Handler) timerNewFormModel(now time.Time, channels []domain.Channel) (t
 		Active:    true,
 		ChannelID: selectedChannel,
 		Day:       day.Format("2006-01-02"),
+		DayMode:   "single",
 		Start:     localNow.Format("15:04"),
 		Stop:      "00:00",
 		Priority:  99,
@@ -2444,10 +3299,9 @@ func (h *Handler) timerFromCreateForm(r *http.Request) (domain.Timer, error) {
 		return domain.Timer{}, domain.ErrInvalidInput
 	}
 
-	dayStr := strings.TrimSpace(form.Get("day"))
-	day, err := time.ParseInLocation("2006-01-02", dayStr, time.Local)
-	if err != nil {
-		return domain.Timer{}, domain.ErrInvalidInput
+	dayMode := strings.TrimSpace(form.Get("day_mode"))
+	if dayMode == "" {
+		dayMode = "single"
 	}
 
 	startStr := strings.TrimSpace(form.Get("start"))
@@ -2457,11 +3311,35 @@ func (h *Handler) timerFromCreateForm(r *http.Request) (domain.Timer, error) {
 	if err1 != nil || err2 != nil {
 		return domain.Timer{}, domain.ErrInvalidInput
 	}
+	startMinutes := startClock.Hour()*60 + startClock.Minute()
+	stopMinutes := stopClock.Hour()*60 + stopClock.Minute()
 
-	start := time.Date(day.Year(), day.Month(), day.Day(), startClock.Hour(), startClock.Minute(), 0, 0, time.Local)
-	stop := time.Date(day.Year(), day.Month(), day.Day(), stopClock.Hour(), stopClock.Minute(), 0, 0, time.Local)
-	if stop.Before(start) {
-		stop = stop.Add(24 * time.Hour)
+	day := time.Time{}
+	start := time.Time{}
+	stop := time.Time{}
+	daySpec := ""
+	if dayMode == "weekly" {
+		mask, any := weekdayMaskFromForm(form)
+		if !any {
+			return domain.Timer{}, domain.ErrInvalidInput
+		}
+		daySpec = mask
+	} else {
+		dayStr := strings.TrimSpace(form.Get("day"))
+		parsedDay, err := time.ParseInLocation("2006-01-02", dayStr, time.Local)
+		if err != nil {
+			return domain.Timer{}, domain.ErrInvalidInput
+		}
+		day = parsedDay
+		start = time.Date(day.Year(), day.Month(), day.Day(), startClock.Hour(), startClock.Minute(), 0, 0, time.Local)
+		stop = time.Date(day.Year(), day.Month(), day.Day(), stopClock.Hour(), stopClock.Minute(), 0, 0, time.Local)
+		if stop.Before(start) {
+			stop = stop.Add(24 * time.Hour)
+		}
+		// Ensure this is treated as a one-time timer.
+		daySpec = ""
+		startMinutes = -1
+		stopMinutes = -1
 	}
 
 	priority, err := strconv.Atoi(strings.TrimSpace(form.Get("priority")))
@@ -2484,10 +3362,14 @@ func (h *Handler) timerFromCreateForm(r *http.Request) (domain.Timer, error) {
 		Day:       day,
 		Start:     start,
 		Stop:      stop,
-		Priority:  priority,
-		Lifetime:  lifetime,
-		Title:     title,
-		Aux:       aux,
+		DaySpec:   daySpec,
+		// For repeating timers, these clocks are required.
+		StartMinutes: startMinutes,
+		StopMinutes:  stopMinutes,
+		Priority:     priority,
+		Lifetime:     lifetime,
+		Title:        title,
+		Aux:          aux,
 	}, nil
 }
 
@@ -2564,13 +3446,44 @@ func (h *Handler) timerToFormModel(t domain.Timer) timerFormModel {
 		dayStr = day.In(time.Local).Format("2006-01-02")
 	}
 
+	dayMode := "single"
+	daySpec := strings.TrimSpace(t.DaySpec)
+	if isWeekdayMaskHTTP(daySpec) {
+		dayMode = "weekly"
+	}
+
 	startStr := ""
 	stopStr := ""
-	if !t.Start.IsZero() {
+	if dayMode == "weekly" {
+		if t.StartMinutes >= 0 {
+			startStr = formatClockFromMinutes(t.StartMinutes)
+		}
+		if t.StopMinutes >= 0 {
+			stopStr = formatClockFromMinutes(t.StopMinutes)
+		}
+	}
+	if startStr == "" && !t.Start.IsZero() {
 		startStr = t.Start.In(time.Local).Format("15:04")
 	}
-	if !t.Stop.IsZero() {
+	if stopStr == "" && !t.Stop.IsZero() {
 		stopStr = t.Stop.In(time.Local).Format("15:04")
+	}
+
+	wdMon := false
+	wdTue := false
+	wdWed := false
+	wdThu := false
+	wdFri := false
+	wdSat := false
+	wdSun := false
+	if dayMode == "weekly" && len(daySpec) == 7 {
+		wdMon = daySpec[0] != '-' && daySpec[0] != '.'
+		wdTue = daySpec[1] != '-' && daySpec[1] != '.'
+		wdWed = daySpec[2] != '-' && daySpec[2] != '.'
+		wdThu = daySpec[3] != '-' && daySpec[3] != '.'
+		wdFri = daySpec[4] != '-' && daySpec[4] != '.'
+		wdSat = daySpec[5] != '-' && daySpec[5] != '.'
+		wdSun = daySpec[6] != '-' && daySpec[6] != '.'
 	}
 
 	return timerFormModel{
@@ -2578,6 +3491,14 @@ func (h *Handler) timerToFormModel(t domain.Timer) timerFormModel {
 		Active:    t.Active,
 		ChannelID: t.ChannelID,
 		Day:       dayStr,
+		DayMode:   dayMode,
+		WDMon:     wdMon,
+		WDTue:     wdTue,
+		WDWed:     wdWed,
+		WDThu:     wdThu,
+		WDFri:     wdFri,
+		WDSat:     wdSat,
+		WDSun:     wdSun,
 		Start:     startStr,
 		Stop:      stopStr,
 		Priority:  t.Priority,
@@ -2600,10 +3521,9 @@ func (h *Handler) timerFromForm(r *http.Request) (domain.Timer, error) {
 		return domain.Timer{}, domain.ErrInvalidInput
 	}
 
-	dayStr := strings.TrimSpace(form.Get("day"))
-	day, err := time.ParseInLocation("2006-01-02", dayStr, time.Local)
-	if err != nil {
-		return domain.Timer{}, domain.ErrInvalidInput
+	dayMode := strings.TrimSpace(form.Get("day_mode"))
+	if dayMode == "" {
+		dayMode = "single"
 	}
 
 	startStr := strings.TrimSpace(form.Get("start"))
@@ -2613,11 +3533,34 @@ func (h *Handler) timerFromForm(r *http.Request) (domain.Timer, error) {
 	if err1 != nil || err2 != nil {
 		return domain.Timer{}, domain.ErrInvalidInput
 	}
+	startMinutes := startClock.Hour()*60 + startClock.Minute()
+	stopMinutes := stopClock.Hour()*60 + stopClock.Minute()
 
-	start := time.Date(day.Year(), day.Month(), day.Day(), startClock.Hour(), startClock.Minute(), 0, 0, time.Local)
-	stop := time.Date(day.Year(), day.Month(), day.Day(), stopClock.Hour(), stopClock.Minute(), 0, 0, time.Local)
-	if stop.Before(start) {
-		stop = stop.Add(24 * time.Hour)
+	day := time.Time{}
+	start := time.Time{}
+	stop := time.Time{}
+	daySpec := ""
+	if dayMode == "weekly" {
+		mask, any := weekdayMaskFromForm(form)
+		if !any {
+			return domain.Timer{}, domain.ErrInvalidInput
+		}
+		daySpec = mask
+	} else {
+		dayStr := strings.TrimSpace(form.Get("day"))
+		parsedDay, err := time.ParseInLocation("2006-01-02", dayStr, time.Local)
+		if err != nil {
+			return domain.Timer{}, domain.ErrInvalidInput
+		}
+		day = parsedDay
+		start = time.Date(day.Year(), day.Month(), day.Day(), startClock.Hour(), startClock.Minute(), 0, 0, time.Local)
+		stop = time.Date(day.Year(), day.Month(), day.Day(), stopClock.Hour(), stopClock.Minute(), 0, 0, time.Local)
+		if stop.Before(start) {
+			stop = stop.Add(24 * time.Hour)
+		}
+		daySpec = ""
+		startMinutes = -1
+		stopMinutes = -1
 	}
 
 	priority, err := strconv.Atoi(strings.TrimSpace(form.Get("priority")))
@@ -2638,16 +3581,19 @@ func (h *Handler) timerFromForm(r *http.Request) (domain.Timer, error) {
 	aux := form.Get("aux")
 
 	return domain.Timer{
-		ID:        id,
-		Active:    active,
-		ChannelID: channelID,
-		Day:       day,
-		Start:     start,
-		Stop:      stop,
-		Priority:  priority,
-		Lifetime:  lifetime,
-		Title:     title,
-		Aux:       aux,
+		ID:           id,
+		Active:       active,
+		ChannelID:    channelID,
+		Day:          day,
+		Start:        start,
+		Stop:         stop,
+		DaySpec:      daySpec,
+		StartMinutes: startMinutes,
+		StopMinutes:  stopMinutes,
+		Priority:     priority,
+		Lifetime:     lifetime,
+		Title:        title,
+		Aux:          aux,
 	}, nil
 }
 

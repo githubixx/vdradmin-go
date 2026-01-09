@@ -28,37 +28,61 @@
         <div id="search-results">
             {{if .Query}}
             <h3>Results for "{{.Query}}"</h3>
-            <div class="epg-list">
-                {{range .Events}}
-                <div class="epg-item">
-                    <div class="epg-time">
-                        <time datetime="{{.Start.Format "2006-01-02T15:04"}}">
-                            {{.Start.Format "15:04"}}
-                        </time>
-                    </div>
-                    <div class="epg-content">
-                        <div class="epg-header">
-                            <h4>{{.Title}}</h4>
-                            <span class="epg-channel">{{.ChannelName}}</span>
-                        </div>
-                        {{if .Subtitle}}
-                        <p class="epg-subtitle">{{.Subtitle}}</p>
-                        {{end}}
-                    </div>
-                    {{if eq $.Role "admin"}}
-                    <div class="epg-actions">
-                        <button
-                            hx-post="/timers/create?channel={{.ChannelID}}&event_id={{.EventID}}"
-                            class="btn btn-sm btn-primary">
-                            Record
-                        </button>
-                    </div>
-                    {{end}}
-                </div>
-                {{else}}
-                <p class="empty-state">No results found</p>
-                {{end}}
+            {{range .DayGroups}}
+            <div class="toolbar" style="display: flex; justify-content: space-between; align-items: center;">
+                <h3>{{.DayLabel}}</h3>
             </div>
+
+            <div class="toolbar">
+                <table class="data-table" style="table-layout: fixed; width: 100%;">
+                    <thead>
+                        <tr>
+                            <th style="width: 92px;">Time</th>
+                            <th>Title</th>
+                            <th style="width: 220px;">Channel</th>
+                            {{if eq $.Role "admin"}}
+                            <th style="width: 110px; text-align: right;"></th>
+                            {{end}}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Events}}
+                        <tr>
+                            <td>
+                                <time datetime="{{.Start.Format "2006-01-02T15:04"}}">{{.Start.Format "15:04"}}-{{.Stop.Format "15:04"}}</time>
+                            </td>
+                            <td>
+                                <div style="font-weight: 600;">{{.Title}}</div>
+                                {{if .Subtitle}}<div class="epg-subtitle">{{.Subtitle}}</div>{{end}}
+                            </td>
+                            <td>{{.ChannelName}}</td>
+                            {{if eq $.Role "admin"}}
+                            <td class="actions" style="text-align: right;">
+                                {{if or .TimerActive (le .EventID 0)}}
+                                <button type="button" class="btn btn-sm btn-secondary" disabled>Scheduled</button>
+                                {{else}}
+                                <button
+                                    hx-post="/timers/create?channel={{.ChannelID}}&event_id={{.EventID}}"
+                                    class="btn btn-sm btn-primary">
+                                    Record
+                                </button>
+                                {{end}}
+                            </td>
+                            {{end}}
+                        </tr>
+                        {{else}}
+                        <tr>
+                            <td colspan="{{if eq $.Role "admin"}}4{{else}}3{{end}}">
+                                <p class="empty-state" style="padding: 0.75rem 0; text-align: left;">No matches</p>
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+            {{else}}
+            <p class="empty-state">No results found</p>
+            {{end}}
             {{end}}
         </div>
     </main>

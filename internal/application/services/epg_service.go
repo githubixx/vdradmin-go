@@ -257,6 +257,88 @@ func (s *EPGService) GetCurrentPrograms(ctx context.Context) ([]domain.EPGEvent,
 	return currentPrograms, nil
 }
 
+// GetProgramsAt returns what's playing on all channels at the provided time.
+// This uses a single SVDRP request and then derives the currently-running event per channel.
+func (s *EPGService) GetProgramsAt(ctx context.Context, at time.Time) ([]domain.EPGEvent, error) {
+	if at.IsZero() {
+		at = time.Now()
+	}
+
+	// If the caller requests "now", reuse the cached current-programs summary when possible.
+	now := time.Now()
+	if at.After(now.Add(-30*time.Second)) && at.Before(now.Add(30*time.Second)) {
+		return s.GetCurrentPrograms(ctx)
+	}
+
+	events, err := s.vdrClient.GetEPG(ctx, "", time.Time{})
+	if err != nil {
+		return nil, err
+	}
+
+	byChannel := make(map[string]domain.EPGEvent)
+	for i := range events {
+		ev := events[i]
+		if ev.ChannelID == "" {
+			continue
+		}
+		if !s.isWantedChannel(ev.ChannelID) {
+			continue
+		}
+		if ev.Start.After(at) || !ev.Stop.After(at) {
+			continue
+		}
+		prev, ok := byChannel[ev.ChannelID]
+		if !ok || prev.Start.Before(ev.Start) {
+			byChannel[ev.ChannelID] = ev
+		}
+	}
+
+	programs := make([]domain.EPGEvent, 0, len(byChannel))
+	for _, ev := range byChannel {
+		programs = append(programs, ev)
+	}
+
+	// Ensure channels.conf order: if the EPG payload doesn't include a numeric channel number,
+	// map the channel id back to the LSTC order.
+	channels, err := s.getAllChannelsCached(ctx)
+	if err == nil {
+		numByID := make(map[string]int, len(channels))
+		nameByID := make(map[string]string, len(channels))
+		for _, ch := range channels {
+			numByID[ch.ID] = ch.Number
+			nameByID[ch.ID] = ch.Name
+		}
+		for i := range programs {
+			if programs[i].ChannelNumber == 0 {
+				programs[i].ChannelNumber = numByID[programs[i].ChannelID]
+			}
+			if programs[i].ChannelName == "" {
+				programs[i].ChannelName = nameByID[programs[i].ChannelID]
+			}
+		}
+	}
+
+	sort.SliceStable(programs, func(i, j int) bool {
+		ni := programs[i].ChannelNumber
+		nj := programs[j].ChannelNumber
+		if ni != 0 && nj != 0 && ni != nj {
+			return ni < nj
+		}
+		// Fallback: try numeric channel id if present
+		idI, _ := strconv.Atoi(programs[i].ChannelID)
+		idJ, _ := strconv.Atoi(programs[j].ChannelID)
+		if idI != 0 && idJ != 0 && idI != idJ {
+			return idI < idJ
+		}
+		if programs[i].ChannelName != programs[j].ChannelName {
+			return programs[i].ChannelName < programs[j].ChannelName
+		}
+		return programs[i].Start.Before(programs[j].Start)
+	})
+
+	return programs, nil
+}
+
 // SearchEPG searches for programs matching criteria
 func (s *EPGService) SearchEPG(ctx context.Context, query string) ([]domain.EPGEvent, error) {
 	// Get all EPG data

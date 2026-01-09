@@ -22,6 +22,28 @@ vdr:
   # Leave empty to show all channels.
   # Values are VDR channel IDs (as returned by SVDRP LSTC), e.g. "C-1-1-1".
   wanted_channels: []
+  # Optional: enable "stream URL" mode on /watch.
+  #
+  # If set, /watch will embed the given URL into the TV screen and replace
+  # occurrences of "{channel}" with the selected VDR channel number (e.g. "1", "2", "3").
+  # The URL must point to a stream format your browser can render (e.g. HLS).
+  #
+  # Example for streamdev-server (serves MPEG-TS, not browser-playable by default!):
+  #   stream_url_template: "http://127.0.0.1:3000/{channel}"
+  # Replace 127.0.0.1 with your VDR's hostname or IP if remote.
+  # Most browsers CANNOT play raw MPEG-TS streams directly; you usually need HLS or MP4/WebM.
+  # Use a remuxer (e.g. streamdev externremux or a proxy) to provide browser-compatible formats if needed.
+  stream_url_template: ""
+
+  # Recommended: HLS proxy backend URL (requires ffmpeg installed).
+  # If set, vdradmin-go transcodes streamdev output to HLS for browser playback.
+  # Use {channel} as placeholder for channel number.
+  #
+  # Example:
+  #   streamdev_backend_url: "http://127.0.0.1:3000/{channel}"
+  #
+  # When enabled, /watch automatically uses /watch/stream/{channel}/index.m3u8 internally.
+  streamdev_backend_url: ""
   video_dir: "/var/lib/video.00"
   config_dir: "/etc/vdr"
   reconnect_delay: 5s

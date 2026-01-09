@@ -1,0 +1,747 @@
+{{define "watch.html"}}
+<!DOCTYPE html>
+<html lang="en" {{if eq .ThemeMode "dark"}}data-theme="dark"{{else if eq .ThemeMode "light"}}data-theme="light"{{end}} data-theme-default="{{.ThemeDefault}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watch TV - VDRAdmin-go</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/theme.js?v=20260104" defer></script>
+</head>
+<body{{if .StreamURLTemplate}} data-stream-template="{{.StreamURLTemplate}}"{{end}}>
+    {{template "nav_header" .}}
+
+    <main class="container">
+        <div class="toolbar">
+            <div class="watchtv-toolbar">
+                <div class="watchtv-controls">
+                    <strong>TV</strong>
+
+                    {{if .StreamURLTemplate}}
+                    <span class="watchtv-label">Stream</span>
+                    {{else}}
+
+                    <label class="watchtv-label" for="watchtv-interval">Interval</label>
+                    <select id="watchtv-interval" class="watchtv-select">
+                        <option value="0" {{if eq .Interval "0"}}selected{{end}}>off</option>
+                        <option value="1" {{if eq .Interval "1"}}selected{{end}}>1 sec.</option>
+                        <option value="2" {{if eq .Interval "2"}}selected{{end}}>2 sec.</option>
+                        <option value="3" {{if eq .Interval "3"}}selected{{end}}>3 sec.</option>
+                        <option value="5" {{if eq .Interval "5"}}selected{{end}}>5 sec.</option>
+                        <option value="10" {{if eq .Interval "10"}}selected{{end}}>10 sec.</option>
+                        <option value="30" {{if eq .Interval "30"}}selected{{end}}>30 sec.</option>
+                        <option value="60" {{if eq .Interval "60"}}selected{{end}}>60 sec.</option>
+                    </select>
+                    <button type="button" class="btn btn-secondary btn-menu" id="watchtv-grab">G</button>
+
+                    <label class="watchtv-label" for="watchtv-size">Size</label>
+                    <select id="watchtv-size" class="watchtv-select">
+                        <option value="full" {{if eq .Size "full"}}selected{{end}}>1:1</option>
+                        <option value="half" {{if eq .Size "half"}}selected{{end}}>1:2</option>
+                        <option value="quarter" {{if eq .Size "quarter"}}selected{{end}}>1:4</option>
+                    </select>
+                    <button type="button" class="btn btn-secondary btn-menu" id="watchtv-grab-2">G</button>
+
+                    {{end}}
+                </div>
+
+            </div>
+        </div>
+
+        {{if .HomeError}}
+        <div class="toolbar">
+            <strong>VDR connection error:</strong> {{.HomeError}}
+        </div>
+        {{end}}
+
+        <div class="watchtv-grid">
+            <section class="watchtv-screen">
+                <div class="watchtv-screen-inner" id="watchtv-screen">
+                    <div class="watchtv-overlay" id="watchtv-overlay" hidden>
+                        <div class="watchtv-overlay-card">
+                            <div class="watchtv-overlay-title">{{if .StreamURLTemplate}}Stream unavailable{{else}}Snapshot unavailable{{end}}</div>
+                            <div class="watchtv-overlay-body" id="watchtv-overlay-body"></div>
+                            <div class="watchtv-overlay-hint">
+                                {{if .StreamURLTemplate}}
+                                {{if .StreamHint}}{{.StreamHint}}{{else}}Streaming is enabled.{{end}}
+                                {{else}}
+                                This uses SVDRP <strong>GRAB</strong> on the VDR host.
+                                {{end}}
+                            </div>
+                        </div>
+                    </div>
+                    {{if .StreamURLTemplate}}
+                    <video id="watchtv-video" class="watchtv-video" controls autoplay muted playsinline></video>
+                    {{else}}
+                    <img id="watchtv-image" class="watchtv-image" alt="TV snapshot" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" />
+                    {{end}}
+                </div>
+            </section>
+
+            <section class="watchtv-remote" aria-label="Remote control">
+                <div class="remote-panel">
+                    <div class="remote-row remote-row-right">
+                        <button class="remote-btn remote-btn-power" data-key="power" type="button">Power</button>
+                    </div>
+
+                    <div class="remote-grid remote-grid-nums">
+                        <button class="remote-btn" data-key="1" type="button">1</button>
+                        <button class="remote-btn" data-key="2" type="button">2</button>
+                        <button class="remote-btn" data-key="3" type="button">3</button>
+                        <button class="remote-btn" data-key="4" type="button">4</button>
+                        <button class="remote-btn" data-key="5" type="button">5</button>
+                        <button class="remote-btn" data-key="6" type="button">6</button>
+                        <button class="remote-btn" data-key="7" type="button">7</button>
+                        <button class="remote-btn" data-key="8" type="button">8</button>
+                        <button class="remote-btn" data-key="9" type="button">9</button>
+                        <span></span>
+                        <button class="remote-btn" data-key="0" type="button">0</button>
+                        <span></span>
+                    </div>
+
+                    <div class="remote-grid remote-grid-top">
+                        <button class="remote-btn" data-key="menu" type="button">Menu</button>
+                        <span></span>
+                        <button class="remote-btn" data-key="back" type="button">Back</button>
+                    </div>
+
+                    <div class="remote-grid remote-grid-colors">
+                        <button class="remote-btn remote-btn-red" data-key="red" type="button"></button>
+                        <button class="remote-btn remote-btn-green" data-key="green" type="button"></button>
+                        <button class="remote-btn remote-btn-yellow" data-key="yellow" type="button"></button>
+                        <button class="remote-btn remote-btn-blue" data-key="blue" type="button"></button>
+                    </div>
+
+                    <div class="remote-grid remote-grid-nav">
+                        <span></span>
+                        <button class="remote-btn" data-key="up" type="button">▲</button>
+                        <span></span>
+
+                        <button class="remote-btn" data-key="left" type="button">◀</button>
+                        <button class="remote-btn remote-btn-ok" data-key="ok" type="button">OK</button>
+                        <button class="remote-btn" data-key="right" type="button">▶</button>
+
+                        <span></span>
+                        <button class="remote-btn" data-key="down" type="button">▼</button>
+                        <span></span>
+                    </div>
+
+                    <div class="remote-grid remote-grid-transport">
+                        <button class="remote-btn" data-key="rec" type="button">●</button>
+                        <button class="remote-btn" data-key="stop" type="button">■</button>
+                        <button class="remote-btn" data-key="fastrew" type="button">⏪</button>
+                        <button class="remote-btn" data-key="play" type="button">▶︎</button>
+                        <button class="remote-btn" data-key="fastfwd" type="button">⏩</button>
+                        <button class="remote-btn" data-key="prev" type="button">⏮</button>
+                        <button class="remote-btn" data-key="pause" type="button">⏸</button>
+                        <button class="remote-btn" data-key="next" type="button">⏭</button>
+                    </div>
+
+                    <div class="remote-grid remote-grid-volume reopening">
+                        <button class="remote-btn" data-key="VolumeMinus" type="button">Volume-</button>
+                        <button class="remote-btn" data-key="mute" type="button">Mute</button>
+                        <button class="remote-btn" data-key="VolumePlus" type="button">Volume+</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="watchtv-channels" aria-label="Channels">
+                <div class="watchtv-channels-panel">
+                    <div class="watchtv-channels-title">Channels</div>
+                    <select id="watchtv-channel" size="32" class="watchtv-channel-list">
+                        {{range .Channels}}
+                        <option value="{{.ID}}" data-number="{{.Number}}" {{if eq $.CurrentChannel .ID}}selected{{end}}>{{.Name}}</option>
+                        {{end}}
+                    </select>
+                </div>
+            </section>
+        </div>
+
+        <div class="toolbar watchtv-now" id="watchtv-now" hidden>
+            <div><strong id="watchtv-now-title"></strong></div>
+            <div class="epg-duration" id="watchtv-now-time"></div>
+            <p class="epg-subtitle" id="watchtv-now-subtitle" hidden></p>
+            <p class="watchtv-now-description" id="watchtv-now-description" hidden></p>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; {{.Year}} vdradmin-go | <a href="https://github.com/githubixx/vdradmin-go">GitHub</a></p>
+        </div>
+    </footer>
+
+    {{/* hls.js is needed for reliable HLS playback in Chromium/Firefox */}}
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+
+<script>
+(() => {
+    const img = document.getElementById('watchtv-image');
+    const overlay = document.getElementById('watchtv-overlay');
+    const overlayBody = document.getElementById('watchtv-overlay-body');
+    const intervalSel = document.getElementById('watchtv-interval');
+    const sizeSel = document.getElementById('watchtv-size');
+    const grabBtn = document.getElementById('watchtv-grab');
+    const grabBtn2 = document.getElementById('watchtv-grab-2');
+    const channelSel = document.getElementById('watchtv-channel');
+        const video = document.getElementById('watchtv-video');
+
+    const nowBox = document.getElementById('watchtv-now');
+    const nowTitle = document.getElementById('watchtv-now-title');
+    const nowTime = document.getElementById('watchtv-now-time');
+    const nowSubtitle = document.getElementById('watchtv-now-subtitle');
+    const nowDescription = document.getElementById('watchtv-now-description');
+
+    const streamTemplate = document.body?.dataset?.streamTemplate || '';
+    const streamEnabled = streamTemplate.trim() !== '';
+
+    let timer = null;
+    let lastObjectURL = null;
+    let currentStreamChannel = null; // Track current channel for cleanup
+    let hls = null;
+    let nowTimer = null;
+    let hlsFatalErrorCount = 0;
+
+    let lastSuccessfulChannelID = '';
+    let lastSuccessfulChannelNum = '';
+    let lastSuccessfulChannelIndex = -1;
+
+    let channelSwitchController = null;
+
+    let digitBuffer = '';
+    let digitTimer = null;
+    const digitCommitDelayMs = 1200;
+
+    function formatHHMM(date) {
+        const d = (date instanceof Date) ? date : new Date(date);
+        if (!Number.isFinite(d.getTime())) return '';
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        return `${hh}:${mm}`;
+    }
+
+    async function refreshNowInfo(channelID) {
+        if (!nowBox || !nowTitle || !nowTime) return;
+        if (!channelID) {
+            nowBox.hidden = true;
+            return;
+        }
+        try {
+            const res = await fetch(`/watch/now?channel=${encodeURIComponent(channelID)}`, { cache: 'no-store' });
+            if (res.status === 204) {
+                nowBox.hidden = true;
+                return;
+            }
+            if (!res.ok) {
+                nowBox.hidden = true;
+                return;
+            }
+            const data = await res.json();
+            if (!data || typeof data.title !== 'string' || data.title.trim() === '') {
+                nowBox.hidden = true;
+                return;
+            }
+
+            nowTitle.textContent = data.title;
+
+            const start = data.start ? new Date(data.start) : null;
+            const stop = data.stop ? new Date(data.stop) : null;
+            const startStr = start ? formatHHMM(start) : '';
+            const stopStr = stop ? formatHHMM(stop) : '';
+            nowTime.textContent = (startStr && stopStr) ? `${startStr}-${stopStr}` : '';
+
+            if (nowSubtitle) {
+                const s = (typeof data.subtitle === 'string') ? data.subtitle.trim() : '';
+                nowSubtitle.textContent = s;
+                nowSubtitle.hidden = s === '';
+            }
+
+            if (nowDescription) {
+                const d = (typeof data.description === 'string') ? data.description.trim() : '';
+                nowDescription.textContent = d;
+                nowDescription.hidden = d === '';
+            }
+
+            nowBox.hidden = false;
+        } catch {
+            nowBox.hidden = true;
+        }
+    }
+
+    function currentIntervalSeconds() {
+        if (!intervalSel) return 0;
+        const v = parseInt(intervalSel.value, 10);
+        return Number.isFinite(v) ? v : 0;
+    }
+
+    function snapshotURL() {
+        if (!sizeSel) return `/watch/snapshot?rand=${Date.now()}`;
+        const size = encodeURIComponent(sizeSel.value);
+        return `/watch/snapshot?size=${size}&rand=${Date.now()}`;
+    }
+
+    function setScreenWidth() {
+        if (!sizeSel) return;
+        const size = sizeSel.value;
+        const w = (size === 'full' ? 1920 : (size === 'half' ? 960 : 480));
+        const screen = document.getElementById('watchtv-screen');
+        if (screen) screen.style.width = w + 'px';
+    }
+
+    function stop() {
+        if (timer) {
+            window.clearTimeout(timer);
+            timer = null;
+        }
+    }
+
+    function showOverlay(message) {
+        if (!overlay || !overlayBody) return;
+        overlayBody.textContent = message || 'Unknown error';
+        overlay.hidden = false;
+        overlay.removeAttribute('hidden');
+    }
+
+    function hideOverlay() {
+        if (!overlay) return;
+        overlay.hidden = true;
+        overlay.setAttribute('hidden', '');
+    }
+
+    function selectedChannelID() {
+        if (!channelSel) return '';
+        const opt = channelSel.options[channelSel.selectedIndex];
+        return opt && opt.value ? opt.value : '';
+    }
+
+    function buildStreamURL(channelID) {
+        if (!streamEnabled) return '';
+        let url = streamTemplate;
+        // Extract channel number from the select option's data attribute.
+        const opt = channelSel?.options[channelSel.selectedIndex];
+        const channelNum = opt?.getAttribute('data-number') || '';
+        if (channelNum !== '') {
+            // Don't encode if it's an internal path (starts with /)
+            if (url.startsWith('/')) {
+                url = url.split('{channel}').join(channelNum);
+            } else {
+                url = url.split('{channel}').join(encodeURIComponent(channelNum));
+            }
+        }
+        return url;
+    }
+
+    function applyStream(channelID) {
+            if (!img && !video) return;
+        const url = buildStreamURL(channelID);
+        if (!url) {
+            showOverlay('Stream URL is not configured.');
+            return;
+        }
+
+        // Skip if already on this channel
+        if (currentStreamChannel === channelID) {
+            console.log('Already on channel', channelID);
+            return;
+        }
+
+        console.log('Switching from', currentStreamChannel, 'to', channelID);
+        currentStreamChannel = channelID;
+
+        // Stop any snapshot timer and release object URLs from snapshot mode.
+        stop();
+        if (lastObjectURL) {
+            URL.revokeObjectURL(lastObjectURL);
+            lastObjectURL = null;
+        }
+
+        hideOverlay();
+            if (video) {
+                hlsFatalErrorCount = 0;
+                // Properly reset video element for new stream
+                // Add cache-busting timestamp to force fresh playlist load
+                let newSrc = url.startsWith('/') ? window.location.origin + url : url;
+                newSrc = newSrc + '?t=' + Date.now();
+                
+                console.log('Loading new stream:', newSrc);
+
+                // Tear down any existing hls.js instance to stop old requests.
+                if (hls) {
+                    try { hls.destroy(); } catch { /* ignore */ }
+                    hls = null;
+                }
+                
+                // Remove error handler first
+                video.onerror = null;
+                
+                // Clear and reset video element
+                video.pause();
+                video.removeAttribute('src');
+                while (video.firstChild) {
+                    video.removeChild(video.firstChild);
+                }
+                video.load();
+                
+                // Prefer hls.js when available (Chromium/Firefox). Only fall back to native
+                // HLS for Safari/iOS or environments where hls.js isn't supported.
+                const canUseHlsJs = typeof window.Hls !== 'undefined' && window.Hls.isSupported && window.Hls.isSupported();
+                const canPlayNative = video.canPlayType('application/vnd.apple.mpegurl') !== '';
+
+                if (!canUseHlsJs && canPlayNative) {
+                    video.src = newSrc;
+                    video.onerror = (e) => {
+                        console.error('Video error:', e, video.error);
+                        const msg = video.error ? `Stream error: ${video.error.message || video.error.code}` : 'Stream failed to load';
+                        showOverlay(msg);
+                    };
+                    video.load();
+                    const playPromise = video.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch((err) => {
+                            console.log('Autoplay prevented or failed:', err);
+                        });
+                    }
+                    return;
+                }
+
+                if (!canUseHlsJs) {
+                    showOverlay('Streaming not supported (hls.js not available).');
+                    return;
+                }
+
+                hls = new window.Hls({
+                    // Keep defaults; we want stability, not extra tuning.
+                    enableWorker: true,
+                });
+
+                hls.on(window.Hls.Events.ERROR, (event, data) => {
+                    if (!data || !data.fatal) return;
+
+                    // hls.js can mark some early tuning hiccups as fatal. Try to recover
+                    // instead of immediately bailing out, otherwise the UI gets stuck on
+                    // "Stream unavailable" even though segments start flowing shortly after.
+                    hlsFatalErrorCount++;
+                    console.error('hls.js fatal error:', data);
+
+                    const type = data.type;
+                    if (type === window.Hls.ErrorTypes.NETWORK_ERROR) {
+                        // Try to restart loading.
+                        try {
+                            hls.startLoad();
+                            return;
+                        } catch {
+                            // fall through
+                        }
+                    }
+                    if (type === window.Hls.ErrorTypes.MEDIA_ERROR) {
+                        // Try to recover from media errors (decoder/demux).
+                        try {
+                            hls.recoverMediaError();
+                            return;
+                        } catch {
+                            // fall through
+                        }
+                    }
+
+                    // If we keep hitting fatal errors, show overlay and give up.
+                    if (hlsFatalErrorCount >= 3) {
+                        showOverlay('Stream failed to load.');
+                        try { hls.destroy(); } catch { /* ignore */ }
+                        hls = null;
+                    }
+                });
+
+                hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+                    hideOverlay();
+                    const playPromise = video.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch((err) => {
+                            console.log('Autoplay prevented or failed:', err);
+                        });
+                    }
+                });
+
+                // If playback starts, ensure any stale overlay is hidden.
+                video.onplaying = () => hideOverlay();
+                video.oncanplay = () => hideOverlay();
+
+                hls.loadSource(newSrc);
+                hls.attachMedia(video);
+            } else if (img) {
+                img.src = url;
+            }
+    }
+
+    async function loadSnapshotOnce() {
+        const url = snapshotURL();
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) {
+            let msg = `HTTP ${res.status}`;
+            try {
+                const data = await res.json();
+                if (data && typeof data.error === 'string' && data.error.trim() !== '') {
+                    msg = data.error;
+                }
+            } catch {
+                // ignore
+            }
+            throw new Error(msg);
+        }
+        const blob = await res.blob();
+        const obj = URL.createObjectURL(blob);
+        if (lastObjectURL) URL.revokeObjectURL(lastObjectURL);
+        lastObjectURL = obj;
+            if (img) img.src = obj;
+    }
+
+    async function refresh() {
+        if (streamEnabled) {
+            applyStream(selectedChannelID());
+            return;
+        }
+        setScreenWidth();
+        try {
+            await loadSnapshotOnce();
+            hideOverlay();
+        } catch (e) {
+            // Stop auto-refresh on errors to avoid spamming logs.
+            stop();
+            showOverlay(e && e.message ? e.message : 'Grab image failed');
+            return;
+        }
+
+        const sec = currentIntervalSeconds();
+        if (sec > 0) {
+            stop();
+            timer = window.setTimeout(refresh, sec * 1000);
+        }
+    }
+
+    async function postForm(url, data, opts) {
+        const body = new URLSearchParams(data);
+        let res;
+        try {
+            res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body,
+                signal: opts?.signal,
+            });
+        } catch (e) {
+            if (e && e.name === 'AbortError') {
+                const err = new Error('aborted');
+                err.isAbort = true;
+                throw err;
+            }
+            throw e;
+        }
+
+
+        if (!res.ok) {
+            let text = '';
+            try { text = (await res.text()) || ''; } catch { /* ignore */ }
+            text = (text || '').trim();
+            const msg = text !== '' ? text : `${url}: ${res.status}`;
+            const err = new Error(msg);
+            err.status = res.status;
+            const ra = res.headers.get('Retry-After');
+            if (ra) {
+                const sec = parseFloat(ra);
+                if (Number.isFinite(sec) && sec > 0) {
+                    err.retryAfterMs = Math.round(sec * 1000);
+                }
+            }
+            throw err;
+        }
+    }
+
+    async function sendKey(key) {
+        stop();
+        await postForm('/watch/key', { key });
+        if (!streamEnabled) window.setTimeout(refresh, 500);
+    }
+
+    function selectChannelByNumber(channelNumber) {
+        if (!channelSel) return null;
+        const wanted = String(parseInt(channelNumber, 10));
+        if (!wanted || wanted === 'NaN') return null;
+        for (let i = 0; i < channelSel.options.length; i++) {
+            const opt = channelSel.options[i];
+            const num = opt?.getAttribute('data-number');
+            if (num && String(parseInt(num, 10)) === wanted) {
+                channelSel.selectedIndex = i;
+                return opt;
+            }
+        }
+        return null;
+    }
+
+    function stepChannel(delta) {
+        if (!channelSel || channelSel.options.length === 0) return;
+        const idx = channelSel.selectedIndex >= 0 ? channelSel.selectedIndex : 0;
+        const next = Math.max(0, Math.min(channelSel.options.length - 1, idx + delta));
+        channelSel.selectedIndex = next;
+        const opt = channelSel.options[next];
+        if (opt && opt.value) switchChannel(opt.value).catch(() => {});
+    }
+
+    function commitDigitBuffer() {
+        if (digitTimer) {
+            window.clearTimeout(digitTimer);
+            digitTimer = null;
+        }
+        const buf = digitBuffer;
+        digitBuffer = '';
+        const opt = selectChannelByNumber(buf);
+        if (opt && opt.value) {
+            switchChannel(opt.value).catch(() => {});
+        }
+    }
+
+    function pushDigit(d) {
+        if (!/^[0-9]$/.test(d)) return;
+        digitBuffer = (digitBuffer + d).replace(/^0+(?=\d)/, '');
+        if (digitBuffer.length > 4) {
+            digitBuffer = d;
+        }
+        if (digitTimer) window.clearTimeout(digitTimer);
+        digitTimer = window.setTimeout(commitDigitBuffer, digitCommitDelayMs);
+    }
+
+    async function switchChannel(channelID) {
+        stop();
+
+        // Abort any in-flight switch so rapid clicks don't queue up and keep killing streams.
+        if (channelSwitchController) {
+            try { channelSwitchController.abort(); } catch { /* ignore */ }
+        }
+        channelSwitchController = new AbortController();
+
+        const opt = channelSel?.options[channelSel.selectedIndex];
+        const channelNum = opt?.getAttribute('data-number') || '';
+
+        // Keep track of what was last working, so we can revert selection if tuning fails.
+        const prevNum = lastSuccessfulChannelNum;
+
+        // Always tell VDR to switch channels.
+        // In stream mode this also frees tuners by stopping active ffmpeg streams.
+
+        const maxAttempts = 3;
+        let attempt = 0;
+        while (true) {
+            attempt++;
+            try {
+                await postForm('/watch/channel', { channel: channelID, channel_num: channelNum, prev_channel_num: prevNum }, { signal: channelSwitchController.signal });
+                break;
+            } catch (e) {
+                if (e && e.isAbort) return;
+                const status = e && typeof e.status === 'number' ? e.status : 0;
+                // 409 means SVDRP 554 (tuner busy). Retry a couple of times before surfacing.
+                if (status === 409 && attempt < maxAttempts) {
+                    const delay = (e && typeof e.retryAfterMs === 'number' && e.retryAfterMs > 0) ? e.retryAfterMs : 900;
+                    await new Promise((resolve) => window.setTimeout(resolve, delay));
+                    continue;
+                }
+                throw e;
+            }
+        }
+
+        try {
+
+            lastSuccessfulChannelID = channelID;
+            lastSuccessfulChannelNum = channelNum;
+            lastSuccessfulChannelIndex = channelSel ? channelSel.selectedIndex : -1;
+
+            // Update "Now" info after tuning.
+            refreshNowInfo(channelID).catch(() => {});
+
+            if (streamEnabled) {
+                applyStream(channelID);
+            } else {
+                window.setTimeout(refresh, 500);
+            }
+        } catch (e) {
+            // Surface the error and keep the UI consistent with what's actually playing.
+            const msg = (e && e.message) ? e.message : 'Channel switch failed';
+            showOverlay(msg);
+
+            if (channelSel && lastSuccessfulChannelIndex >= 0) {
+                channelSel.selectedIndex = lastSuccessfulChannelIndex;
+            }
+
+            if (streamEnabled && lastSuccessfulChannelID) {
+                applyStream(lastSuccessfulChannelID);
+                refreshNowInfo(lastSuccessfulChannelID).catch(() => {});
+            }
+        }
+    }
+
+    intervalSel?.addEventListener('change', () => {
+        const sec = currentIntervalSeconds();
+        stop();
+        if (sec > 0) refresh();
+    });
+
+    sizeSel?.addEventListener('change', () => {
+        stop();
+        refresh();
+    });
+
+    grabBtn?.addEventListener('click', () => { stop(); refresh(); });
+    grabBtn2?.addEventListener('click', () => { stop(); refresh(); });
+
+    channelSel?.addEventListener('change', () => {
+        const opt = channelSel.options[channelSel.selectedIndex];
+        if (opt && opt.value) switchChannel(opt.value).catch(() => {});
+    });
+
+    document.querySelectorAll('[data-key]')?.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const key = btn.getAttribute('data-key');
+            if (!key) return;
+
+            // Channel switching via remote buttons.
+            if (/^[0-9]$/.test(key)) {
+                pushDigit(key);
+                return;
+            }
+            if (key === 'up') {
+                stepChannel(-1);
+                return;
+            }
+            if (key === 'down') {
+                stepChannel(1);
+                return;
+            }
+
+            // Everything else goes through SVDRP HITK.
+            sendKey(key).catch(() => {});
+        });
+    });
+
+    // Initial load
+    if (streamEnabled) {
+        // Initialize "last successful" to the server-selected channel.
+        lastSuccessfulChannelID = selectedChannelID();
+        const opt = channelSel?.options[channelSel.selectedIndex];
+        lastSuccessfulChannelNum = opt?.getAttribute('data-number') || '';
+        lastSuccessfulChannelIndex = channelSel ? channelSel.selectedIndex : -1;
+
+        // Ensure VDR is tuned first (and server-side streams are reset), then attach player.
+        switchChannel(selectedChannelID()).catch(() => {});
+    } else {
+        setScreenWidth();
+        refresh();
+    }
+
+    // Load "Now" info for the initially selected channel and keep it fresh.
+    refreshNowInfo(selectedChannelID()).catch(() => {});
+    if (nowTimer) window.clearInterval(nowTimer);
+    nowTimer = window.setInterval(() => {
+        refreshNowInfo(selectedChannelID()).catch(() => {});
+    }, 30000);
+})();
+</script>
+</body>
+</html>
+{{end}}

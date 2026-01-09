@@ -67,9 +67,101 @@ make build
 ./build/vdradmin --config config.yaml
 ```
 
+## Usage / Deployment Options
+
+vdradmin-go can be run in multiple ways depending on your setup. Releases are built automatically via GitHub Actions when a new release tag is created.
+
+### 1) Use the released binary (recommended)
+
+1. Download the `linux_amd64` archive from the latest GitHub Release.
+2. Extract it and run:
+
+```bash
+./vdradmin --config /path/to/config.yaml
+```
+
+Tip: `./vdradmin --version` prints the release version.
+
+### 2) Use the Docker container (GHCR)
+
+Pull and run the image from GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/<owner>/<repo>:1.2.3
+docker run \
+  --rm -p 8080:8080 \
+  -v "${PWD}/config.yaml:/app/config.yaml:ro" \
+  ghcr.io/<owner>/<repo>:1.2.3
+```
+
+### 3) Run as a systemd service
+
+If you want vdradmin-go to start automatically on boot:
+
+1. Copy the example unit file from `deployments/systemd/vdradmin.service` to your systemd directory.
+2. Install the `vdradmin` binary somewhere like `/usr/local/bin/vdradmin`.
+3. Ensure the unit points to your config path.
+4. Enable and start:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now vdradmin
+```
+
+### 4) Use docker-compose
+
+There is an example compose file at `deployments/docker-compose.yml`.
+Typically you will:
+
+- set the image to `ghcr.io/<owner>/<repo>:1.2.3`
+- mount your `config.yaml` into the container
+
+Then run:
+
+```bash
+docker compose -f deployments/docker-compose.yml up -d
+```
+
 ## Configuration
 
 See `configs/config.example.yaml` for full configuration options.
+
+## Watch TV
+
+The **Watch TV** page (`/watch`) provides:
+
+- a periodically refreshed **snapshot** (configurable interval + size)
+- a glossy **remote control** (SVDRP `HITK`)
+- a **channel list** restricted to channels configured in **Configurations** (wanted channels)
+
+### Requirements
+
+The snapshot feature uses the SVDRP `GRAB` command.
+
+- If your VDR does not support `GRAB` (or cannot grab a picture on the VDR host), the page will still load but snapshots will fail. This is common for headless/recording-only VDR instances that have tuners but no primary video output/decoder device.
+
+For troubleshooting and background, see `docs/WATCHTV.md`.
+
+### Optional: stream URL mode (headless setups)
+
+If you run VDR headless (recording-only) and `GRAB` cannot work, you can enable streaming for `/watch`.
+
+**Recommended: HLS proxy (built-in transcoding)**
+
+Configure `vdr.streamdev_backend_url` in Configurations:
+- Example: `http://127.0.0.1:3000/{channel}`
+- Requires: `ffmpeg` installed on the vdradmin-go host
+- vdradmin-go will transcode streamdev MPEG-TS to browser-playable HLS automatically
+- `/watch` uses internal proxy endpoint `/watch/stream/{channel}/index.m3u8`
+
+**Alternative: Direct external stream URL**
+
+- Configure `vdr.stream_url_template` if you have a pre-existing HLS/MJPEG/WebM endpoint
+- The template may contain `{channel}`, which will be replaced with the selected VDR channel **number** (e.g. `1`, `2`, `3`).
+- `/watch` embeds the URL into an HTML5 `<video>` element. The URL must point to a format your browser can play (for example HLS `.m3u8` or a browser-supported MP4/WebM stream).
+
+If you use `vdr-plugin-streamdev-server`, its HTTP server commonly runs on port `3000` and can serve channels by number, e.g. `http://127.0.0.1:3000/1`.
+Note: streamdev’s default outputs are typically TS/PES/ES, which most browsers do not play directly; you may need an external remux/transcode step to get true in-browser playback.
 
 ## Integration Tests (Docker)
 

@@ -9,14 +9,42 @@
     <script src="/static/js/theme.js?v=20260104" defer></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
-<body>
+<body class="page-now">
     {{template "nav_header" .}}
 
     <main class="container">
 
+        <div class="toolbar channels-selector">
+            <form action="/now" method="get" class="nav-channel-form" id="whats-on-form">
+                <div class="nav-select">
+                    <label for="whats-on-hour" class="nav-channel-label">What's on</label>
+                    <select id="whats-on-hour" name="h">
+                        {{range .HourOptions}}
+                        <option value="{{.}}" {{if eq $.SelectedHour .}}selected{{end}}>{{if eq . "now"}}now{{else}}{{.}}:00{{end}}</option>
+                        {{end}}
+                    </select>
+                </div>
+
+                <span class="nav-channel-label">at</span>
+
+                <input
+                    id="whats-on-at"
+                    class="nav-time"
+                    type="time"
+                    name="at"
+                    value="{{.SelectedAt}}"
+                    required
+                    step="60"
+                    pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                    aria-label="Time (HH:MM)" />
+
+                <span class="nav-channel-label">o'clock</span>
+            </form>
+        </div>
+
         {{if .HomeError}}
         <div class="toolbar">
-            <strong>VDR connection error:</strong> {{.HomeError}}
+            <strong>Error:</strong> {{.HomeError}}
         </div>
         {{end}}
 
@@ -37,7 +65,7 @@
                 </div>
                 <div class="epg-actions">
                     {{if gt .EventID 0}}
-                    <a class="btn btn-sm btn-secondary" href="/event?channel={{.ChannelID}}&id={{.EventID}}" onclick="window.open(this.href,'vdradmin_moreinfo','width=560,height=420,scrollbars=yes,resizable=yes'); return false;">More information</a>
+                    <a class="btn btn-sm btn-secondary" href="/event?channel={{.ChannelID}}&id={{.EventID}}" onclick="window.open(this.href,'vdradmin_moreinfo','width=560,height=420,scrollbars=yes,resizable=yes'); return false;">Information</a>
                     {{end}}
                 </div>
             </div>
@@ -52,6 +80,56 @@
             <p>&copy; {{.Year}} vdradmin-go | <a href="https://github.com/githubixx/vdradmin-go">GitHub</a></p>
         </div>
     </footer>
+
+    <script>
+    (() => {
+        const form = document.getElementById('whats-on-form');
+        const hourSel = document.getElementById('whats-on-hour');
+        const atInput = document.getElementById('whats-on-at');
+        if (!form || !hourSel || !atInput) return;
+
+        const pad2 = (n) => String(n).padStart(2, '0');
+        const nowHHMM = () => {
+            const d = new Date();
+            return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+        };
+        const hourToHHMM = (h) => `${pad2(h)}:00`;
+
+        const validateTime = () => {
+            const v = String(atInput.value || '').trim();
+            const ok = /^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(v);
+            atInput.setCustomValidity(ok ? '' : 'Please enter a valid time (HH:MM).');
+            return ok;
+        };
+
+        hourSel.addEventListener('change', () => {
+            const v = String(hourSel.value || '').trim();
+            if (v === 'now') {
+                atInput.value = nowHHMM();
+            } else if (/^\d{1,2}$/.test(v)) {
+                const h = parseInt(v, 10);
+                if (Number.isFinite(h) && h >= 0 && h <= 23) {
+                    atInput.value = hourToHHMM(h);
+                }
+            }
+            validateTime();
+            if (form.requestSubmit) form.requestSubmit();
+            else form.submit();
+        });
+
+        atInput.addEventListener('input', () => {
+            validateTime();
+        });
+
+        atInput.addEventListener('change', () => {
+            if (!validateTime()) return;
+            if (form.requestSubmit) form.requestSubmit();
+            else form.submit();
+        });
+
+        validateTime();
+    })();
+    </script>
 </body>
 </html>
 {{end}}

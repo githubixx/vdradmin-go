@@ -32,7 +32,24 @@
                 </select>
 
                 <label for="day">Day Of Recording</label>
-                <input id="day" type="date" name="day" value="{{.Timer.Day}}" required>
+                <div>
+                    <div class="timer-radio-group">
+                        <label><input type="radio" name="day_mode" value="single" {{if or (eq .Timer.DayMode "") (eq .Timer.DayMode "single")}}checked{{end}}> Single</label>
+                        <label><input type="radio" name="day_mode" value="weekly" {{if eq .Timer.DayMode "weekly"}}checked{{end}}> Weekly</label>
+                    </div>
+
+                    <input id="day" type="date" name="day" value="{{.Timer.Day}}">
+
+                    <div id="weekly-days" style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.5rem;">
+                        <label><input type="checkbox" name="wd_mon" value="1" {{if .Timer.WDMon}}checked{{end}}> Monday</label>
+                        <label><input type="checkbox" name="wd_tue" value="1" {{if .Timer.WDTue}}checked{{end}}> Tuesday</label>
+                        <label><input type="checkbox" name="wd_wed" value="1" {{if .Timer.WDWed}}checked{{end}}> Wednesday</label>
+                        <label><input type="checkbox" name="wd_thu" value="1" {{if .Timer.WDThu}}checked{{end}}> Thursday</label>
+                        <label><input type="checkbox" name="wd_fri" value="1" {{if .Timer.WDFri}}checked{{end}}> Friday</label>
+                        <label><input type="checkbox" name="wd_sat" value="1" {{if .Timer.WDSat}}checked{{end}}> Saturday</label>
+                        <label><input type="checkbox" name="wd_sun" value="1" {{if .Timer.WDSun}}checked{{end}}> Sunday</label>
+                    </div>
+                </div>
 
                 <label for="start">Start Time</label>
                 <input id="start" type="text" name="start" value="{{.Timer.Start}}" inputmode="numeric" placeholder="HH:MM" pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$" required>
@@ -66,6 +83,35 @@
             <p>&copy; {{.Year}} vdradmin-go | <a href="https://github.com/githubixx/vdradmin-go">GitHub</a></p>
         </div>
     </footer>
+
+    <script>
+        (function () {
+            function updateDayMode() {
+                var weekly = document.querySelector('input[name="day_mode"][value="weekly"]');
+                var dayInput = document.getElementById('day');
+                var weeklyDays = document.getElementById('weekly-days');
+                var isWeekly = weekly && weekly.checked;
+
+                if (dayInput) {
+                    dayInput.disabled = isWeekly;
+                    dayInput.required = !isWeekly;
+                }
+                if (weeklyDays) {
+                    weeklyDays.style.display = isWeekly ? 'flex' : 'none';
+                    var checks = weeklyDays.querySelectorAll('input[type="checkbox"]');
+                    for (var i = 0; i < checks.length; i++) {
+                        checks[i].disabled = !isWeekly;
+                    }
+                }
+            }
+
+            var radios = document.querySelectorAll('input[name="day_mode"]');
+            for (var i = 0; i < radios.length; i++) {
+                radios[i].addEventListener('change', updateDayMode);
+            }
+            updateDayMode();
+        })();
+    </script>
 </body>
 </html>
 {{end}}

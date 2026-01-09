@@ -115,6 +115,15 @@ type VDRConfig struct {
 	ReconnectDelay time.Duration `yaml:"reconnect_delay"`
 	DVBCards       int           `yaml:"dvb_cards"`
 	WantedChannels []string      `yaml:"wanted_channels"`
+	// StreamURLTemplate optionally enables "stream URL" mode on the Watch TV page.
+	// If set, /watch will embed an <img> that points to this URL and substitutes
+	// occurrences of "{channel}" with the selected VDR channel ID.
+	// The referenced stream must be browser-renderable (commonly an MJPEG stream).
+	StreamURLTemplate string `yaml:"stream_url_template"`
+	// StreamdevBackendURL is the backend source for HLS transcoding proxy.
+	// If set (e.g. "http://127.0.0.1:3000/{channel}"), /watch/stream/{channel}/index.m3u8
+	// will transcode from this source using ffmpeg.
+	StreamdevBackendURL string `yaml:"streamdev_backend_url"`
 }
 
 // AuthConfig contains authentication settings
@@ -154,14 +163,16 @@ func Load(path string) (*Config, error) {
 			MaxHeaderBytes: 1 << 20, // 1 MB
 		},
 		VDR: VDRConfig{
-			Host:           "localhost",
-			Port:           6419,
-			Timeout:        10 * time.Second,
-			VideoDir:       "/var/lib/video.00",
-			ConfigDir:      "/etc/vdr",
-			ReconnectDelay: 5 * time.Second,
-			DVBCards:       1,
-			WantedChannels: []string{},
+			Host:                "localhost",
+			Port:                6419,
+			Timeout:             10 * time.Second,
+			VideoDir:            "/var/lib/video.00",
+			ConfigDir:           "/etc/vdr",
+			ReconnectDelay:      5 * time.Second,
+			DVBCards:            1,
+			WantedChannels:      []string{},
+			StreamURLTemplate:   "",
+			StreamdevBackendURL: "",
 		},
 		Auth: AuthConfig{
 			Enabled:      true,

@@ -62,7 +62,11 @@
                     <div class="timer-meta">
                         <span class="timer-channel">{{.ChannelName}}</span>
                         <span class="timer-time">
-                            {{if .Start.IsZero}}&mdash;{{else}}{{.Start.Format "2006-01-02 15:04"}} - {{.Stop.Format "15:04"}}{{end}}
+                            {{if .NextOccurrences}}
+                                {{range $i, $s := .NextOccurrences}}{{if $i}}<br />{{end}}{{$s}}{{end}}
+                            {{else}}
+                                {{if .Start.IsZero}}&mdash;{{else}}{{.Start.Format "2006-01-02 15:04"}} - {{.Stop.Format "15:04"}}{{end}}
+                            {{end}}
                         </span>
                     </div>
                 </div>

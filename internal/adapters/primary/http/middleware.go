@@ -46,14 +46,26 @@ func LoggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 
 			duration := time.Since(start)
 
-			logger.Info("request",
+			attrs := []slog.Attr{
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
 				slog.String("remote", r.RemoteAddr),
 				slog.Int("status", rw.status),
 				slog.Int("size", rw.size),
 				slog.Duration("duration", duration),
-			)
+			}
+
+			// HLS clients can legitimately request segments that are already gone (or not yet present)
+			// during stream startup/channel switching. Avoid spamming logs with these expected misses.
+			if strings.HasPrefix(r.URL.Path, "/watch/stream/") {
+				switch rw.status {
+				case http.StatusNotFound, http.StatusServiceUnavailable:
+					logger.LogAttrs(r.Context(), slog.LevelDebug, "request", attrs...)
+					return
+				}
+			}
+
+			logger.LogAttrs(r.Context(), slog.LevelInfo, "request", attrs...)
 		})
 	}
 }
