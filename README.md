@@ -67,6 +67,61 @@ make build
 ./build/vdradmin --config config.yaml
 ```
 
+## Usage / Deployment Options
+
+vdradmin-go can be run in multiple ways depending on your setup. Releases are built automatically via GitHub Actions when a new release tag is created.
+
+### 1) Use the released binary (recommended)
+
+1. Download the `linux_amd64` archive from the latest GitHub Release.
+2. Extract it and run:
+
+```bash
+./vdradmin --config /path/to/config.yaml
+```
+
+Tip: `./vdradmin --version` prints the release version.
+
+### 2) Use the Docker container (GHCR)
+
+Pull and run the image from GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/<owner>/<repo>:1.2.3
+docker run \
+  --rm -p 8080:8080 \
+  -v "${PWD}/config.yaml:/app/config.yaml:ro" \
+  ghcr.io/<owner>/<repo>:1.2.3
+```
+
+### 3) Run as a systemd service
+
+If you want vdradmin-go to start automatically on boot:
+
+1. Copy the example unit file from `deployments/systemd/vdradmin.service` to your systemd directory.
+2. Install the `vdradmin` binary somewhere like `/usr/local/bin/vdradmin`.
+3. Ensure the unit points to your config path.
+4. Enable and start:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now vdradmin
+```
+
+### 4) Use docker-compose
+
+There is an example compose file at `deployments/docker-compose.yml`.
+Typically you will:
+
+- set the image to `ghcr.io/<owner>/<repo>:1.2.3`
+- mount your `config.yaml` into the container
+
+Then run:
+
+```bash
+docker compose -f deployments/docker-compose.yml up -d
+```
+
 ## Configuration
 
 See `configs/config.example.yaml` for full configuration options.
