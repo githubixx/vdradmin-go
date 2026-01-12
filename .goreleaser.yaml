@@ -9,7 +9,8 @@ before:
 
 builds:
   - id: vdradmin
-    main: ./cmd/vdradmin/main.go
+    dir: .
+    main: ./cmd/vdradmin
     binary: vdradmin
     env:
       - CGO_ENABLED=0
