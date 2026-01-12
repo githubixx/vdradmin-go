@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -394,6 +395,14 @@ func (c *Client) GetRecordings(ctx context.Context) ([]domain.Recording, error) 
 						}
 						// Permission/mount issues: don't hide recordings we can't verify.
 					}
+
+					// Some VDR setups don't include subtitle in LSTR metadata,
+					// but it is present in the recording's info file.
+					if strings.TrimSpace(r.Subtitle) == "" {
+						if sub, subErr := readRecordingInfoSubtitle(dirPath); subErr == nil && strings.TrimSpace(sub) != "" {
+							r.Subtitle = sub
+						}
+					}
 				}
 				recordings = append(recordings, r)
 			}
@@ -401,6 +410,25 @@ func (c *Client) GetRecordings(ctx context.Context) ([]domain.Recording, error) 
 
 		return recordings, nil
 	})
+}
+
+func readRecordingInfoSubtitle(recordingDir string) (string, error) {
+	infoPath := filepath.Join(recordingDir, "info")
+	b, err := os.ReadFile(infoPath)
+	if err != nil {
+		return "", err
+	}
+	scanner := bufio.NewScanner(strings.NewReader(string(b)))
+	for scanner.Scan() {
+		line := strings.TrimRight(scanner.Text(), "\r\n")
+		if strings.HasPrefix(line, "S ") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "S ")), nil
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return "", err
+	}
+	return "", nil
 }
 
 func (c *Client) getRecordingDirPathLocked(id string) (string, error) {

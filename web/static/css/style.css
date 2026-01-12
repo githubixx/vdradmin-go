@@ -1365,8 +1365,9 @@ main {
 
 .recording-subtitle {
     color: var(--text-muted);
-    font-style: italic;
-    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    font-style: normal;
+    margin-bottom: 0.25rem;
 }
 
 .recording-meta {
