@@ -72,16 +72,16 @@ func DefaultProfiles(archiveBaseDir string) []ArchiveProfile {
 	base := strings.TrimSpace(archiveBaseDir)
 	return []ArchiveProfile{
 		{
-			ID:      "movies-hd",
-			Name:    "Movies (movies-hd)",
+			ID:      "movies",
+			Name:    "Movies",
 			Kind:    KindMovie,
-			BaseDir: filepath.Join(base, "movies-hd"),
+			BaseDir: filepath.Join(base, "movies"),
 		},
 		{
-			ID:      "series-hd",
-			Name:    "Series (serien-hd)",
+			ID:      "series",
+			Name:    "Series",
 			Kind:    KindSeries,
-			BaseDir: filepath.Join(base, "serien-hd"),
+			BaseDir: filepath.Join(base, "series"),
 		},
 	}
 }
