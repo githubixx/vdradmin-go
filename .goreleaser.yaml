@@ -9,7 +9,7 @@ before:
 
 builds:
   - id: vdradmin
-    main: ./cmd/vdradmin
+    main: ./cmd/vdradmin/main.go
     binary: vdradmin
     env:
       - CGO_ENABLED=0
@@ -24,12 +24,14 @@ builds:
       - -X main.date={{.Date}}
 
 archives:
-  - format: tar.gz
+  - formats:
+      - tar.gz
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
 
 checksum:
   name_template: checksums.txt
