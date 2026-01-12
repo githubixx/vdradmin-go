@@ -15,25 +15,98 @@
     <main class="container">
 
         <div class="toolbar">
-            <div style="display:flex; align-items:center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
-                <div class="sort-options">
-                    <label for="sort">Sort by:</label>
-                    <select id="sort" name="sort" hx-get="/recordings" hx-trigger="change" hx-target=".recording-list" hx-select=".recording-list" hx-swap="outerHTML" hx-include="this">
-                        <option value="date" {{if eq .Sort "date"}}selected{{end}}>Date</option>
-                        <option value="name" {{if eq .Sort "name"}}selected{{end}}>Name</option>
-                        <option value="length" {{if eq .Sort "length"}}selected{{end}}>Length</option>
-                    </select>
+            <div class="recordings-toolbar" id="recordings-filters">
+                <div class="recordings-toolbar-top">
+                    <div class="sort-options">
+                        <label for="sort">Sort by:</label>
+                        <select
+                            id="sort"
+                            name="sort"
+                            hx-get="/recordings"
+                            hx-trigger="change"
+                            hx-target=".recording-list"
+                            hx-select=".recording-list"
+                            hx-swap="outerHTML"
+                            hx-include="#recordings-filters"
+                            hx-on:htmx:beforeRequest="const q=document.getElementById('recording-search')?.value?.trim()||''; if (q && q.length < 3) { event.preventDefault(); }">
+                            <option value="date" {{if eq .Sort "date"}}selected{{end}}>Date</option>
+                            <option value="name" {{if eq .Sort "name"}}selected{{end}}>Name</option>
+                            <option value="length" {{if eq .Sort "length"}}selected{{end}}>Length</option>
+                        </select>
+                    </div>
+
+                    <div class="recordings-toolbar-actions">
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-secondary"
+                            hx-post="/recordings/refresh"
+                            hx-target=".recording-list"
+                            hx-select=".recording-list"
+                            hx-swap="outerHTML"
+                            hx-include="#recordings-filters"
+                            hx-on:htmx:beforeRequest="const q=document.getElementById('recording-search')?.value?.trim()||''; if (q && q.length < 3) { event.preventDefault(); }">
+                            Refresh recordings
+                        </button>
+                    </div>
                 </div>
-                <button
-                    type="button"
-                    class="btn btn-sm btn-secondary"
-                    hx-post="/recordings/refresh"
-                    hx-target=".recording-list"
-                    hx-select=".recording-list"
-                    hx-swap="outerHTML"
-                    hx-include="#sort">
-                    Refresh recordings
-                </button>
+
+                <div class="recordings-search-box">
+                    <div class="recordings-search">
+                        <label for="recording-search">Search:</label>
+                        <input
+                            id="recording-search"
+                            name="q"
+                            type="search"
+                            inputmode="search"
+                            placeholder="Title…"
+                            autocomplete="off"
+                            value="{{.Query}}"
+                            class="search-input recordings-search-input"
+                            hx-get="/recordings"
+                            hx-trigger="keyup changed delay:1s"
+                            hx-target=".recording-list"
+                            hx-select=".recording-list"
+                            hx-swap="outerHTML"
+                            hx-include="#recordings-filters"
+                            hx-on:htmx:beforeRequest="const q=this.value.trim(); if (q && q.length < 3) { event.preventDefault(); }">
+                    </div>
+
+                    <div class="toggle-chips" id="recordings-search-options">
+                        <span class="toggle-chips-label">Include:</span>
+
+                        <input
+                            class="toggle-chip-input"
+                            type="checkbox"
+                            id="recordings-search-in-subtitle"
+                            name="in_subtitle"
+                            value="1"
+                            {{if .InSubtitle}}checked{{end}}
+                            hx-get="/recordings"
+                            hx-trigger="change"
+                            hx-target=".recording-list"
+                            hx-select=".recording-list"
+                            hx-swap="outerHTML"
+                            hx-include="#recordings-filters"
+                            hx-on:htmx:beforeRequest="const q=document.getElementById('recording-search')?.value?.trim()||''; if (q && q.length < 3) { event.preventDefault(); }">
+                        <label class="btn btn-sm btn-secondary toggle-chip" for="recordings-search-in-subtitle">Subtitle</label>
+
+                        <input
+                            class="toggle-chip-input"
+                            type="checkbox"
+                            id="recordings-search-in-path"
+                            name="in_path"
+                            value="1"
+                            {{if .InPath}}checked{{end}}
+                            hx-get="/recordings"
+                            hx-trigger="change"
+                            hx-target=".recording-list"
+                            hx-select=".recording-list"
+                            hx-swap="outerHTML"
+                            hx-include="#recordings-filters"
+                            hx-on:htmx:beforeRequest="const q=document.getElementById('recording-search')?.value?.trim()||''; if (q && q.length < 3) { event.preventDefault(); }">
+                        <label class="btn btn-sm btn-secondary toggle-chip" for="recordings-search-in-path">Path</label>
+                    </div>
+                </div>
             </div>
         </div>
 
