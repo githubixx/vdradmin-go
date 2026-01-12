@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/githubixx/vdradmin-go/internal/application/archive"
 	"github.com/githubixx/vdradmin-go/internal/application/services"
@@ -3931,6 +3932,11 @@ func (h *Handler) RecordingList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	includeSubtitle := isTruthy(r.URL.Query().Get("in_subtitle"))
+	includePath := isTruthy(r.URL.Query().Get("in_path"))
+	recordings = filterRecordings(recordings, q, includeSubtitle, includePath)
+
 	sortBy := r.URL.Query().Get("sort")
 	if sortBy == "" {
 		sortBy = "date"
@@ -3940,6 +3946,9 @@ func (h *Handler) RecordingList(w http.ResponseWriter, r *http.Request) {
 	data := map[string]any{
 		"Recordings": recordings,
 		"Sort":       sortBy,
+		"Query":      q,
+		"InSubtitle": includeSubtitle,
+		"InPath":     includePath,
 	}
 	if role, _ := r.Context().Value("role").(string); role == "admin" {
 		data["ActiveArchiveJobs"] = h.archiveJobs.ActiveJobIDsByRecording()
@@ -3970,6 +3979,19 @@ func (h *Handler) RecordingRefresh(w http.ResponseWriter, r *http.Request) {
 		sortBy = "date"
 	}
 
+	q := strings.TrimSpace(r.FormValue("q"))
+	if q == "" {
+		q = strings.TrimSpace(r.URL.Query().Get("q"))
+	}
+	includeSubtitle := isTruthy(r.FormValue("in_subtitle"))
+	if !includeSubtitle {
+		includeSubtitle = isTruthy(r.URL.Query().Get("in_subtitle"))
+	}
+	includePath := isTruthy(r.FormValue("in_path"))
+	if !includePath {
+		includePath = isTruthy(r.URL.Query().Get("in_path"))
+	}
+
 	h.recordingService.InvalidateCache()
 
 	recordings, err := h.recordingService.GetAllRecordings(r.Context())
@@ -3977,11 +3999,15 @@ func (h *Handler) RecordingRefresh(w http.ResponseWriter, r *http.Request) {
 		h.handleError(w, r, err)
 		return
 	}
+	recordings = filterRecordings(recordings, q, includeSubtitle, includePath)
 	recordings = h.recordingService.SortRecordings(recordings, sortBy)
 
 	data := map[string]any{
 		"Recordings": recordings,
 		"Sort":       sortBy,
+		"Query":      q,
+		"InSubtitle": includeSubtitle,
+		"InPath":     includePath,
 	}
 	if role, _ := r.Context().Value("role").(string); role == "admin" {
 		data["ActiveArchiveJobs"] = h.archiveJobs.ActiveJobIDsByRecording()
@@ -3989,11 +4015,59 @@ func (h *Handler) RecordingRefresh(w http.ResponseWriter, r *http.Request) {
 
 	// For non-HTMX browsers, behave like a standard action.
 	if r.Header.Get("HX-Request") == "" {
-		http.Redirect(w, r, "/recordings?sort="+url.QueryEscape(sortBy), http.StatusSeeOther)
+		params := url.Values{}
+		params.Set("sort", sortBy)
+		if strings.TrimSpace(q) != "" {
+			params.Set("q", q)
+		}
+		if includeSubtitle {
+			params.Set("in_subtitle", "1")
+		}
+		if includePath {
+			params.Set("in_path", "1")
+		}
+		http.Redirect(w, r, "/recordings?"+params.Encode(), http.StatusSeeOther)
 		return
 	}
 
 	h.renderTemplate(w, r, "recordings.html", data)
+}
+
+func filterRecordings(recordings []domain.Recording, query string, includeSubtitle bool, includePath bool) []domain.Recording {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return recordings
+	}
+	if utf8.RuneCountInString(query) < 3 {
+		return recordings
+	}
+
+	q := strings.ToLower(query)
+	filtered := make([]domain.Recording, 0, len(recordings))
+	for _, rec := range recordings {
+		haystackParts := []string{rec.Title}
+		if includeSubtitle {
+			haystackParts = append(haystackParts, rec.Subtitle)
+		}
+		if includePath {
+			haystackParts = append(haystackParts, rec.Path)
+		}
+		haystack := strings.ToLower(strings.Join(haystackParts, "\n"))
+		if strings.Contains(haystack, q) {
+			filtered = append(filtered, rec)
+		}
+	}
+	return filtered
+}
+
+func isTruthy(v string) bool {
+	s := strings.ToLower(strings.TrimSpace(v))
+	switch s {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 // RecordingDelete deletes a recording
