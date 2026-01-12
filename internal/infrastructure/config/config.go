@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -11,13 +12,39 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	Server ServerConfig `yaml:"server"`
-	VDR    VDRConfig    `yaml:"vdr"`
-	Auth   AuthConfig   `yaml:"auth"`
-	Cache  CacheConfig  `yaml:"cache"`
-	Timer  TimerConfig  `yaml:"timer"`
-	EPG    EPGConfig    `yaml:"epg"`
-	UI     UIConfig     `yaml:"ui"`
+	Server  ServerConfig  `yaml:"server"`
+	VDR     VDRConfig     `yaml:"vdr"`
+	Auth    AuthConfig    `yaml:"auth"`
+	Cache   CacheConfig   `yaml:"cache"`
+	Timer   TimerConfig   `yaml:"timer"`
+	EPG     EPGConfig     `yaml:"epg"`
+	Archive ArchiveConfig `yaml:"archive"`
+	UI      UIConfig      `yaml:"ui"`
+}
+
+// ArchiveProfileConfig defines a destination profile for archiving recordings.
+type ArchiveProfileConfig struct {
+	ID      string `yaml:"id"`
+	Name    string `yaml:"name"`
+	Kind    string `yaml:"kind"`     // "movie" or "series"
+	BaseDir string `yaml:"base_dir"` // absolute destination directory
+}
+
+// ArchiveConfig contains settings for archiving/re-encoding recordings.
+type ArchiveConfig struct {
+	// BaseDir is the root directory where archived recordings should be stored.
+	// Example: "/vdr/36".
+	BaseDir string `yaml:"base_dir"`
+	// Profiles optionally overrides the default destination profiles.
+	// If empty, vdradmin-go derives two defaults from BaseDir:
+	// - movies-hd (movie) -> <base_dir>/movies-hd
+	// - series-hd (series) -> <base_dir>/serien-hd
+	Profiles []ArchiveProfileConfig `yaml:"profiles"`
+	// FFMpegArgs are extra arguments passed to ffmpeg when archiving.
+	// They should NOT include input (-i) or output path; these are provided by vdradmin-go.
+	// Example (VAAPI HEVC + copy audio):
+	//   -vaapi_device /dev/dri/renderD128 -vf format=nv12,hwupload -map 0:0 -c:v hevc_vaapi -rc_mode CQP -global_quality 23 -profile:v main -map 0:a -c:a copy
+	FFMpegArgs string `yaml:"ffmpeg_args"`
 }
 
 // EPGConfig contains settings and saved searches related to EPG.
@@ -194,6 +221,11 @@ func Load(path string) (*Config, error) {
 		EPG: EPGConfig{
 			Searches: []EPGSearch{},
 		},
+		Archive: ArchiveConfig{
+			BaseDir:    "",
+			Profiles:   nil,
+			FFMpegArgs: "-vaapi_device /dev/dri/renderD128 -vf format=nv12,hwupload -map 0:0 -c:v hevc_vaapi -rc_mode CQP -global_quality 23 -profile:v main -map 0:a -c:a copy",
+		},
 		UI: UIConfig{
 			Theme:     "system",
 			LoginPage: "/timers",
@@ -336,6 +368,48 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("invalid epg.searches[%d]: %w", i, err)
 		}
 	}
+
+	// Archive
+	c.Archive.BaseDir = strings.TrimSpace(c.Archive.BaseDir)
+	c.Archive.FFMpegArgs = strings.TrimSpace(c.Archive.FFMpegArgs)
+	if c.Archive.BaseDir != "" {
+		if !filepath.IsAbs(c.Archive.BaseDir) {
+			return fmt.Errorf("invalid archive.base_dir: %q (must be an absolute path)", c.Archive.BaseDir)
+		}
+		c.Archive.BaseDir = filepath.Clean(c.Archive.BaseDir)
+	}
+	seenArchiveProfile := make(map[string]struct{}, len(c.Archive.Profiles))
+	for i := range c.Archive.Profiles {
+		p := &c.Archive.Profiles[i]
+		p.ID = strings.TrimSpace(p.ID)
+		p.Name = strings.TrimSpace(p.Name)
+		p.Kind = strings.ToLower(strings.TrimSpace(p.Kind))
+		p.BaseDir = strings.TrimSpace(p.BaseDir)
+		if p.ID == "" {
+			return fmt.Errorf("invalid archive.profiles[%d].id: required", i)
+		}
+		if p.ID == "none" {
+			return fmt.Errorf("invalid archive.profiles[%d].id: %q (reserved)", i, p.ID)
+		}
+		if _, ok := seenArchiveProfile[p.ID]; ok {
+			return fmt.Errorf("duplicate archive.profiles[%d].id: %q", i, p.ID)
+		}
+		seenArchiveProfile[p.ID] = struct{}{}
+		if p.Name == "" {
+			return fmt.Errorf("invalid archive.profiles[%d].name: required", i)
+		}
+		if p.Kind != "movie" && p.Kind != "series" {
+			return fmt.Errorf("invalid archive.profiles[%d].kind: %q (must be movie or series)", i, p.Kind)
+		}
+		if p.BaseDir == "" {
+			return fmt.Errorf("invalid archive.profiles[%d].base_dir: required", i)
+		}
+		if !filepath.IsAbs(p.BaseDir) {
+			return fmt.Errorf("invalid archive.profiles[%d].base_dir: %q (must be an absolute path)", i, p.BaseDir)
+		}
+		p.BaseDir = filepath.Clean(p.BaseDir)
+	}
+	// Allow empty ffmpeg args; execution layer may still add required flags.
 
 	return nil
 }

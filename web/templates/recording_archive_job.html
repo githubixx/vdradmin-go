@@ -1,0 +1,280 @@
+{{define "recording_archive_job.html"}}
+<!DOCTYPE html>
+<html lang="en" {{if eq .ThemeMode "dark"}}data-theme="dark"{{else if eq .ThemeMode "light"}}data-theme="light"{{end}} data-theme-default="{{.ThemeDefault}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Archive Job - VDRAdmin-go</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/theme.js?v=20260104" defer></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body>
+    {{template "nav_header" .}}
+
+    <main class="container">
+        <div class="toolbar">
+            <div style="display:flex; justify-content: space-between; align-items: center; gap: 1rem; width: 100%;">
+                <h3 style="margin: 0;">Archive Job</h3>
+                <a class="btn btn-sm btn-secondary" href="/recordings">Back</a>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <h3>Status</h3>
+            <div class="config-grid">
+                <label>Job ID</label>
+                <div style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">{{.Job.ID}}</div>
+
+                <label>Server instance</label>
+                <div style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">{{.InstanceID}}</div>
+
+                <label>Server PID</label>
+                <div style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">{{.PID}}</div>
+
+                <label>Job owner</label>
+                <div style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">{{.Job.InstanceID}}</div>
+
+                <label>State</label>
+                <div id="job-state">{{.Job.Status}}</div>
+
+                <label>Progress</label>
+                <div>
+                    <div class="progress">
+                        <div id="progress-bar" class="progress-bar" style="width: {{if .Job.Progress.KnownDuration}}{{printf "%.1f" .Job.Progress.Percent}}{{else}}{{if or (eq .Job.Status "queued") (eq .Job.Status "running")}}0{{else}}100{{end}}{{end}}%;"></div>
+                        <div id="progress-indeterminate" class="progress-indeterminate" {{if or .Job.Progress.KnownDuration (and (ne .Job.Status "queued") (ne .Job.Status "running"))}}hidden{{end}}></div>
+                    </div>
+                    <div id="progress-meta" class="empty-state" style="padding: 0.5rem 0 0 0; text-align: left;">
+                        {{if .Job.Progress.KnownDuration}}
+                            {{printf "%.1f" .Job.Progress.Percent}}% • out_time_ms={{.Job.Progress.OutTimeMS}} • speed={{.Job.Progress.Speed}}
+                        {{else}}
+                            out_time_ms={{.Job.Progress.OutTimeMS}} • speed={{.Job.Progress.Speed}}
+                        {{end}}
+                    </div>
+                    <div id="poll-error" class="empty-state" style="padding: 0.25rem 0 0 0; text-align: left; display:none;"></div>
+                </div>
+
+                <label>Error</label>
+                <div id="job-error">{{if .Job.Error}}{{.Job.Error}}{{else}}—{{end}}</div>
+
+                <label>Actions</label>
+                <div>
+                    <a class="btn btn-sm btn-secondary" href="/recordings/archive/jobs">Jobs</a>
+                    {{if or (eq .Job.Status "queued") (eq .Job.Status "running")}}
+                    <button id="job-cancel" class="btn btn-sm btn-danger"
+                            hx-post="/recordings/archive/job/cancel?id={{.JobID}}"
+                            hx-confirm="Cancel this archive job?"
+                            hx-swap="none">Cancel</button>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <h3>Logs</h3>
+            <p class="empty-state" style="padding: 0 0 0.5rem 0; text-align: left;">
+                Logs append as new output appears. Scrolling won’t jump.
+            </p>
+            <pre id="job-logs" class="log-panel">{{.Job.LogTail}}</pre>
+        </div>
+
+        <div class="toolbar">
+            <h3>Target</h3>
+            <div class="config-grid">
+                <label>Target dir</label>
+                <div style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">{{.Job.Preview.TargetDir}}</div>
+
+                <label>Output video</label>
+                <div style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">{{.Job.Preview.VideoPath}}</div>
+
+                <label>Info copy</label>
+                <div style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">{{.Job.Preview.InfoDstPath}}</div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; {{.Year}} vdradmin-go | <a href="https://github.com/githubixx/vdradmin-go">GitHub</a></p>
+        </div>
+    </footer>
+
+    <script>
+        (() => {
+            const jobID = {{printf "%q" .JobID}};
+            const stateEl = document.getElementById('job-state');
+            const errEl = document.getElementById('job-error');
+            const barEl = document.getElementById('progress-bar');
+            const indEl = document.getElementById('progress-indeterminate');
+            const metaEl = document.getElementById('progress-meta');
+            const pollErrEl = document.getElementById('poll-error');
+            const logsEl = document.getElementById('job-logs');
+            const cancelEl = document.getElementById('job-cancel');
+
+            let next = {{.Job.LogCount}};
+            let polling = {{if or (eq .Job.Status "queued") (eq .Job.Status "running")}}true{{else}}false{{end}};
+
+            // If this is an already-finished job (opened via Jobs → Open), ensure the
+            // indeterminate animation is off immediately even if we don't poll.
+            if (!polling) {
+                if (indEl) indEl.hidden = true;
+                if (barEl && barEl.style.width === '0%') {
+                    barEl.style.width = '100%';
+                }
+                if (cancelEl) cancelEl.disabled = true;
+            }
+
+            function parseErrorMessage(status, contentType, bodyText) {
+                if (contentType && contentType.indexOf('application/json') >= 0) {
+                    try {
+                        var obj = JSON.parse(bodyText || '{}');
+                        if (obj && obj.error) {
+                            var id = obj.id;
+                            if (typeof id === 'string' && id.length >= 2 && id[0] === '"' && id[id.length - 1] === '"') {
+                                id = id.slice(1, -1);
+                            }
+                            var inst = obj.instance_id ? (' (instance=' + obj.instance_id + ')') : '';
+                            var pid = (obj.pid !== undefined && obj.pid !== null) ? (' (pid=' + obj.pid + ')') : '';
+                            var jc = (obj.job_count !== undefined && obj.job_count !== null) ? (' (job_count=' + obj.job_count + ')') : '';
+                            if (id) return 'poll failed: HTTP ' + status + ' ' + obj.error + ' (id=' + id + ')' + inst + pid + jc;
+                            return 'poll failed: HTTP ' + status + ' ' + obj.error + inst + pid + jc;
+                        }
+                    } catch (e) {
+                        // fall through
+                    }
+                }
+                var snippet = (bodyText || '').trim();
+                if (snippet.length > 200) snippet = snippet.slice(0, 200) + '…';
+                if (snippet) return 'poll failed: HTTP ' + status + ' ' + snippet;
+                return 'poll failed: HTTP ' + status;
+            }
+
+            function isAtBottom(el) {
+                if (!el) return true;
+                const threshold = 20;
+                return (el.scrollTop + el.clientHeight) >= (el.scrollHeight - threshold);
+            }
+
+            function appendLogs(lines) {
+                if (!logsEl || !lines || lines.length === 0) return;
+                const shouldStick = isAtBottom(logsEl);
+                const prefix = logsEl.textContent && !logsEl.textContent.endsWith('\n') ? '\n' : '';
+                logsEl.textContent = logsEl.textContent + prefix + lines.join('\n');
+                if (shouldStick) {
+                    logsEl.scrollTop = logsEl.scrollHeight;
+                }
+            }
+
+            function valOrEmpty(v) {
+                return (v === undefined || v === null) ? '' : v;
+            }
+
+            function setProgress(p) {
+                if (!p || !barEl || !indEl || !metaEl) return;
+                if (p.known_duration) {
+                    indEl.hidden = true;
+                    const pct = Math.max(0, Math.min(100, Number(p.percent || 0)));
+                    barEl.style.width = pct.toFixed(1) + '%';
+                    metaEl.textContent = pct.toFixed(1) + '% • out_time_ms=' + valOrEmpty(p.out_time_ms) + ' • speed=' + valOrEmpty(p.speed);
+                } else {
+                    // Only animate indeterminate while actively running/queued.
+                    const st = (stateEl && stateEl.textContent) ? String(stateEl.textContent).trim() : '';
+                    const active = (st === 'queued' || st === 'running');
+                    indEl.hidden = !active;
+                    if (!active) {
+                        barEl.style.width = '100%';
+                    }
+                    metaEl.textContent = 'out_time_ms=' + valOrEmpty(p.out_time_ms) + ' • speed=' + valOrEmpty(p.speed);
+                }
+            }
+
+            async function pollOnce() {
+                const url = '/recordings/archive/job/poll?' + new URLSearchParams({ id: jobID, from: String(next) }).toString();
+                const resp = await fetch(url, {
+                    headers: { 'Accept': 'application/json' },
+                    credentials: 'same-origin',
+                });
+                const ct = String(resp.headers.get('content-type') || '');
+                if (!resp.ok) {
+                    const body = await resp.text().catch(() => '');
+                       var msg = parseErrorMessage(resp.status, ct, body);
+                       throw new Error(msg);
+                }
+                if (ct.indexOf('application/json') === -1) {
+                    const body = await resp.text().catch(() => '');
+                    throw new Error('poll returned non-JSON: ' + ct + (body ? ('\n' + body.slice(0, 200)) : ''));
+                }
+                return await resp.json();
+            }
+
+            async function tick() {
+                if (!polling) return;
+                try {
+                    if (pollErrEl) {
+                        pollErrEl.style.display = 'none';
+                        pollErrEl.textContent = '';
+                    }
+                    const data = await pollOnce();
+
+                    if (stateEl && data.status && stateEl.textContent !== data.status) {
+                        stateEl.textContent = data.status;
+                    }
+                    if (errEl) {
+                        errEl.textContent = data.error ? data.error : '—';
+                    }
+
+                    if (typeof data.log_next === 'number') {
+                        next = data.log_next;
+                    }
+                    appendLogs(data.log_lines);
+
+                    setProgress(data.progress);
+
+                    if (data.status !== 'queued' && data.status !== 'running') {
+                        polling = false;
+                        // Stop indeterminate animation when finished.
+                        if (indEl) indEl.hidden = true;
+                        if (barEl && (!data.progress || !data.progress.known_duration)) {
+                            barEl.style.width = '100%';
+                        }
+                        if (cancelEl) cancelEl.disabled = true;
+                        return;
+                    }
+                } catch (_) {
+                    const msg = String((_ && _.message) ? _.message : _);
+
+                    // Common case: user opened an old job page after a server restart.
+                    if (msg.indexOf('HTTP 404') >= 0 && (msg.indexOf('unknown job') >= 0 || msg.indexOf('Unknown job') >= 0)) {
+                        polling = false;
+                        if (indEl) indEl.hidden = true;
+                        if (cancelEl) cancelEl.disabled = true;
+                    }
+                    if (pollErrEl) {
+                        pollErrEl.style.display = 'block';
+                        pollErrEl.textContent = 'Polling error: ' + msg;
+                    }
+                }
+                setTimeout(tick, 1000);
+            }
+
+            // If the user clicks cancel, stop the indeterminate animation immediately.
+            document.body.addEventListener('htmx:afterRequest', (e) => {
+                const t = e && e.target;
+                if (!t || t !== cancelEl) return;
+                if (indEl) indEl.hidden = true;
+                if (stateEl) stateEl.textContent = 'canceling';
+                polling = true;
+                setTimeout(tick, 50);
+            });
+
+            // Initial: if tail exists, scroll to bottom.
+            if (logsEl && logsEl.textContent) {
+                logsEl.scrollTop = logsEl.scrollHeight;
+            }
+
+            tick();
+        })();
+    </script>
+</body>
+</html>
+{{end}}

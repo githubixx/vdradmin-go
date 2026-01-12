@@ -56,6 +56,10 @@ func (m *channelsVDRMock) SetCurrentChannel(ctx context.Context, channelID strin
 }
 func (m *channelsVDRMock) SendKey(ctx context.Context, key string) error { return nil }
 
+func (m *channelsVDRMock) GetRecordingDir(ctx context.Context, recordingID string) (string, error) {
+	return "", nil
+}
+
 func TestChannels_DisablesRecordOnlyForScheduledShow(t *testing.T) {
 	loc := time.Local
 	// Pick a day that is not "today" so the handler doesn't hide finished programs.
@@ -221,6 +225,10 @@ func (m *channelsEPGAtSpyVDRMock) DeleteTimer(ctx context.Context, timerID int) 
 
 func (m *channelsEPGAtSpyVDRMock) GetRecordings(ctx context.Context) ([]domain.Recording, error) {
 	return nil, nil
+}
+
+func (m *channelsEPGAtSpyVDRMock) GetRecordingDir(ctx context.Context, recordingID string) (string, error) {
+	return "", nil
 }
 func (m *channelsEPGAtSpyVDRMock) DeleteRecording(ctx context.Context, path string) error { return nil }
 func (m *channelsEPGAtSpyVDRMock) GetCurrentChannel(ctx context.Context) (string, error) {

@@ -13,20 +13,21 @@ import (
 //
 // Keeping this in one place avoids copy/paste and makes future test expansion easier.
 type mockVDRClient struct {
-	ConnectFunc          func(ctx context.Context) error
-	CloseFunc            func() error
-	PingFunc             func(ctx context.Context) error
-	GetChannelsFunc      func(ctx context.Context) ([]domain.Channel, error)
-	GetEPGFunc           func(ctx context.Context, channelID string, at time.Time) ([]domain.EPGEvent, error)
-	GetTimersFunc        func(ctx context.Context) ([]domain.Timer, error)
-	CreateTimerFunc      func(ctx context.Context, timer *domain.Timer) error
-	UpdateTimerFunc      func(ctx context.Context, timer *domain.Timer) error
-	DeleteTimerFunc      func(ctx context.Context, timerID int) error
-	GetRecordingsFunc    func(ctx context.Context) ([]domain.Recording, error)
-	DeleteRecordingFunc  func(ctx context.Context, path string) error
+	ConnectFunc           func(ctx context.Context) error
+	CloseFunc             func() error
+	PingFunc              func(ctx context.Context) error
+	GetChannelsFunc       func(ctx context.Context) ([]domain.Channel, error)
+	GetEPGFunc            func(ctx context.Context, channelID string, at time.Time) ([]domain.EPGEvent, error)
+	GetTimersFunc         func(ctx context.Context) ([]domain.Timer, error)
+	CreateTimerFunc       func(ctx context.Context, timer *domain.Timer) error
+	UpdateTimerFunc       func(ctx context.Context, timer *domain.Timer) error
+	DeleteTimerFunc       func(ctx context.Context, timerID int) error
+	GetRecordingsFunc     func(ctx context.Context) ([]domain.Recording, error)
+	GetRecordingDirFunc   func(ctx context.Context, recordingID string) (string, error)
+	DeleteRecordingFunc   func(ctx context.Context, path string) error
 	GetCurrentChannelFunc func(ctx context.Context) (string, error)
 	SetCurrentChannelFunc func(ctx context.Context, channelID string) error
-	SendKeyFunc          func(ctx context.Context, key string) error
+	SendKeyFunc           func(ctx context.Context, key string) error
 }
 
 var _ ports.VDRClient = (*mockVDRClient)(nil)
@@ -99,6 +100,13 @@ func (m *mockVDRClient) GetRecordings(ctx context.Context) ([]domain.Recording, 
 		return m.GetRecordingsFunc(ctx)
 	}
 	return nil, nil
+}
+
+func (m *mockVDRClient) GetRecordingDir(ctx context.Context, recordingID string) (string, error) {
+	if m.GetRecordingDirFunc != nil {
+		return m.GetRecordingDirFunc(ctx, recordingID)
+	}
+	return "", nil
 }
 
 func (m *mockVDRClient) DeleteRecording(ctx context.Context, path string) error {

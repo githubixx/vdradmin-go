@@ -47,6 +47,10 @@ func (m *epgsearchRunVDRMock) DeleteTimer(ctx context.Context, timerID int) erro
 func (m *epgsearchRunVDRMock) GetRecordings(ctx context.Context) ([]domain.Recording, error) {
 	return nil, nil
 }
+
+func (m *epgsearchRunVDRMock) GetRecordingDir(ctx context.Context, recordingID string) (string, error) {
+	return "", nil
+}
 func (m *epgsearchRunVDRMock) DeleteRecording(ctx context.Context, path string) error { return nil }
 func (m *epgsearchRunVDRMock) GetCurrentChannel(ctx context.Context) (string, error)  { return "", nil }
 func (m *epgsearchRunVDRMock) SetCurrentChannel(ctx context.Context, channelID string) error {

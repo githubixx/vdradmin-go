@@ -422,6 +422,15 @@ func (c *Client) getRecordingDirPathLocked(id string) (string, error) {
 	return strings.TrimSpace(lines[0]), nil
 }
 
+// GetRecordingDir resolves the on-disk directory path for a recording.
+func (c *Client) GetRecordingDir(ctx context.Context, recordingID string) (string, error) {
+	return withRetry(ctx, c, func() (string, error) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		return c.getRecordingDirPathLocked(recordingID)
+	})
+}
+
 // DeleteRecording deletes a recording.
 func (c *Client) DeleteRecording(ctx context.Context, path string) error {
 	return withRetryWrite(ctx, c, func() error {

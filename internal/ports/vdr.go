@@ -39,6 +39,10 @@ type VDRClient interface {
 	// GetRecordings retrieves all recordings
 	GetRecordings(ctx context.Context) ([]domain.Recording, error)
 
+	// GetRecordingDir resolves the on-disk directory path for a recording.
+	// For SVDRP-backed clients this typically maps to `LSTR <id> path`.
+	GetRecordingDir(ctx context.Context, recordingID string) (string, error)
+
 	// DeleteRecording deletes a recording
 	DeleteRecording(ctx context.Context, path string) error
 

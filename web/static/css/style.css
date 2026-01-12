@@ -1383,6 +1383,56 @@ main {
     align-items: flex-start;
 }
 
+/* Archive progress */
+.progress {
+    position: relative;
+    height: 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.02)), var(--surface-color);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.30), rgba(255, 255, 255, 0.08)), var(--primary-color);
+    transition: width 0.25s ease;
+}
+
+.progress-indeterminate::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -40%;
+    height: 100%;
+    width: 40%;
+    background: linear-gradient(90deg, transparent, rgba(124, 58, 237, 0.35), transparent);
+    animation: progress-sweep 1.2s infinite;
+}
+
+@keyframes progress-sweep {
+    0% { left: -40%; }
+    100% { left: 100%; }
+}
+
+.log-panel {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    background: var(--surface-color);
+    box-shadow: var(--shadow);
+    max-height: 240px;
+    overflow: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    white-space: pre-wrap;
+}
+
 /* Search Form */
 .search-form {
     display: flex;
@@ -1438,6 +1488,10 @@ main {
 
 .data-table tbody tr:hover {
     background: var(--surface-hover);
+}
+
+.data-table tbody tr.is-selected {
+    background: rgba(124, 58, 237, 0.12);
 }
 
 .data-table td.actions {
