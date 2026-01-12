@@ -33,12 +33,12 @@ type ArchiveProfileConfig struct {
 // ArchiveConfig contains settings for archiving/re-encoding recordings.
 type ArchiveConfig struct {
 	// BaseDir is the root directory where archived recordings should be stored.
-	// Example: "/vdr/36".
+	// Example: "/vdr".
 	BaseDir string `yaml:"base_dir"`
 	// Profiles optionally overrides the default destination profiles.
 	// If empty, vdradmin-go derives two defaults from BaseDir:
-	// - movies-hd (movie) -> <base_dir>/movies-hd
-	// - series-hd (series) -> <base_dir>/serien-hd
+	// - movies (movies) -> <base_dir>/movies
+	// - series (series) -> <base_dir>/series
 	Profiles []ArchiveProfileConfig `yaml:"profiles"`
 	// FFMpegArgs are extra arguments passed to ffmpeg when archiving.
 	// They should NOT include input (-i) or output path; these are provided by vdradmin-go.

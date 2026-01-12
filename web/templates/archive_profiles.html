@@ -48,19 +48,19 @@
                         <input type="hidden" name="profile_indices" value="{{.Index}}">
                         <div class="config-grid">
                             <label>ID</label>
-                            <input name="profile_id_{{.Index}}" type="text" value="{{.ID}}" placeholder="movies-hd">
+                            <input name="profile_id_{{.Index}}" type="text" value="{{.ID}}" placeholder="movies">
 
                             <label>Name</label>
-                            <input name="profile_name_{{.Index}}" type="text" value="{{.Name}}" placeholder="Movies (HD)">
+                            <input name="profile_name_{{.Index}}" type="text" value="{{.Name}}" placeholder="Movies">
 
                             <label>Kind</label>
                             <select name="profile_kind_{{.Index}}">
-                                <option value="movie" {{if eq .Kind "movie"}}selected{{end}}>movie</option>
+                                <option value="movie" {{if eq .Kind "movie"}}selected{{end}}>movies</option>
                                 <option value="series" {{if eq .Kind "series"}}selected{{end}}>series</option>
                             </select>
 
                             <label>Destination dir</label>
-                            <input name="profile_base_dir_{{.Index}}" type="text" value="{{.BaseDir}}" placeholder="/vdr/36/movies-hd">
+                            <input name="profile_base_dir_{{.Index}}" type="text" value="{{.BaseDir}}" placeholder="/vdr/movies">
 
                             <label>Delete</label>
                             <div>
@@ -89,10 +89,10 @@
             <input type="hidden" name="profile_indices" value="__IDX__">
             <div class="config-grid">
                 <label>ID</label>
-                <input name="profile_id___IDX__" type="text" value="" placeholder="movies-hd">
+                <input name="profile_id___IDX__" type="text" value="" placeholder="movies">
 
                 <label>Name</label>
-                <input name="profile_name___IDX__" type="text" value="" placeholder="Movies (HD)">
+                <input name="profile_name___IDX__" type="text" value="" placeholder="Movies">
 
                 <label>Kind</label>
                 <select name="profile_kind___IDX__">
@@ -101,7 +101,7 @@
                 </select>
 
                 <label>Destination dir</label>
-                <input name="profile_base_dir___IDX__" type="text" value="" placeholder="/vdr/36/movies-hd">
+                <input name="profile_base_dir___IDX__" type="text" value="" placeholder="/vdr/movies">
 
                 <label>Delete</label>
                 <div>

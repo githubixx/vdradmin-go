@@ -97,9 +97,9 @@ func FindProfile(profiles []ArchiveProfile, id string) (ArchiveProfile, bool) {
 
 func DefaultProfileIDForKind(k Kind) string {
 	if k == KindSeries {
-		return "series-hd"
+		return "series"
 	}
-	return "movies-hd"
+	return "movies"
 }
 
 func Slugify(s string) string {
