@@ -84,25 +84,25 @@ ui:
   login_page: /timers
 
 archive:
-  # Root directory where archived recordings should be stored, e.g. "/vdr/36".
-  # Movies will go to <base_dir>/movies-hd/<movie_slug>
-  # Series will go to <base_dir>/serien-hd/<series_slug>/<episode_slug>
-  base_dir: /vdr/36
+  # Root directory where archived recordings should be stored, e.g. "/vdr".
+  # Movies will go to <base_dir>/movies/<movie_slug>
+  # Series will go to <base_dir>/series/<series_slug>/<episode_slug>
+  base_dir: /vdr
 
   # Optional: override destination profiles.
   # If omitted, vdradmin-go derives two default profiles from base_dir:
-  # - movies-hd (movie)  -> /vdr/36/movies-hd
-  # - series-hd (series) -> /vdr/36/serien-hd
+  # - movies -> /vdr/movies
+  # - series -> /vdr/series
   # Add more profiles to support additional archive directories.
   profiles:
-    - id: movies-hd
-      name: Movies (movies-hd)
+    - id: movies
+      name: Movies
       kind: movie
-      base_dir: /vdr/36/movies-hd
-    - id: series-hd
-      name: Series (serien-hd)
+      base_dir: /vdr/movies
+    - id: series
+      name: Series
       kind: series
-      base_dir: /vdr/36/serien-hd
+      base_dir: /vdr/series
 
   # Extra arguments passed to ffmpeg when archiving.
   # Do NOT include input (-i) or output file path.
