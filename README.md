@@ -126,6 +126,27 @@ docker compose -f deployments/docker-compose.yml up -d
 
 See `configs/config.example.yaml` for full configuration options.
 
+## Archive recordings
+
+The **Recordings** page (`/recordings`) includes an **Archive** action (admin-only) that remuxes a VDR recording directory (multiple `*.ts` segments) into a single `video.mkv` inside `archive.base_dir`.
+
+Requirements:
+
+- `ffmpeg` installed on the vdradmin-go host
+- Optional (for percentage progress): `ffprobe`
+
+Configuration:
+
+- `archive.base_dir`: absolute output directory root
+- `archive.profiles`: optional list of destination profiles (movie/series) so you can add more archive directories or customize defaults
+- `archive.ffmpeg_args`: additional ffmpeg output args (defaults are hardware-accel friendly but can be changed)
+
+Safety defaults:
+
+- keeps originals
+- runs in background
+- refuses to overwrite an existing output file
+
 ## Watch TV
 
 The **Watch TV** page (`/watch`) provides:

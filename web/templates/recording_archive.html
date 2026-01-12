@@ -1,0 +1,354 @@
+{{define "recording_archive.html"}}
+<!DOCTYPE html>
+<html lang="en" {{if eq .ThemeMode "dark"}}data-theme="dark"{{else if eq .ThemeMode "light"}}data-theme="light"{{end}} data-theme-default="{{.ThemeDefault}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Archive - VDRAdmin-go</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="/static/js/theme.js?v=20260104" defer></script>
+</head>
+<body>
+    {{template "nav_header" .}}
+
+    <main class="container">
+        <div class="toolbar">
+            <div style="display:flex; justify-content: space-between; align-items: center; gap: 1rem; width: 100%;">
+                <h3 style="margin: 0;">Archive Recording</h3>
+                <a class="btn btn-sm btn-secondary" href="/recordings">Back</a>
+            </div>
+            {{if .ArchiveWarning}}
+                <p class="empty-state" style="padding: 0.75rem 0 0 0; text-align: left;"><strong>Note:</strong> {{.ArchiveWarning}}</p>
+            {{end}}
+        </div>
+
+        {{if .Error}}
+        <div class="toolbar">
+            <p><strong>Error:</strong> {{.Error}}</p>
+        </div>
+        {{end}}
+
+        <div class="toolbar">
+            <h3>Detected metadata</h3>
+            <div class="config-grid">
+                <label>Recording ID</label>
+                <div>{{.RecordingID}}</div>
+
+                <label>Recording dir</label>
+                <div style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">{{.RecordingDir}}</div>
+
+                <label>Kind</label>
+                <div>{{.DetectedKind}}</div>
+            </div>
+        </div>
+
+        <form id="archive-form" method="post" action="/recordings/archive/start">
+            <input type="hidden" name="path" value="{{.RecordingID}}">
+            <div class="toolbar">
+                <h3>Archive settings (preview)</h3>
+                <div class="config-grid">
+                    <label for="title">Movie / series name</label>
+                    <input id="title" name="title" type="text" value="{{.Title}}">
+
+                    <label for="episode">Episode name (series)</label>
+                    <input id="episode" name="episode" type="text" value="{{.Episode}}" placeholder="(optional)">
+
+                    <label for="profile">Profile</label>
+                    <select id="profile" name="profile">
+                        <option value="none" data-kind="" data-base-dir="" {{if eq $.SelectedProfileID "none"}}selected{{end}}>None</option>
+                        {{range .Profiles}}
+                            <option value="{{.ID}}" data-kind="{{.Kind}}" data-base-dir="{{.BaseDir}}" {{if eq $.SelectedProfileID .ID}}selected{{end}}>{{.Name}}</option>
+                        {{end}}
+                    </select>
+
+                    <label for="format">Output format</label>
+                    <select id="format" name="format">
+                        <option value="mkv" {{if or (not $.Format) (eq $.Format "mkv")}}selected{{end}}>MKV</option>
+                        <option value="mp4" {{if eq $.Format "mp4"}}selected{{end}}>MP4</option>
+                    </select>
+                </div>
+
+                <div class="sort-options" style="justify-content: flex-end; width: 100%; margin-top: 1rem;">
+                    <button id="start-archive" type="submit" class="btn btn-primary" {{if .OutputExists}}disabled title="Output already exists"{{end}}>Start archive</button>
+                </div>
+
+                <p class="empty-state" style="padding: 0.75rem 0 0 0; text-align: left;">
+                    Preview updates automatically when you change Profile (and when you edit title/episode, if you haven't overridden the preview fields).
+                </p>
+
+                <div id="output-exists" {{if not .OutputExists}}style="display:none;"{{end}}>
+                    <p class="empty-state" style="padding: 0.75rem 0 0 0; text-align: left;">
+                        <strong>Output already exists:</strong>
+                        <span id="output-exists-path" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">{{.OutputExistsPath}}</span>
+                        (refusing to overwrite)
+                    </p>
+                </div>
+            </div>
+
+            <div class="toolbar">
+                <h3>Preview (editable)</h3>
+                <div id="preview-error" class="empty-state" style="display:none; padding: 0 0 0.5rem 0; text-align:left;"></div>
+                <div class="config-grid">
+                    <label for="target_dir">Target dir</label>
+                    <input id="target_dir" name="target_dir" type="text" value="{{if .Preview}}{{.Preview.TargetDir}}{{end}}" placeholder="(auto)" autocomplete="off">
+
+                    <label for="video_path">Output video</label>
+                    <input id="video_path" name="video_path" type="text" value="{{if .Preview}}{{.Preview.VideoPath}}{{end}}" placeholder="(auto)" autocomplete="off">
+
+                    <label for="info_dst_path">Info copy</label>
+                    <input id="info_dst_path" name="info_dst_path" type="text" value="{{if .Preview}}{{.Preview.InfoDstPath}}{{end}}" placeholder="(auto)" autocomplete="off">
+                </div>
+            </div>
+        </form>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; {{.Year}} vdradmin-go | <a href="https://github.com/githubixx/vdradmin-go">GitHub</a></p>
+        </div>
+    </footer>
+
+    <script>
+        (() => {
+            const profileEl = document.getElementById('profile');
+            const titleEl = document.getElementById('title');
+            const episodeEl = document.getElementById('episode');
+            const formatEl = document.getElementById('format');
+            const startBtn = document.getElementById('start-archive');
+            const outputBox = document.getElementById('output-exists');
+            const outputPathEl = document.getElementById('output-exists-path');
+            const errEl = document.getElementById('preview-error');
+
+            const previewFieldIds = ['target_dir', 'video_path', 'info_dst_path'];
+            const dirty = new Set();
+
+            const PROFILE_NONE = 'none';
+            let lastProfileValue = profileEl ? String(profileEl.value || '') : '';
+
+            function get(id) {
+                return document.getElementById(id);
+            }
+
+            for (const id of previewFieldIds) {
+                const el = get(id);
+                if (!el) continue;
+                el.addEventListener('input', () => dirty.add(id));
+            }
+
+            function setError(msg) {
+                if (!errEl) return;
+                const t = (msg || '').trim();
+                if (!t) {
+                    errEl.style.display = 'none';
+                    errEl.textContent = '';
+                    return;
+                }
+                errEl.style.display = 'block';
+                errEl.textContent = t;
+            }
+
+            function updateOutputWarning(exists, path) {
+                if (!outputBox || !outputPathEl || !startBtn) return;
+                if (exists) {
+                    outputPathEl.textContent = path || '';
+                    outputBox.style.display = 'block';
+                    startBtn.disabled = true;
+                    startBtn.title = 'Output already exists';
+                } else {
+                    outputBox.style.display = 'none';
+                    startBtn.disabled = false;
+                    startBtn.title = '';
+                }
+            }
+
+            function applySuggestion(id, value) {
+                const el = get(id);
+                if (!el) return;
+                // Respect user edits: only fill fields the user hasn't touched, or fields currently empty.
+                if (dirty.has(id) && el.value.trim() !== '') return;
+                el.value = value || '';
+            }
+
+            function clearPreviewFields() {
+                for (const id of previewFieldIds) {
+                    const el = get(id);
+                    if (el) el.value = '';
+                }
+                dirty.clear();
+            }
+
+            function selectedExt() {
+                if (!formatEl) return 'mkv';
+                const v = String(formatEl.value || '').toLowerCase().trim();
+                return v === 'mp4' ? 'mp4' : 'mkv';
+            }
+
+            function deriveOutputPathsFromTargetDir(force) {
+                const targetEl = get('target_dir');
+                const videoEl = get('video_path');
+                const infoEl = get('info_dst_path');
+                if (!targetEl || !videoEl || !infoEl) return;
+
+                const target = (targetEl.value || '').trim();
+                if (!target) return;
+
+                const ext = selectedExt();
+                const desiredVideo = target.replace(/\/+$/, '') + '/video.' + ext;
+                const desiredInfo = target.replace(/\/+$/, '') + '/video.info';
+
+                if (force || !dirty.has('video_path') || videoEl.value.trim() === '') {
+                    videoEl.value = desiredVideo;
+                }
+                if (force || !dirty.has('info_dst_path') || infoEl.value.trim() === '') {
+                    infoEl.value = desiredInfo;
+                }
+            }
+
+            function applyReadonlyForProfileNone(isNone) {
+                const videoEl = get('video_path');
+                const infoEl = get('info_dst_path');
+                if (videoEl) videoEl.readOnly = !!isNone;
+                if (infoEl) infoEl.readOnly = !!isNone;
+            }
+
+            async function fetchPreview(params) {
+                const url = '/recordings/archive/preview?' + new URLSearchParams(params).toString();
+                const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                let data = null;
+                try {
+                    data = await resp.json();
+                } catch (_) {
+                    // ignore
+                }
+                if (!resp.ok) {
+                    throw new Error((data && data.error) ? data.error : ('HTTP ' + resp.status));
+                }
+                if (data && data.error) throw new Error(data.error);
+                return data;
+            }
+
+            async function refreshPreviewSuggestions() {
+                if (!profileEl) return;
+                try {
+                    setError('');
+
+                    // "None" profile: don't suggest values; let the user fill everything.
+                    // Still check for an existing output if a custom video path is provided.
+                    if (profileEl.value === PROFILE_NONE) {
+                        applyReadonlyForProfileNone(true);
+                        deriveOutputPathsFromTargetDir(true);
+                        const vp = (get('video_path') ? get('video_path').value : '');
+                        if (String(vp || '').trim() === '') {
+                            updateOutputWarning(false, '');
+                            return;
+                        }
+                        const check = await fetchPreview({
+                            title: (titleEl ? titleEl.value : ''),
+                            episode: (episodeEl ? episodeEl.value : ''),
+                            profile: PROFILE_NONE,
+                            target_dir: (get('target_dir') ? get('target_dir').value : ''),
+                            format: selectedExt(),
+                            video_path: vp,
+                        });
+                        updateOutputWarning(!!check.output_exists, check.output_exists_path);
+                        return;
+                    }
+
+                    applyReadonlyForProfileNone(false);
+
+                    const data = await fetchPreview({
+                        title: (titleEl ? titleEl.value : ''),
+                        episode: (episodeEl ? episodeEl.value : ''),
+                        profile: profileEl.value,
+                        format: selectedExt(),
+                        video_path: (get('video_path') ? get('video_path').value : ''),
+                    });
+
+                    applySuggestion('target_dir', data.target_dir);
+                    applySuggestion('video_path', data.video_path);
+                    applySuggestion('info_dst_path', data.info_dst_path);
+
+                    // If the user edits target dir, keep output paths in sync (unless overridden).
+                    deriveOutputPathsFromTargetDir(false);
+
+                    // Re-check output existence for the effective current video path.
+                    const check = await fetchPreview({
+                        title: (titleEl ? titleEl.value : ''),
+                        episode: (episodeEl ? episodeEl.value : ''),
+                        profile: profileEl.value,
+                        format: selectedExt(),
+                        target_dir: (get('target_dir') ? get('target_dir').value : ''),
+                        video_path: (get('video_path') ? get('video_path').value : ''),
+                    });
+                    updateOutputWarning(!!check.output_exists, check.output_exists_path);
+                } catch (e) {
+                    setError(String(e && e.message ? e.message : e));
+                }
+            }
+
+            let t = null;
+            function debounceRefresh() {
+                if (t) clearTimeout(t);
+                t = setTimeout(() => {
+                    t = null;
+                    refreshPreviewSuggestions();
+                }, 350);
+            }
+
+            if (profileEl) profileEl.addEventListener('change', () => {
+                const next = String(profileEl.value || '');
+                const prev = String(lastProfileValue || '');
+                lastProfileValue = next;
+
+                // Reset preview when leaving Profile=None so normal profiles can re-suggest values.
+                if (prev === PROFILE_NONE && next !== PROFILE_NONE) {
+                    clearPreviewFields();
+                    applyReadonlyForProfileNone(false);
+                    refreshPreviewSuggestions();
+                    return;
+                }
+
+                if (next === PROFILE_NONE) {
+                    clearPreviewFields();
+                    setError('');
+                    updateOutputWarning(false, '');
+                    applyReadonlyForProfileNone(true);
+                    return;
+                }
+                refreshPreviewSuggestions();
+            });
+            if (titleEl) titleEl.addEventListener('input', debounceRefresh);
+            if (episodeEl) episodeEl.addEventListener('input', debounceRefresh);
+
+            if (formatEl) formatEl.addEventListener('change', () => {
+                // Keep output path extension in sync with selected container.
+                if (profileEl && profileEl.value === PROFILE_NONE) {
+                    deriveOutputPathsFromTargetDir(true);
+                } else {
+                    deriveOutputPathsFromTargetDir(false);
+                }
+                debounceRefresh();
+            });
+
+            // Keep dependent fields in sync when user edits target dir (without overriding explicit edits).
+            const targetEl = get('target_dir');
+            if (targetEl) targetEl.addEventListener('input', () => {
+                if (profileEl && profileEl.value === PROFILE_NONE) {
+                    deriveOutputPathsFromTargetDir(true);
+                } else {
+                    deriveOutputPathsFromTargetDir(false);
+                }
+                debounceRefresh();
+            });
+
+            const videoEl = get('video_path');
+            if (videoEl) videoEl.addEventListener('input', debounceRefresh);
+
+            // On load, ensure output warning matches the current effective video path.
+            refreshPreviewSuggestions();
+        })();
+    </script>
+</body>
+</html>
+{{end}}

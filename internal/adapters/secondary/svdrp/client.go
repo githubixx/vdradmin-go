@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -71,7 +72,9 @@ var recordingPathTimestampRe = regexp.MustCompile(`\b(\d{4}-\d{2}-\d{2})\.(\d{2}
 var recordingListLeadingDateTimeRe = regexp.MustCompile(`^\s*(\d{4}-\d{2}-\d{2})\s+(\d{2}):(\d{2})\b`)
 var recordingShortDateRe = regexp.MustCompile(`^\d{2}\.\d{2}\.\d{2}$`)
 var recordingClockRe = regexp.MustCompile(`^\d{2}:\d{2}$`)
-var recordingLengthRe = regexp.MustCompile(`^\d+:\d{2}\*?$`)
+
+// Recording length tokens may include flags like '*' and '!' (e.g. "4:22*!" or "0:22*").
+var recordingLengthRe = regexp.MustCompile(`^\d+:\d{2}[*!]{0,2}$`)
 
 // Returned when we failed while writing/flushing the command to the socket.
 // Retrying after this is usually safe because the command likely didn't reach VDR.
@@ -394,6 +397,40 @@ func (c *Client) GetRecordings(ctx context.Context) ([]domain.Recording, error) 
 						}
 						// Permission/mount issues: don't hide recordings we can't verify.
 					}
+
+					// Some VDR setups don't include complete metadata in LSTR.
+					// Best-effort enrich from the recording's info file.
+					if info, infoErr := readRecordingInfoMeta(dirPath); infoErr == nil {
+						if strings.TrimSpace(r.Subtitle) == "" && strings.TrimSpace(info.Subtitle) != "" {
+							r.Subtitle = info.Subtitle
+						}
+						if strings.TrimSpace(r.Description) == "" && strings.TrimSpace(info.Description) != "" {
+							r.Description = info.Description
+						}
+						if strings.TrimSpace(r.Channel) == "" && strings.TrimSpace(info.Channel) != "" {
+							r.Channel = info.Channel
+						}
+						if r.Date.IsZero() && !info.Start.IsZero() {
+							r.Date = info.Start
+						}
+						if r.Date.IsZero() {
+							// Some entries (e.g. radio) have info E=0 and may not have a parsable ID/path.
+							r.Date = parseRecordingDateFromPath(dirPath)
+						}
+						if r.Length <= 0 && info.Duration > 0 {
+							r.Length = info.Duration
+						}
+						// If LSTR title looks like it accidentally includes time/length, prefer info title.
+						if strings.TrimSpace(info.Title) != "" && (strings.TrimSpace(r.Title) == "" || looksLikeTimeLengthPrefix(r.Title)) {
+							r.Title = info.Title
+						}
+						// Fallback: if still no title, infer from the folder structure.
+						if strings.TrimSpace(r.Title) == "" {
+							if inferred := inferRecordingTitleFromDir(dirPath); inferred != "" {
+								r.Title = inferred
+							}
+						}
+					}
 				}
 				recordings = append(recordings, r)
 			}
@@ -401,6 +438,122 @@ func (c *Client) GetRecordings(ctx context.Context) ([]domain.Recording, error) 
 
 		return recordings, nil
 	})
+}
+
+type recordingInfoMeta struct {
+	Title       string
+	Subtitle    string
+	Description string
+	Channel     string
+	Start       time.Time
+	Duration    time.Duration
+}
+
+func looksLikeTimeLengthPrefix(title string) bool {
+	f := strings.Fields(strings.TrimSpace(title))
+	if len(f) < 2 {
+		return false
+	}
+	return recordingClockRe.MatchString(f[0]) && recordingLengthRe.MatchString(f[1])
+}
+
+func inferRecordingTitleFromDir(recordingDir string) string {
+	// Typical VDR folder layout:
+	//   /video/<Title>/_/2025-07-05.23.00.77-0.rec
+	// or
+	//   /video/<Folder>/<Title>/_/2025-...rec
+	// where "_" is used as a placeholder segment.
+	//
+	// We pick the nearest non-"_" parent folder name and normalize underscores.
+	if recordingDir == "" {
+		return ""
+	}
+	parent := filepath.Base(filepath.Dir(recordingDir))
+	if parent == "" || parent == "." || parent == string(filepath.Separator) {
+		return ""
+	}
+	if parent == "_" {
+		parent = filepath.Base(filepath.Dir(filepath.Dir(recordingDir)))
+	}
+	parent = strings.TrimSpace(parent)
+	if parent == "" || parent == "_" {
+		return ""
+	}
+	parent = strings.ReplaceAll(parent, "_", " ")
+	parent = strings.TrimSpace(parent)
+	parent = strings.Join(strings.Fields(parent), " ")
+	return parent
+}
+
+func readRecordingInfoSubtitle(recordingDir string) (string, error) {
+	meta, err := readRecordingInfoMeta(recordingDir)
+	if err != nil {
+		return "", err
+	}
+	return meta.Subtitle, nil
+}
+
+func readRecordingInfoMeta(recordingDir string) (recordingInfoMeta, error) {
+	infoPath := filepath.Join(recordingDir, "info")
+	b, err := os.ReadFile(infoPath)
+	if err != nil {
+		return recordingInfoMeta{}, err
+	}
+
+	var out recordingInfoMeta
+	scanner := bufio.NewScanner(strings.NewReader(string(b)))
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimRight(scanner.Text(), "\r\n")
+		if strings.HasPrefix(line, "T ") {
+			if out.Title == "" {
+				out.Title = strings.TrimSpace(strings.TrimPrefix(line, "T "))
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "S ") {
+			if out.Subtitle == "" {
+				out.Subtitle = strings.TrimSpace(strings.TrimPrefix(line, "S "))
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "D ") {
+			if out.Description == "" {
+				out.Description = strings.TrimSpace(strings.TrimPrefix(line, "D "))
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "C ") {
+			// Example: "C S19.2E-1-1089-12003 RTL Television"
+			cLine := strings.TrimSpace(strings.TrimPrefix(line, "C "))
+			parts := strings.Fields(cLine)
+			if len(parts) >= 2 {
+				out.Channel = strings.TrimSpace(strings.Join(parts[1:], " "))
+			} else {
+				out.Channel = strings.TrimSpace(cLine)
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "E ") {
+			// Example: "E <eventid> <startUnix> <durationSec> ..."
+			parts := strings.Fields(strings.TrimSpace(strings.TrimPrefix(line, "E ")))
+			if len(parts) >= 3 {
+				startUnix, err1 := strconv.ParseInt(parts[1], 10, 64)
+				durSec, err2 := strconv.ParseInt(parts[2], 10, 64)
+				if err1 == nil && err2 == nil {
+					out.Start = time.Unix(startUnix, 0).In(time.Local)
+					if durSec > 0 {
+						out.Duration = time.Duration(durSec) * time.Second
+					}
+				}
+			}
+			continue
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return recordingInfoMeta{}, err
+	}
+	return out, nil
 }
 
 func (c *Client) getRecordingDirPathLocked(id string) (string, error) {
@@ -420,6 +573,15 @@ func (c *Client) getRecordingDirPathLocked(id string) (string, error) {
 		return "", nil
 	}
 	return strings.TrimSpace(lines[0]), nil
+}
+
+// GetRecordingDir resolves the on-disk directory path for a recording.
+func (c *Client) GetRecordingDir(ctx context.Context, recordingID string) (string, error) {
+	return withRetry(ctx, c, func() (string, error) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		return c.getRecordingDirPathLocked(recordingID)
+	})
 }
 
 // DeleteRecording deletes a recording.
@@ -1128,7 +1290,8 @@ func parseRecording(line string) (domain.Recording, error) {
 
 func parseRecordingLength(token string) time.Duration {
 	token = strings.TrimSpace(token)
-	token = strings.TrimSuffix(token, "*")
+	// Tokens may include trailing flags like '*' and '!' (e.g. "4:22*!" or "0:22*").
+	token = strings.TrimRight(token, "*!")
 	parts := strings.Split(token, ":")
 	if len(parts) != 2 {
 		return 0

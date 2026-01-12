@@ -1,0 +1,50 @@
+{{define "recording_archive_job_status.html"}}
+<div id="job-status"
+    {{if or (eq .Job.Status "queued") (eq .Job.Status "running")}}hx-get="/recordings/archive/job/status?id={{.JobID}}" hx-trigger="every 1s" hx-swap="outerHTML"{{end}}>
+
+    <div class="toolbar">
+        <h3>Status</h3>
+        <div class="config-grid">
+            <label>Job ID</label>
+            <div style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">{{.Job.ID}}</div>
+
+            <label>State</label>
+            <div>{{.Job.Status}}</div>
+
+            <label>Progress</label>
+            <div>
+                {{if .Job.Progress.KnownDuration}}
+                    <div class="progress"><div class="progress-bar" style="width: {{printf "%.1f" .Job.Progress.Percent}}%;"></div></div>
+                    <div class="empty-state" style="padding: 0.5rem 0 0 0; text-align: left;">
+                        {{printf "%.1f" .Job.Progress.Percent}}% • out_time_ms={{.Job.Progress.OutTimeMS}} • speed={{.Job.Progress.Speed}}
+                    </div>
+                {{else}}
+                    <div class="progress"><div class="progress-indeterminate"></div></div>
+                    <div class="empty-state" style="padding: 0.5rem 0 0 0; text-align: left;">
+                        out_time_ms={{.Job.Progress.OutTimeMS}} • speed={{.Job.Progress.Speed}}
+                    </div>
+                {{end}}
+            </div>
+
+            <label>Error</label>
+            <div>{{if .Job.Error}}{{.Job.Error}}{{else}}—{{end}}</div>
+
+            <label>Actions</label>
+            <div>
+                <a class="btn btn-sm btn-secondary" href="/recordings/archive/jobs">Jobs</a>
+                {{if or (eq .Job.Status "queued") (eq .Job.Status "running")}}
+                <button class="btn btn-sm btn-danger"
+                        hx-post="/recordings/archive/job/cancel?id={{.JobID}}"
+                        hx-confirm="Cancel this archive job?"
+                        hx-swap="none">Cancel</button>
+                {{end}}
+            </div>
+        </div>
+    </div>
+
+    <div class="toolbar">
+        <h3>Logs (tail)</h3>
+        <pre class="log-panel">{{.Job.LogTail}}</pre>
+    </div>
+</div>
+{{end}}

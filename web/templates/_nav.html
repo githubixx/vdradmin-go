@@ -24,7 +24,10 @@
                     <a href="/watch" {{if eq .Path "/watch"}}class="active" aria-current="page"{{end}}>Watch TV</a>
                     <a href="/playing" {{if eq .Path "/playing"}}class="active" aria-current="page"{{end}}>Playing Today</a>
                     <a href="/timers" {{if eq .Path "/timers"}}class="active" aria-current="page"{{end}}>Timers</a>
-                    <a href="/recordings" {{if eq .Path "/recordings"}}class="active" aria-current="page"{{end}}>Recordings</a>
+                    <a href="/recordings" {{if eq .PageName "Recordings"}}class="active" aria-current="page"{{end}}>Recordings</a>
+                    {{if eq .Role "admin"}}
+                    <a href="/recordings/archive/jobs" {{if or (eq .Path "/recordings/archive/jobs") (eq .Path "/recordings/archive/job")}}class="active" aria-current="page"{{end}}>Jobs</a>
+                    {{end}}
                     <a href="/search" {{if eq .Path "/search"}}class="active" aria-current="page"{{end}}>Search</a>
                     <a href="/epgsearch" {{if eq .Path "/epgsearch"}}class="active" aria-current="page"{{end}}>EPG Search</a>
                     <a href="/configurations" {{if eq .Path "/configurations"}}class="active" aria-current="page"{{end}}>Configurations</a>

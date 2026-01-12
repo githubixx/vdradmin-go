@@ -8,12 +8,15 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/githubixx/vdradmin-go/internal/application/archive"
 	"github.com/githubixx/vdradmin-go/internal/application/services"
 	"github.com/githubixx/vdradmin-go/internal/domain"
 	"github.com/githubixx/vdradmin-go/internal/infrastructure/config"
@@ -28,6 +31,9 @@ type Handler struct {
 	cfg              *config.Config
 	configPath       string
 	vdrClient        ports.VDRClient
+	archiveJobs      *archive.JobManager
+	instanceID       string
+	pid              int
 	epgService       *services.EPGService
 	timerService     *services.TimerService
 	recordingService *services.RecordingService
@@ -53,6 +59,9 @@ func NewHandler(
 		cfg:              nil,
 		configPath:       "",
 		vdrClient:        nil,
+		archiveJobs:      archive.NewJobManager(),
+		instanceID:       fmt.Sprintf("%d", time.Now().UnixNano()),
+		pid:              os.Getpid(),
 		epgService:       epgService,
 		timerService:     timerService,
 		recordingService: recordingService,
@@ -209,6 +218,11 @@ func pageNameForPath(path string) string {
 	// Normalize common entry points.
 	if path == "" || path == "/" || path == "/now" {
 		return "What's on now"
+	}
+
+	// Treat archive job pages as their own top-level section.
+	if strings.HasPrefix(path, "/recordings/archive/jobs") || strings.HasPrefix(path, "/recordings/archive/job") {
+		return "Jobs"
 	}
 
 	// Group sub-pages under their main navigation entry.
@@ -843,20 +857,32 @@ func (h *Handler) Channels(w http.ResponseWriter, r *http.Request) {
 // Configurations renders a simple configuration page.
 // For now it only allows switching between system/light/dark theme.
 func (h *Handler) Configurations(w http.ResponseWriter, r *http.Request) {
-	data := map[string]any{}
-	if h.cfg != nil {
-		data["Config"] = h.cfg
-		wanted := make(map[string]bool, len(h.cfg.VDR.WantedChannels))
-		for _, id := range h.cfg.VDR.WantedChannels {
-			wanted[id] = true
-		}
-		data["WantedChannelSet"] = wanted
-	}
+	data := h.configurationsBaseData(r)
 	if msg := strings.TrimSpace(r.URL.Query().Get("msg")); msg != "" {
 		data["Message"] = msg
 	}
 	if errMsg := strings.TrimSpace(r.URL.Query().Get("err")); errMsg != "" {
 		data["Error"] = errMsg
+	}
+	h.renderTemplate(w, r, "configurations.html", data)
+}
+
+func (h *Handler) configurationsBaseData(r *http.Request) map[string]any {
+	data := map[string]any{}
+	if h.cfg != nil {
+		data["Config"] = h.cfg
+		profiles := h.archiveProfilesFromConfig(h.cfg)
+		data["ArchiveProfiles"] = profiles
+		data["ArchiveProfilesDerived"] = len(h.cfg.Archive.Profiles) == 0
+		if len(profiles) > 0 {
+			data["ArchiveProfileSelectedID"] = profiles[0].ID
+			data["ArchiveProfileSelected"] = &profiles[0]
+		}
+		wanted := make(map[string]bool, len(h.cfg.VDR.WantedChannels))
+		for _, id := range h.cfg.VDR.WantedChannels {
+			wanted[id] = true
+		}
+		data["WantedChannelSet"] = wanted
 	}
 	if h.epgService != nil {
 		chs, err := h.epgService.GetAllChannels(r.Context())
@@ -867,7 +893,34 @@ func (h *Handler) Configurations(w http.ResponseWriter, r *http.Request) {
 			data["AllChannels"] = []domain.Channel{}
 		}
 	}
-	h.renderTemplate(w, r, "configurations.html", data)
+	return data
+}
+
+func (h *Handler) archiveProfilesFromConfig(cfg *config.Config) []archive.ArchiveProfile {
+	if cfg == nil {
+		return nil
+	}
+	if len(cfg.Archive.Profiles) == 0 {
+		return archive.DefaultProfiles(cfg.Archive.BaseDir)
+	}
+	out := make([]archive.ArchiveProfile, 0, len(cfg.Archive.Profiles))
+	for _, p := range cfg.Archive.Profiles {
+		k := archive.KindMovie
+		if strings.ToLower(strings.TrimSpace(p.Kind)) == "series" {
+			k = archive.KindSeries
+		}
+		out = append(out, archive.ArchiveProfile{ID: p.ID, Name: p.Name, Kind: k, BaseDir: p.BaseDir})
+	}
+	return out
+}
+
+func (h *Handler) defaultProfileIDForKind(profiles []archive.ArchiveProfile, k archive.Kind) string {
+	for _, p := range profiles {
+		if p.Kind == k {
+			return p.ID
+		}
+	}
+	return ""
 }
 
 // ConfigurationsApply applies configuration changes without persisting them.
@@ -888,18 +941,16 @@ func (h *Handler) ConfigurationsApply(w http.ResponseWriter, r *http.Request) {
 
 	updated, err := h.buildConfigFromForm(r.PostForm)
 	if err != nil {
-		h.renderTemplate(w, r, "configurations.html", map[string]any{
-			"Config": h.cfg,
-			"Error":  err.Error(),
-		})
+		data := h.configurationsBaseData(r)
+		data["Error"] = err.Error()
+		h.renderTemplate(w, r, "configurations.html", data)
 		return
 	}
 
 	if err := h.applyRuntimeConfig(updated); err != nil {
-		h.renderTemplate(w, r, "configurations.html", map[string]any{
-			"Config": h.cfg,
-			"Error":  err.Error(),
-		})
+		data := h.configurationsBaseData(r)
+		data["Error"] = err.Error()
+		h.renderTemplate(w, r, "configurations.html", data)
 		return
 	}
 	http.Redirect(w, r, "/configurations?msg="+url.QueryEscape("Applied configuration (not saved)."), http.StatusSeeOther)
@@ -923,10 +974,9 @@ func (h *Handler) ConfigurationsSave(w http.ResponseWriter, r *http.Request) {
 
 	updated, err := h.buildConfigFromForm(r.PostForm)
 	if err != nil {
-		h.renderTemplate(w, r, "configurations.html", map[string]any{
-			"Config": h.cfg,
-			"Error":  err.Error(),
-		})
+		data := h.configurationsBaseData(r)
+		data["Error"] = err.Error()
+		h.renderTemplate(w, r, "configurations.html", data)
 		return
 	}
 
@@ -934,25 +984,22 @@ func (h *Handler) ConfigurationsSave(w http.ResponseWriter, r *http.Request) {
 
 	// Persist
 	if strings.TrimSpace(h.configPath) == "" {
-		h.renderTemplate(w, r, "configurations.html", map[string]any{
-			"Config": h.cfg,
-			"Error":  "No config path configured; cannot save.",
-		})
+		data := h.configurationsBaseData(r)
+		data["Error"] = "No config path configured; cannot save."
+		h.renderTemplate(w, r, "configurations.html", data)
 		return
 	}
 	if err := updated.Save(h.configPath); err != nil {
-		h.renderTemplate(w, r, "configurations.html", map[string]any{
-			"Config": h.cfg,
-			"Error":  err.Error(),
-		})
+		data := h.configurationsBaseData(r)
+		data["Error"] = err.Error()
+		h.renderTemplate(w, r, "configurations.html", data)
 		return
 	}
 
 	if err := h.applyRuntimeConfig(updated); err != nil {
-		h.renderTemplate(w, r, "configurations.html", map[string]any{
-			"Config": h.cfg,
-			"Error":  err.Error(),
-		})
+		data := h.configurationsBaseData(r)
+		data["Error"] = err.Error()
+		h.renderTemplate(w, r, "configurations.html", data)
 		return
 	}
 
@@ -961,6 +1008,144 @@ func (h *Handler) ConfigurationsSave(w http.ResponseWriter, r *http.Request) {
 		msg = "Saved and applied configuration (requires daemon restart)."
 	}
 	http.Redirect(w, r, "/configurations?msg="+url.QueryEscape(msg), http.StatusSeeOther)
+}
+
+// ConfigurationsArchiveProfiles shows the archive destination profiles management page.
+func (h *Handler) ConfigurationsArchiveProfiles(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.cfg == nil {
+		http.Error(w, "Configuration not available", http.StatusInternalServerError)
+		return
+	}
+	profiles := h.archiveProfilesFromConfig(h.cfg)
+	views := make([]map[string]any, 0, len(profiles))
+	for i, p := range profiles {
+		kind := "movie"
+		if p.Kind == archive.KindSeries {
+			kind = "series"
+		}
+		views = append(views, map[string]any{
+			"Index":   i,
+			"ID":      p.ID,
+			"Name":    p.Name,
+			"Kind":    kind,
+			"BaseDir": p.BaseDir,
+		})
+	}
+	h.renderTemplate(w, r, "archive_profiles.html", map[string]any{
+		"Profiles":  views,
+		"Derived":   len(h.cfg.Archive.Profiles) == 0,
+		"NextIndex": len(views),
+	})
+}
+
+// ConfigurationsArchiveProfilesSave persists archive destination profiles.
+func (h *Handler) ConfigurationsArchiveProfilesSave(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.cfg == nil {
+		http.Error(w, "Configuration not available", http.StatusInternalServerError)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(h.configPath) == "" {
+		http.Error(w, "No config path configured; cannot save.", http.StatusInternalServerError)
+		return
+	}
+
+	updated := *h.cfg
+
+	indices := r.PostForm["profile_indices"]
+	// Keep indices stable and numeric where possible.
+	maxIdx := 0
+	cleanIdx := make([]string, 0, len(indices))
+	for _, idx := range indices {
+		idx = strings.TrimSpace(idx)
+		if idx == "" {
+			continue
+		}
+		cleanIdx = append(cleanIdx, idx)
+		if n, err := strconv.Atoi(idx); err == nil {
+			if n > maxIdx {
+				maxIdx = n
+			}
+		}
+	}
+	indices = cleanIdx
+	deleteIdx := make(map[string]bool)
+	for _, idx := range indices {
+		if r.PostFormValue("profile_delete_"+idx) == "on" {
+			deleteIdx[idx] = true
+		}
+	}
+
+	profiles := make([]config.ArchiveProfileConfig, 0, len(indices))
+	for _, idx := range indices {
+		if deleteIdx[idx] {
+			continue
+		}
+		id := strings.TrimSpace(r.PostFormValue("profile_id_" + idx))
+		name := strings.TrimSpace(r.PostFormValue("profile_name_" + idx))
+		kind := strings.TrimSpace(r.PostFormValue("profile_kind_" + idx))
+		baseDir := strings.TrimSpace(r.PostFormValue("profile_base_dir_" + idx))
+		// Skip completely empty rows (e.g. user clicked add but didn't fill).
+		if id == "" && name == "" && kind == "" && baseDir == "" {
+			continue
+		}
+		profiles = append(profiles, config.ArchiveProfileConfig{ID: id, Name: name, Kind: kind, BaseDir: baseDir})
+	}
+	updated.Archive.Profiles = profiles
+
+	if err := updated.Validate(); err != nil {
+		// Re-render with the submitted values.
+		views := make([]map[string]any, 0, len(indices))
+		for _, idx := range indices {
+			views = append(views, map[string]any{
+				"Index":   idx,
+				"ID":      r.PostFormValue("profile_id_" + idx),
+				"Name":    r.PostFormValue("profile_name_" + idx),
+				"Kind":    r.PostFormValue("profile_kind_" + idx),
+				"BaseDir": r.PostFormValue("profile_base_dir_" + idx),
+				"Delete":  deleteIdx[idx],
+			})
+		}
+		h.renderTemplate(w, r, "archive_profiles.html", map[string]any{
+			"Profiles":  views,
+			"Derived":   false,
+			"NextIndex": maxIdx + 1,
+			"Error":     err.Error(),
+		})
+		return
+	}
+
+	if err := updated.Save(h.configPath); err != nil {
+		h.renderTemplate(w, r, "archive_profiles.html", map[string]any{
+			"Profiles":  nil,
+			"Derived":   false,
+			"NextIndex": 0,
+			"Error":     err.Error(),
+		})
+		return
+	}
+	if err := h.applyRuntimeConfig(&updated); err != nil {
+		h.renderTemplate(w, r, "archive_profiles.html", map[string]any{
+			"Profiles":  nil,
+			"Derived":   false,
+			"NextIndex": 0,
+			"Error":     err.Error(),
+		})
+		return
+	}
+
+	http.Redirect(w, r, "/configurations?msg="+url.QueryEscape("Saved archive profiles."), http.StatusSeeOther)
 }
 
 func serverRestartRequired(oldCfg config.ServerConfig, newCfg config.ServerConfig) bool {
@@ -1078,6 +1263,10 @@ func (h *Handler) buildConfigFromForm(form url.Values) (*config.Config, error) {
 	updated.VDR.StreamURLTemplate = strings.TrimSpace(form.Get("vdr_stream_url_template"))
 	// Streamdev backend URL for HLS proxy (optional, can be empty)
 	updated.VDR.StreamdevBackendURL = strings.TrimSpace(form.Get("vdr_streamdev_backend_url"))
+
+	// Archive
+	updated.Archive.BaseDir = strings.TrimSpace(form.Get("archive_base_dir"))
+	updated.Archive.FFMpegArgs = strings.TrimSpace(form.Get("archive_ffmpeg_args"))
 
 	// Cache
 	if v := strings.TrimSpace(form.Get("cache_epg_expiry")); v != "" {
@@ -2515,10 +2704,10 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 
 	type timerView struct {
 		domain.Timer
-		ChannelName string
-		IsRecording bool
-		IsCritical  bool
-		IsCollision bool
+		ChannelName     string
+		IsRecording     bool
+		IsCritical      bool
+		IsCollision     bool
 		NextOccurrences []string
 	}
 
@@ -3752,6 +3941,57 @@ func (h *Handler) RecordingList(w http.ResponseWriter, r *http.Request) {
 		"Recordings": recordings,
 		"Sort":       sortBy,
 	}
+	if role, _ := r.Context().Value("role").(string); role == "admin" {
+		data["ActiveArchiveJobs"] = h.archiveJobs.ActiveJobIDsByRecording()
+	}
+
+	h.renderTemplate(w, r, "recordings.html", data)
+}
+
+// RecordingRefresh invalidates the recordings cache and returns a fresh list.
+// It is intended for cases where recordings are changed out-of-band (e.g. deleted on disk).
+func (h *Handler) RecordingRefresh(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.recordingService == nil {
+		http.Error(w, "Recording service not available", http.StatusInternalServerError)
+		return
+	}
+
+	_ = r.ParseForm()
+	// Prefer form value (htmx), fall back to query.
+	sortBy := strings.TrimSpace(r.FormValue("sort"))
+	if sortBy == "" {
+		sortBy = strings.TrimSpace(r.URL.Query().Get("sort"))
+	}
+	if sortBy == "" {
+		sortBy = "date"
+	}
+
+	h.recordingService.InvalidateCache()
+
+	recordings, err := h.recordingService.GetAllRecordings(r.Context())
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+	recordings = h.recordingService.SortRecordings(recordings, sortBy)
+
+	data := map[string]any{
+		"Recordings": recordings,
+		"Sort":       sortBy,
+	}
+	if role, _ := r.Context().Value("role").(string); role == "admin" {
+		data["ActiveArchiveJobs"] = h.archiveJobs.ActiveJobIDsByRecording()
+	}
+
+	// For non-HTMX browsers, behave like a standard action.
+	if r.Header.Get("HX-Request") == "" {
+		http.Redirect(w, r, "/recordings?sort="+url.QueryEscape(sortBy), http.StatusSeeOther)
+		return
+	}
 
 	h.renderTemplate(w, r, "recordings.html", data)
 }
@@ -3775,6 +4015,553 @@ func (h *Handler) RecordingDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+// RecordingArchivePrepare shows a preview form for archiving a recording.
+// MVP: preview-only (directory naming + target paths), no ffmpeg execution yet.
+func (h *Handler) RecordingArchivePrepare(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.cfg == nil {
+		http.Error(w, "Configuration not available", http.StatusInternalServerError)
+		return
+	}
+	if h.vdrClient == nil {
+		http.Error(w, "VDR client not available", http.StatusInternalServerError)
+		return
+	}
+
+	recID := strings.TrimSpace(r.URL.Query().Get("path"))
+	if recID == "" {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+	if jobID, ok := h.archiveJobs.ActiveJobIDForRecording(recID); ok {
+		http.Redirect(w, r, "/recordings/archive/job?id="+url.QueryEscape(jobID), http.StatusFound)
+		return
+	}
+
+	recDir, err := h.vdrClient.GetRecordingDir(r.Context(), recID)
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+	if strings.TrimSpace(recDir) == "" {
+		h.renderTemplate(w, r, "recording_archive.html", map[string]any{
+			"Error":        "Could not resolve recording directory via VDR.",
+			"RecordingID":  recID,
+			"RecordingDir": "",
+		})
+		return
+	}
+
+	infoPath := filepath.Join(recDir, "info")
+	infoBytes, err := os.ReadFile(infoPath)
+	if err != nil {
+		h.renderTemplate(w, r, "recording_archive.html", map[string]any{
+			"Error":        fmt.Sprintf("Failed to read info file: %v", err),
+			"RecordingID":  recID,
+			"RecordingDir": recDir,
+		})
+		return
+	}
+
+	parsed, err := archive.ParseVDRInfo(strings.NewReader(string(infoBytes)))
+	if err != nil {
+		h.renderTemplate(w, r, "recording_archive.html", map[string]any{
+			"Error":        fmt.Sprintf("Failed to parse info file: %v", err),
+			"RecordingID":  recID,
+			"RecordingDir": recDir,
+		})
+		return
+	}
+
+	// Allow user overrides via query params.
+	title := strings.TrimSpace(r.URL.Query().Get("title"))
+	if title == "" {
+		title = parsed.Title
+	}
+	episode := strings.TrimSpace(r.URL.Query().Get("episode"))
+	if episode == "" {
+		episode = parsed.Episode
+	}
+	format := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("format")))
+	if format != "mp4" {
+		format = "mkv"
+	}
+
+	profiles := h.archiveProfilesFromConfig(h.cfg)
+	sort.SliceStable(profiles, func(i, j int) bool {
+		ai := strings.ToLower(strings.TrimSpace(profiles[i].Name))
+		aj := strings.ToLower(strings.TrimSpace(profiles[j].Name))
+		if ai != aj {
+			return ai < aj
+		}
+		return strings.ToLower(strings.TrimSpace(profiles[i].ID)) < strings.ToLower(strings.TrimSpace(profiles[j].ID))
+	})
+	selectedID := strings.TrimSpace(r.URL.Query().Get("profile"))
+	if selectedID == "" {
+		selectedID = h.defaultProfileIDForKind(profiles, parsed.Kind)
+	}
+
+	const profileNoneID = "none"
+	var preview archive.Preview
+	var perr error
+	if selectedID != profileNoneID {
+		selected, ok := archive.FindProfile(profiles, selectedID)
+		if !ok {
+			selectedID = h.defaultProfileIDForKind(profiles, parsed.Kind)
+			selected, _ = archive.FindProfile(profiles, selectedID)
+		}
+		preview, perr = archive.BuildPreview(selected, title, episode, format)
+	}
+	var warn string
+	if strings.TrimSpace(h.cfg.Archive.BaseDir) == "" {
+		warn = "archive.base_dir is not set yet. Configure it in Configurations → Archive to get correct absolute target paths."
+	}
+
+	data := map[string]any{
+		"RecordingID":       recID,
+		"RecordingDir":      recDir,
+		"DetectedKind":      string(parsed.Kind),
+		"Title":             title,
+		"Episode":           episode,
+		"Profiles":          profiles,
+		"SelectedProfileID": selectedID,
+		"Format":            format,
+		"ArchiveWarning":    warn,
+	}
+	if perr != nil {
+		data["Error"] = perr.Error()
+	} else {
+		if selectedID != profileNoneID {
+			data["Preview"] = preview
+			if preview.VideoPath != "" {
+				if _, err := os.Stat(preview.VideoPath); err == nil {
+					data["OutputExists"] = true
+					data["OutputExistsPath"] = preview.VideoPath
+				}
+			}
+		}
+	}
+
+	h.renderTemplate(w, r, "recording_archive.html", data)
+}
+
+// RecordingArchiveStart starts a background archive job and redirects to the job page.
+func (h *Handler) RecordingArchiveStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.cfg == nil {
+		http.Error(w, "Configuration not available", http.StatusInternalServerError)
+		return
+	}
+	if h.vdrClient == nil {
+		http.Error(w, "VDR client not available", http.StatusInternalServerError)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form", http.StatusBadRequest)
+		return
+	}
+
+	recID := strings.TrimSpace(r.FormValue("path"))
+	if recID == "" {
+		recID = strings.TrimSpace(r.FormValue("recording_id"))
+	}
+	if recID == "" {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+	if jobID, ok := h.archiveJobs.ActiveJobIDForRecording(recID); ok {
+		redirect := "/recordings/archive/job?id=" + url.QueryEscape(jobID)
+		if r.Header.Get("HX-Request") != "" {
+			w.Header().Set("HX-Redirect", redirect)
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		http.Redirect(w, r, redirect, http.StatusFound)
+		return
+	}
+
+	title := strings.TrimSpace(r.FormValue("title"))
+	episode := strings.TrimSpace(r.FormValue("episode"))
+	profileID := strings.TrimSpace(r.FormValue("profile"))
+	format := strings.ToLower(strings.TrimSpace(r.FormValue("format")))
+	if format != "mp4" {
+		format = "mkv"
+	}
+	// Optional user overrides from the Preview section.
+	oTargetDir := strings.TrimSpace(r.FormValue("target_dir"))
+	oVideoPath := strings.TrimSpace(r.FormValue("video_path"))
+	oInfoDstPath := strings.TrimSpace(r.FormValue("info_dst_path"))
+
+	recDir, err := h.vdrClient.GetRecordingDir(r.Context(), recID)
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+	if strings.TrimSpace(recDir) == "" {
+		http.Error(w, "Could not resolve recording directory", http.StatusBadRequest)
+		return
+	}
+
+	infoPath := filepath.Join(recDir, "info")
+	infoBytes, err := os.ReadFile(infoPath)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to read info file: %v", err), http.StatusBadRequest)
+		return
+	}
+	parsed, err := archive.ParseVDRInfo(strings.NewReader(string(infoBytes)))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to parse info file: %v", err), http.StatusBadRequest)
+		return
+	}
+	if title == "" {
+		title = parsed.Title
+	}
+	if episode == "" {
+		episode = parsed.Episode
+	}
+
+	profiles := h.archiveProfilesFromConfig(h.cfg)
+	sort.SliceStable(profiles, func(i, j int) bool {
+		ai := strings.ToLower(strings.TrimSpace(profiles[i].Name))
+		aj := strings.ToLower(strings.TrimSpace(profiles[j].Name))
+		if ai != aj {
+			return ai < aj
+		}
+		return strings.ToLower(strings.TrimSpace(profiles[i].ID)) < strings.ToLower(strings.TrimSpace(profiles[j].ID))
+	})
+	const profileNoneID = "none"
+
+	ffArgs := archive.SplitArgs(h.cfg.Archive.FFMpegArgs)
+	var plan archive.Plan
+	var planErr error
+
+	if strings.TrimSpace(profileID) == profileNoneID {
+		// For "None", only TargetDir is editable; output paths are derived from TargetDir + format.
+		custom := archive.Preview{TargetDir: oTargetDir}
+		plan, planErr = archive.BuildPlanWithPreview(recID, recDir, infoPath, archive.ArchiveProfile{ID: profileNoneID, Name: "None", Kind: parsed.Kind}, custom, format, ffArgs)
+	} else {
+		if profileID == "" {
+			profileID = h.defaultProfileIDForKind(profiles, parsed.Kind)
+		}
+		selected, ok := archive.FindProfile(profiles, profileID)
+		if !ok {
+			selected, _ = archive.FindProfile(profiles, h.defaultProfileIDForKind(profiles, parsed.Kind))
+		}
+		plan, planErr = archive.BuildPlan(recID, recDir, infoPath, selected, title, episode, format, ffArgs)
+	}
+	if planErr != nil {
+		h.renderTemplate(w, r, "recording_archive.html", map[string]any{
+			"Error":             planErr.Error(),
+			"RecordingID":       recID,
+			"RecordingDir":      recDir,
+			"DetectedKind":      string(parsed.Kind),
+			"Title":             title,
+			"Episode":           episode,
+			"Profiles":          profiles,
+			"SelectedProfileID": profileID,
+			"Format":            format,
+			"Preview": &archive.Preview{
+				TargetDir:   oTargetDir,
+				VideoPath:   oVideoPath,
+				InfoDstPath: oInfoDstPath,
+			},
+		})
+		return
+	}
+	// Apply overrides after the plan is built so Profile changes won't clobber user edits.
+	if strings.TrimSpace(profileID) != profileNoneID {
+		if oTargetDir != "" {
+			plan.Preview.TargetDir = oTargetDir
+			// Only auto-derive paths from target dir when the user didn't override them.
+			if oVideoPath == "" {
+				plan.Preview.VideoPath = filepath.Join(oTargetDir, "video."+format)
+			}
+			if oInfoDstPath == "" {
+				plan.Preview.InfoDstPath = filepath.Join(oTargetDir, "video.info")
+			}
+		}
+		if oVideoPath != "" {
+			plan.Preview.VideoPath = oVideoPath
+		}
+		if oInfoDstPath != "" {
+			plan.Preview.InfoDstPath = oInfoDstPath
+		}
+	}
+	if plan.Preview.VideoPath != "" {
+		if _, err := os.Stat(plan.Preview.VideoPath); err == nil {
+			h.renderTemplate(w, r, "recording_archive.html", map[string]any{
+				"Error":             fmt.Sprintf("Output already exists: %s", plan.Preview.VideoPath),
+				"RecordingID":       recID,
+				"RecordingDir":      recDir,
+				"DetectedKind":      string(parsed.Kind),
+				"Title":             title,
+				"Episode":           episode,
+				"Profiles":          profiles,
+				"SelectedProfileID": profileID,
+				"Preview":           plan.Preview,
+				"OutputExists":      true,
+				"OutputExistsPath":  plan.Preview.VideoPath,
+			})
+			return
+		}
+	}
+
+	jobID, err := h.archiveJobs.Start(context.Background(), plan, h.instanceID)
+	if err != nil {
+		h.handleError(w, r, err)
+		return
+	}
+	h.logger.Info("archive job started",
+		slog.String("job_id", jobID),
+		slog.String("instance_id", h.instanceID),
+		slog.String("target_dir", plan.Preview.TargetDir),
+		slog.String("video_path", plan.Preview.VideoPath),
+	)
+
+	redirect := "/recordings/archive/job?id=" + url.QueryEscape(jobID)
+	if r.Header.Get("HX-Request") != "" {
+		w.Header().Set("HX-Redirect", redirect)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, redirect, http.StatusFound)
+}
+
+// RecordingArchivePreview returns suggested preview values for a given profile/title/episode.
+// The client applies these suggestions only to fields the user hasn't edited.
+func (h *Handler) RecordingArchivePreview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.cfg == nil {
+		http.Error(w, "Configuration not available", http.StatusInternalServerError)
+		return
+	}
+
+	title := strings.TrimSpace(r.URL.Query().Get("title"))
+	episode := strings.TrimSpace(r.URL.Query().Get("episode"))
+	profileID := strings.TrimSpace(r.URL.Query().Get("profile"))
+	currentVideoPath := strings.TrimSpace(r.URL.Query().Get("video_path"))
+	targetDir := strings.TrimSpace(r.URL.Query().Get("target_dir"))
+	format := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("format")))
+	if format != "mp4" {
+		format = "mkv"
+	}
+
+	const profileNoneID = "none"
+	var preview archive.Preview
+	if profileID == profileNoneID {
+		p, _ := archive.NormalizePreview(archive.Preview{TargetDir: targetDir}, format)
+		preview = p
+	} else {
+		profiles := h.archiveProfilesFromConfig(h.cfg)
+		selected, ok := archive.FindProfile(profiles, profileID)
+		if !ok {
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{"error": "unknown profile"})
+			return
+		}
+		p, err := archive.BuildPreview(selected, title, episode, format)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{"error": err.Error()})
+			return
+		}
+		preview = p
+	}
+
+	// Output existence warning should reflect the current effective path, not necessarily the suggested one.
+	checkPath := preview.VideoPath
+	if currentVideoPath != "" {
+		checkPath = currentVideoPath
+	}
+	outputExists := false
+	if checkPath != "" {
+		if _, statErr := os.Stat(checkPath); statErr == nil {
+			outputExists = true
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"title_slug":         preview.TitleSlug,
+		"episode_slug":       preview.EpisodeSlug,
+		"target_dir":         preview.TargetDir,
+		"video_path":         preview.VideoPath,
+		"info_dst_path":      preview.InfoDstPath,
+		"output_exists":      outputExists,
+		"output_exists_path": checkPath,
+	})
+}
+
+// RecordingArchiveJobs renders a simple overview of recent archive jobs.
+func (h *Handler) RecordingArchiveJobs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	jobs := h.archiveJobs.List()
+	h.renderTemplate(w, r, "recording_archive_jobs.html", map[string]any{
+		"Jobs": jobs,
+	})
+}
+
+// RecordingArchiveJob renders the job progress page.
+func (h *Handler) RecordingArchiveJob(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	jobID := normalizeArchiveJobID(r.URL.Query().Get("id"))
+	if jobID == "" {
+		http.Error(w, "Missing job id", http.StatusBadRequest)
+		return
+	}
+	snap, ok := h.archiveJobs.Get(jobID)
+	if !ok {
+		http.Error(w, "Unknown job", http.StatusNotFound)
+		return
+	}
+	data := map[string]any{
+		"Job":        snap,
+		"JobID":      jobID,
+		"InstanceID": h.instanceID,
+		"PID":        h.pid,
+	}
+	h.renderTemplate(w, r, "recording_archive_job.html", data)
+}
+
+// RecordingArchiveJobPoll returns a small JSON payload for progress and incremental logs.
+// This avoids flicker caused by swapping large HTML fragments and allows appending logs
+// without resetting the scroll position.
+func (h *Handler) RecordingArchiveJobPoll(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(map[string]any{"error": "method not allowed", "instance_id": h.instanceID, "pid": h.pid})
+		return
+	}
+	jobID := normalizeArchiveJobID(r.URL.Query().Get("id"))
+	if jobID == "" {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]any{"error": "missing job id", "instance_id": h.instanceID, "pid": h.pid})
+		return
+	}
+	from := 0
+	if v := strings.TrimSpace(r.URL.Query().Get("from")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			from = n
+		}
+	}
+
+	snap, newLines, next, ok := h.archiveJobs.Poll(jobID, from)
+	if !ok {
+		jobCount := h.archiveJobs.Count()
+		h.logger.Warn("archive job poll: unknown job",
+			slog.String("job_id", jobID),
+			slog.String("instance_id", h.instanceID),
+			slog.Int("job_count", jobCount),
+		)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(map[string]any{"error": "unknown job", "id": jobID, "instance_id": h.instanceID, "pid": h.pid, "job_count": jobCount})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"instance_id": h.instanceID,
+		"pid":         h.pid,
+		"id":          snap.ID,
+		"status":      snap.Status,
+		"error":       snap.Error,
+		"log_next":    next,
+		"log_lines":   newLines,
+		"progress": map[string]any{
+			"known_duration": snap.Progress.KnownDuration,
+			"percent":        snap.Progress.Percent,
+			"out_time_ms":    snap.Progress.OutTimeMS,
+			"speed":          snap.Progress.Speed,
+		},
+	})
+}
+
+// RecordingArchiveJobStatus returns an HTML fragment with current progress/logs.
+func (h *Handler) RecordingArchiveJobStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	jobID := normalizeArchiveJobID(r.URL.Query().Get("id"))
+	if jobID == "" {
+		http.Error(w, "Missing job id", http.StatusBadRequest)
+		return
+	}
+	snap, ok := h.archiveJobs.Get(jobID)
+	if !ok {
+		http.Error(w, "Unknown job", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	h.renderTemplate(w, r, "recording_archive_job_status.html", map[string]any{
+		"Job":   snap,
+		"JobID": jobID,
+	})
+}
+
+// RecordingArchiveJobCancel cancels a running/queued archive job.
+func (h *Handler) RecordingArchiveJobCancel(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	jobID := normalizeArchiveJobID(r.URL.Query().Get("id"))
+	if jobID == "" {
+		if err := r.ParseForm(); err == nil {
+			jobID = normalizeArchiveJobID(r.FormValue("id"))
+		}
+	}
+	if jobID == "" {
+		http.Error(w, "Missing job id", http.StatusBadRequest)
+		return
+	}
+	if !h.archiveJobs.Cancel(jobID) {
+		http.Error(w, "Job cannot be canceled", http.StatusBadRequest)
+		return
+	}
+	if r.Header.Get("HX-Request") != "" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/recordings/archive/job?id="+url.QueryEscape(jobID), http.StatusFound)
+}
+
+func normalizeArchiveJobID(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	// Some clients end up sending the id with surrounding quotes (id="...").
+	// Accept it by unquoting once.
+	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
+		if unq, err := strconv.Unquote(s); err == nil {
+			return strings.TrimSpace(unq)
+		}
+		return strings.TrimSpace(strings.Trim(s, "\""))
+	}
+	return s
 }
 
 // Helper methods

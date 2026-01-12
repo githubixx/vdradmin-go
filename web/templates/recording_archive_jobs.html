@@ -1,0 +1,55 @@
+{{define "recording_archive_jobs.html"}}
+<!DOCTYPE html>
+<html lang="en" {{if eq .ThemeMode "dark"}}data-theme="dark"{{else if eq .ThemeMode "light"}}data-theme="light"{{end}} data-theme-default="{{.ThemeDefault}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Archive Jobs - VDRAdmin-go</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/theme.js?v=20260104" defer></script>
+</head>
+<body>
+    {{template "nav_header" .}}
+
+    <main class="container">
+        <div class="toolbar">
+            <div style="display:flex; justify-content: space-between; align-items: center; gap: 1rem; width: 100%;">
+                <h3 style="margin: 0;">Archive Jobs</h3>
+                <a class="btn btn-sm btn-secondary" href="/recordings">Back</a>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            {{if not .Jobs}}
+                <p class="empty-state">No archive jobs yet.</p>
+            {{else}}
+                <div class="recording-list">
+                    {{range .Jobs}}
+                    <div class="recording-item">
+                        <div class="recording-info">
+                            <h3 style="margin: 0;">Job {{.ID}}</h3>
+                            <div class="recording-meta">
+                                <span class="recording-date">{{if .StartedAt.IsZero}}{{.CreatedAt.Format "2006-01-02 15:04:05"}}{{else}}{{.StartedAt.Format "2006-01-02 15:04:05"}}{{end}}</span>
+                                <span class="badge">{{.Status}}</span>
+                                {{if .Error}}<span class="empty-state">{{.Error}}</span>{{end}}
+                            </div>
+                            <div style="margin-top: 0.25rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; overflow-wrap: anywhere;">{{.Preview.VideoPath}}</div>
+                        </div>
+                        <div class="recording-actions">
+                            <a class="btn btn-sm btn-primary" href="/recordings/archive/job?id={{.ID}}">Open</a>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+            {{end}}
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; {{.Year}} vdradmin-go | <a href="https://github.com/githubixx/vdradmin-go">GitHub</a></p>
+        </div>
+    </footer>
+</body>
+</html>
+{{end}}

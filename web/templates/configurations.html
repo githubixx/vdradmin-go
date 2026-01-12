@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Configurations - VDRAdmin-go</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="/static/js/theme.js?v=20260104" defer></script>
 </head>
 <body>
@@ -190,6 +191,72 @@
             </div>
 
             <div class="toolbar">
+                <h3>Archive</h3>
+                <div class="config-grid">
+                    <label for="archive_base_dir">Base dir</label>
+                    <div>
+                        <input id="archive_base_dir" name="archive_base_dir" type="text" value="{{if .Config}}{{.Config.Archive.BaseDir}}{{end}}" placeholder="/vdr">
+                        <p class="empty-state" style="padding: 0.5rem 0 0 0; text-align: left;">
+                            Root directory for archived recordings.
+                        </p>
+                    </div>
+
+                    <label for="archive_ffmpeg_args">ffmpeg args</label>
+                    <div>
+                        <textarea id="archive_ffmpeg_args" name="archive_ffmpeg_args" rows="3" placeholder="-vaapi_device /dev/dri/renderD128 ...">{{if .Config}}{{.Config.Archive.FFMpegArgs}}{{end}}</textarea>
+                        <p class="empty-state" style="padding: 0.5rem 0 0 0; text-align: left;">
+                            Extra arguments passed to <code>ffmpeg</code> when archiving. Do not include <code>-i</code> or output path.
+                        </p>
+                    </div>
+
+                    <label>Destination profiles</label>
+                    <div>
+                        <div class="sort-options" style="justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;">
+                            <a class="btn btn-secondary" href="/configurations/archive-profiles">Manage profiles</a>
+                        </div>
+                        {{if .ArchiveProfilesDerived}}
+                            <p class="empty-state" style="padding: 0 0 0.5rem 0; text-align: left;">
+                                Currently using derived defaults from <code>archive.base_dir</code>. Save profiles to customize (e.g. add more destinations).
+                            </p>
+                        {{end}}
+                        {{if .ArchiveProfiles}}
+                            <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                                <select id="archive_profile_select" name="profile_id">
+                                    {{range .ArchiveProfiles}}
+                                        <option value="{{.ID}}" {{if eq .ID $.ArchiveProfileSelectedID}}selected{{end}}>{{.Name}} ({{.ID}})</option>
+                                    {{end}}
+                                </select>
+                            </div>
+                            <div style="margin-top: 0.75rem;">
+                                <table class="data-table" id="archive_profiles_table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Name</th>
+                                            <th>Kind</th>
+                                            <th>Destination dir</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {{range .ArchiveProfiles}}
+                                            <tr data-profile-id="{{.ID}}" {{if eq .ID $.ArchiveProfileSelectedID}}class="is-selected"{{end}}>
+                                                <td style="white-space: nowrap;">{{.ID}}</td>
+                                                <td>{{.Name}}</td>
+                                                <td style="white-space: nowrap;">{{.Kind}}</td>
+                                                <td style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; overflow-wrap: anywhere;">{{.BaseDir}}</td>
+                                            </tr>
+                                        {{end}}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {{else}}
+                            <p class="empty-state" style="padding: 0; text-align: left;">No profiles available.</p>
+                        {{end}}
+                    </div>
+                </div>
+            </div>
+
+            <div class="toolbar">
                 <h3>Cache</h3>
                 <div class="config-grid">
                     <label for="cache_epg_expiry">EPG expiry</label>
@@ -283,6 +350,22 @@
                     }
                 });
             }
+        })();
+
+        (() => {
+            const selectEl = document.getElementById('archive_profile_select');
+            const tableEl = document.getElementById('archive_profiles_table');
+            if (!selectEl || !tableEl) return;
+
+            function syncSelectedRow() {
+                const selectedID = selectEl.value;
+                for (const row of tableEl.querySelectorAll('tbody tr')) {
+                    row.classList.toggle('is-selected', row.dataset.profileId === selectedID);
+                }
+            }
+
+            selectEl.addEventListener('change', syncSelectedRow);
+            syncSelectedRow();
         })();
     </script>
 </body>

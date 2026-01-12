@@ -27,7 +27,7 @@ type timerCreateVDRMock struct {
 }
 
 func (m *timerCreateVDRMock) Connect(ctx context.Context) error { return nil }
-func (m *timerCreateVDRMock) Close() error                     { return nil }
+func (m *timerCreateVDRMock) Close() error                      { return nil }
 func (m *timerCreateVDRMock) Ping(ctx context.Context) error    { return nil }
 func (m *timerCreateVDRMock) GetChannels(ctx context.Context) ([]domain.Channel, error) {
 	return nil, nil
@@ -56,8 +56,12 @@ func (m *timerCreateVDRMock) DeleteTimer(ctx context.Context, timerID int) error
 func (m *timerCreateVDRMock) GetRecordings(ctx context.Context) ([]domain.Recording, error) {
 	return nil, nil
 }
+
+func (m *timerCreateVDRMock) GetRecordingDir(ctx context.Context, recordingID string) (string, error) {
+	return "", nil
+}
 func (m *timerCreateVDRMock) DeleteRecording(ctx context.Context, path string) error { return nil }
-func (m *timerCreateVDRMock) GetCurrentChannel(ctx context.Context) (string, error) { return "", nil }
+func (m *timerCreateVDRMock) GetCurrentChannel(ctx context.Context) (string, error)  { return "", nil }
 func (m *timerCreateVDRMock) SetCurrentChannel(ctx context.Context, channelID string) error {
 	return nil
 }

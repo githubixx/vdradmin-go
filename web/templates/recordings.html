@@ -15,13 +15,25 @@
     <main class="container">
 
         <div class="toolbar">
-            <div class="sort-options">
-                <label for="sort">Sort by:</label>
-                <select id="sort" name="sort" hx-get="/recordings" hx-trigger="change" hx-target=".recording-list" hx-select=".recording-list" hx-swap="outerHTML" hx-include="this">
-                    <option value="date" {{if eq .Sort "date"}}selected{{end}}>Date</option>
-                    <option value="name" {{if eq .Sort "name"}}selected{{end}}>Name</option>
-                    <option value="length" {{if eq .Sort "length"}}selected{{end}}>Length</option>
-                </select>
+            <div style="display:flex; align-items:center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+                <div class="sort-options">
+                    <label for="sort">Sort by:</label>
+                    <select id="sort" name="sort" hx-get="/recordings" hx-trigger="change" hx-target=".recording-list" hx-select=".recording-list" hx-swap="outerHTML" hx-include="this">
+                        <option value="date" {{if eq .Sort "date"}}selected{{end}}>Date</option>
+                        <option value="name" {{if eq .Sort "name"}}selected{{end}}>Name</option>
+                        <option value="length" {{if eq .Sort "length"}}selected{{end}}>Length</option>
+                    </select>
+                </div>
+                <button
+                    type="button"
+                    class="btn btn-sm btn-secondary"
+                    hx-post="/recordings/refresh"
+                    hx-target=".recording-list"
+                    hx-select=".recording-list"
+                    hx-swap="outerHTML"
+                    hx-include="#sort">
+                    Refresh recordings
+                </button>
             </div>
         </div>
 
@@ -43,14 +55,26 @@
                 </div>
                 {{if eq $.Role "admin"}}
                 <div class="recording-actions">
-                    <button
-                        hx-delete="/recordings?path={{.Path}}"
-                        hx-confirm="Are you sure you want to delete this recording?"
-                        hx-swap="outerHTML"
-                        hx-target="closest .recording-item"
-                        class="btn btn-sm btn-danger">
-                        Delete
-                    </button>
+                    {{$jobID := ""}}
+                    {{if $.ActiveArchiveJobs}}
+                        {{$jobID = index $.ActiveArchiveJobs .Path}}
+                    {{end}}
+
+                    {{if $jobID}}
+                        <button class="btn btn-sm btn-danger" disabled title="Archive job is running for this recording">Delete</button>
+                        <a class="btn btn-sm btn-secondary" href="/recordings/archive/job?id={{$jobID | urlquery}}">Archiving...</a>
+                    {{else}}
+                        <button
+                            hx-delete="/recordings?path={{.Path}}"
+                            hx-confirm="Are you sure you want to delete this recording?"
+                            hx-swap="outerHTML"
+                            hx-target="closest .recording-item"
+                            class="btn btn-sm btn-danger">
+                            Delete
+                        </button>
+
+                        <a class="btn btn-sm btn-secondary" href="/recordings/archive?path={{.Path | urlquery}}">Archive</a>
+                    {{end}}
                 </div>
                 {{end}}
             </div>

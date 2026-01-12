@@ -83,6 +83,10 @@ func SetupRoutes(handler *Handler, authCfg *config.AuthConfig, logger *slog.Logg
 	mux.Handle("GET /now", chain(handler.WhatsOnNow, commonMiddleware...))
 	mux.Handle("GET /channels", chain(handler.Channels, commonMiddleware...))
 	mux.Handle("GET /configurations", chain(handler.Configurations, commonMiddleware...))
+
+	// Config management sub-pages (admin-only)
+	mux.Handle("GET /configurations/archive-profiles", chain(handler.ConfigurationsArchiveProfiles, adminMiddleware...))
+	mux.Handle("POST /configurations/archive-profiles/save", chain(handler.ConfigurationsArchiveProfilesSave, adminMiddleware...))
 	mux.Handle("GET /playing", chain(handler.PlayingToday, commonMiddleware...))
 	mux.Handle("GET /watch", chain(handler.WatchTV, commonMiddleware...))
 	mux.Handle("POST /watch/key", chain(handler.WatchTVKey, commonMiddleware...))
@@ -98,6 +102,17 @@ func SetupRoutes(handler *Handler, authCfg *config.AuthConfig, logger *slog.Logg
 	mux.Handle("POST /epgsearch/execute", chain(handler.EPGSearchExecute, commonMiddleware...))
 	mux.Handle("GET /timers", chain(handler.TimerList, commonMiddleware...))
 	mux.Handle("GET /recordings", chain(handler.RecordingList, commonMiddleware...))
+	mux.Handle("POST /recordings/refresh", chain(handler.RecordingRefresh, commonMiddleware...))
+
+	// Archive (admin-only for now)
+	mux.Handle("GET /recordings/archive", chain(handler.RecordingArchivePrepare, adminMiddleware...))
+	mux.Handle("GET /recordings/archive/preview", chain(handler.RecordingArchivePreview, adminMiddleware...))
+	mux.Handle("POST /recordings/archive/start", chain(handler.RecordingArchiveStart, adminMiddleware...))
+	mux.Handle("GET /recordings/archive/jobs", chain(handler.RecordingArchiveJobs, adminMiddleware...))
+	mux.Handle("GET /recordings/archive/job", chain(handler.RecordingArchiveJob, adminMiddleware...))
+	mux.Handle("GET /recordings/archive/job/poll", chain(handler.RecordingArchiveJobPoll, adminMiddleware...))
+	mux.Handle("GET /recordings/archive/job/status", chain(handler.RecordingArchiveJobStatus, adminMiddleware...))
+	mux.Handle("POST /recordings/archive/job/cancel", chain(handler.RecordingArchiveJobCancel, adminMiddleware...))
 
 	// Admin-only routes (write operations)
 	mux.Handle("POST /configurations/apply", chain(handler.ConfigurationsApply, adminMiddleware...))

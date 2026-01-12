@@ -49,6 +49,10 @@ func (m *timersTimelineVDRMock) DeleteTimer(ctx context.Context, timerID int) er
 func (m *timersTimelineVDRMock) GetRecordings(ctx context.Context) ([]domain.Recording, error) {
 	return nil, nil
 }
+
+func (m *timersTimelineVDRMock) GetRecordingDir(ctx context.Context, recordingID string) (string, error) {
+	return "", nil
+}
 func (m *timersTimelineVDRMock) DeleteRecording(ctx context.Context, path string) error { return nil }
 func (m *timersTimelineVDRMock) GetCurrentChannel(ctx context.Context) (string, error) {
 	return "", nil

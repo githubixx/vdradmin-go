@@ -35,6 +35,10 @@ func (s *timerCreateSpyVDR) DeleteTimer(ctx context.Context, timerID int) error 
 func (s *timerCreateSpyVDR) GetRecordings(ctx context.Context) ([]domain.Recording, error) {
 	return nil, nil
 }
+
+func (s *timerCreateSpyVDR) GetRecordingDir(ctx context.Context, recordingID string) (string, error) {
+	return "", nil
+}
 func (s *timerCreateSpyVDR) DeleteRecording(ctx context.Context, path string) error { return nil }
 func (s *timerCreateSpyVDR) GetCurrentChannel(ctx context.Context) (string, error)  { return "", nil }
 func (s *timerCreateSpyVDR) SetCurrentChannel(ctx context.Context, channelID string) error {

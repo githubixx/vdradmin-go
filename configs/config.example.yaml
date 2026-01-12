@@ -82,3 +82,32 @@ ui:
   # Which page to show after login and when clicking the top-left "VDRAdmin-go" brand.
   # Allowed values: /, /timers, /now, /recordings, /channels, /playing, /search, /epgsearch, /configurations
   login_page: /timers
+
+archive:
+  # Root directory where archived recordings should be stored, e.g. "/vdr".
+  # Movies will go to <base_dir>/movies/<movie_slug>
+  # Series will go to <base_dir>/series/<series_slug>/<episode_slug>
+  base_dir: /vdr
+
+  # Optional: override destination profiles.
+  # If omitted, vdradmin-go derives two default profiles from base_dir:
+  # - movies -> /vdr/movies
+  # - series -> /vdr/series
+  # Add more profiles to support additional archive directories.
+  profiles:
+    - id: movies
+      name: Movies
+      kind: movie
+      base_dir: /vdr/movies
+    - id: series
+      name: Series
+      kind: series
+      base_dir: /vdr/series
+
+  # Extra arguments passed to ffmpeg when archiving.
+  # Do NOT include input (-i) or output file path.
+  ffmpeg_args: >-
+    -vaapi_device /dev/dri/renderD128
+    -vf format=nv12,hwupload
+    -map 0:0 -c:v hevc_vaapi -rc_mode CQP -global_quality 23 -profile:v main
+    -map 0:a -c:a copy

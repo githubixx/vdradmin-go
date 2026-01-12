@@ -1,0 +1,182 @@
+{{define "archive_profiles.html"}}
+<!DOCTYPE html>
+<html lang="en" {{if eq .ThemeMode "dark"}}data-theme="dark"{{else if eq .ThemeMode "light"}}data-theme="light"{{end}} data-theme-default="{{.ThemeDefault}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Archive Profiles - VDRAdmin-go</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/theme.js?v=20260104" defer></script>
+</head>
+<body>
+    {{template "nav_header" .}}
+
+    <main class="container">
+        <div class="toolbar">
+            <div style="display:flex; justify-content: space-between; align-items: center; gap: 1rem; width: 100%;">
+                <h3 style="margin: 0;">Archive destination profiles</h3>
+                <a class="btn btn-sm btn-secondary" href="/configurations">Back</a>
+            </div>
+            {{if .Derived}}
+                <p class="empty-state" style="padding: 0.75rem 0 0 0; text-align: left;">
+                    These are currently derived defaults. Saving will write explicit <code>archive.profiles</code> into your config.
+                </p>
+            {{end}}
+        </div>
+
+        {{if .Error}}
+        <div class="toolbar">
+            <p><strong>Error:</strong> {{.Error}}</p>
+        </div>
+        {{end}}
+
+        <form method="post" action="/configurations/archive-profiles/save" id="profiles-form">
+            <div class="toolbar">
+                <div class="sort-options" style="justify-content: flex-end; width: 100%;">
+                    <button type="button" class="btn btn-secondary" id="add-profile">Add profile</button>
+                    <button type="submit" class="btn btn-primary">Save profiles</button>
+                </div>
+                <p class="empty-state" style="padding: 0.75rem 0 0 0; text-align: left;">
+                    Each profile has its own destination directory. Use <strong>movie</strong> for films and <strong>series</strong> for episodic recordings.
+                </p>
+            </div>
+
+            <div class="toolbar">
+                <div id="profiles">
+                    {{range .Profiles}}
+                    <div class="toolbar" style="margin: 0 0 1rem 0;" data-profile-row data-index="{{.Index}}">
+                        <input type="hidden" name="profile_indices" value="{{.Index}}">
+                        <div class="config-grid">
+                            <label>ID</label>
+                            <input name="profile_id_{{.Index}}" type="text" value="{{.ID}}" placeholder="movies">
+
+                            <label>Name</label>
+                            <input name="profile_name_{{.Index}}" type="text" value="{{.Name}}" placeholder="Movies">
+
+                            <label>Kind</label>
+                            <select name="profile_kind_{{.Index}}">
+                                <option value="movie" {{if eq .Kind "movie"}}selected{{end}}>movies</option>
+                                <option value="series" {{if eq .Kind "series"}}selected{{end}}>series</option>
+                            </select>
+
+                            <label>Destination dir</label>
+                            <input name="profile_base_dir_{{.Index}}" type="text" value="{{.BaseDir}}" placeholder="/vdr/movies">
+
+                            <label>Delete</label>
+                            <div>
+                                <input class="profile-delete-flag" name="profile_delete_{{.Index}}" type="hidden" value="{{if .Delete}}on{{end}}">
+                                <button type="button" class="btn btn-sm {{if .Delete}}btn-secondary{{else}}btn-danger{{end}}" data-action="toggle-delete">{{if .Delete}}Undo{{else}}Delete{{end}}</button>
+                                <div class="empty-state" data-delete-note style="padding: 0.25rem 0 0 0; text-align: left; {{if not .Delete}}display:none;{{end}}">
+                                    Marked for deletion (removed on save)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+        </form>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; {{.Year}} vdradmin-go | <a href="https://github.com/githubixx/vdradmin-go">GitHub</a></p>
+        </div>
+    </footer>
+
+    <template id="profile-row-template">
+        <div class="toolbar" style="margin: 0 0 1rem 0;" data-profile-row data-index="__IDX__">
+            <input type="hidden" name="profile_indices" value="__IDX__">
+            <div class="config-grid">
+                <label>ID</label>
+                <input name="profile_id___IDX__" type="text" value="" placeholder="movies">
+
+                <label>Name</label>
+                <input name="profile_name___IDX__" type="text" value="" placeholder="Movies">
+
+                <label>Kind</label>
+                <select name="profile_kind___IDX__">
+                    <option value="movie" selected>movie</option>
+                    <option value="series">series</option>
+                </select>
+
+                <label>Destination dir</label>
+                <input name="profile_base_dir___IDX__" type="text" value="" placeholder="/vdr/movies">
+
+                <label>Delete</label>
+                <div>
+                    <input class="profile-delete-flag" name="profile_delete___IDX__" type="hidden" value="">
+                    <button type="button" class="btn btn-sm btn-danger" data-action="toggle-delete">Delete</button>
+                    <div class="empty-state" data-delete-note style="padding: 0.25rem 0 0 0; text-align: left; display:none;">
+                        Marked for deletion (removed on save)
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        (() => {
+            const btn = document.getElementById('add-profile');
+            const profiles = document.getElementById('profiles');
+            const tpl = document.getElementById('profile-row-template');
+            let next = {{.NextIndex}};
+
+            if (!btn || !profiles || !tpl) return;
+
+            function setRowDeleted(row, deleted) {
+                if (!row) return;
+                const flag = row.querySelector('.profile-delete-flag');
+                const note = row.querySelector('[data-delete-note]');
+                const toggle = row.querySelector('button[data-action="toggle-delete"]');
+                if (flag) flag.value = deleted ? 'on' : '';
+                if (note) note.style.display = deleted ? 'block' : 'none';
+                if (toggle) {
+                    toggle.textContent = deleted ? 'Undo' : 'Delete';
+                    toggle.classList.toggle('btn-danger', !deleted);
+                    toggle.classList.toggle('btn-secondary', deleted);
+                }
+                // Disable edits while marked for deletion (except hidden fields).
+                const controls = row.querySelectorAll('input, select, textarea');
+                controls.forEach((c) => {
+                    if (c && c.tagName && c.tagName.toLowerCase() === 'input') {
+                        const t = String(c.getAttribute('type') || '').toLowerCase();
+                        if (t === 'hidden') return;
+                    }
+                    c.disabled = deleted;
+                });
+                row.style.opacity = deleted ? '0.65' : '';
+            }
+
+            // Initialize any server-rendered rows already marked for deletion.
+            profiles.querySelectorAll('[data-profile-row]').forEach((row) => {
+                const flag = row.querySelector('.profile-delete-flag');
+                setRowDeleted(row, !!(flag && flag.value === 'on'));
+            });
+
+            // Toggle delete via event delegation.
+            profiles.addEventListener('click', (e) => {
+                const target = e && e.target;
+                const btn = target && target.closest ? target.closest('button[data-action="toggle-delete"]') : null;
+                if (!btn) return;
+                const row = btn.closest('[data-profile-row]');
+                if (!row) return;
+                const flag = row.querySelector('.profile-delete-flag');
+                const isDeleted = !!(flag && flag.value === 'on');
+                setRowDeleted(row, !isDeleted);
+            });
+
+            btn.addEventListener('click', () => {
+                const html = tpl.innerHTML.replaceAll('__IDX__', String(next));
+                const wrapper = document.createElement('div');
+                wrapper.innerHTML = html;
+                const node = wrapper.firstElementChild;
+                if (node) profiles.appendChild(node);
+                setRowDeleted(node, false);
+                next++;
+            });
+        })();
+    </script>
+</body>
+</html>
+{{end}}
