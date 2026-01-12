@@ -1,5 +1,5 @@
 # Binaries
-vdradmin
+/vdradmin
 *.exe
 *.dll
 *.so
