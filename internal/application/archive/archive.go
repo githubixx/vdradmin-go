@@ -715,9 +715,17 @@ func parseProgressLine(kv string) (key string, val string, ok bool) {
 }
 
 func runArchive(ctx context.Context, job *Job, plan Plan) error {
+	// If the job was canceled before the runner starts, avoid touching the filesystem.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	// Ensure target dir exists.
 	if err := os.MkdirAll(plan.Preview.TargetDir, 0755); err != nil {
 		return fmt.Errorf("mkdir target dir: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	finalOut := plan.Preview.VideoPath
@@ -744,6 +752,9 @@ func runArchive(ctx context.Context, job *Job, plan Plan) error {
 		return err
 	}
 	defer func() { _ = os.Remove(concatList) }()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
 	// Best-effort duration probe (for percentage).
 	if dur, err := ffprobeDurationSeconds(ctx, concatList); err == nil {
