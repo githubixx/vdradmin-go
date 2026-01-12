@@ -31,3 +31,11 @@ func TestParseRecording_VDR27_LSTR_WithFlaggedLengthToken(t *testing.T) {
 		t.Fatalf("Length=%v, want %v", rec.Length, wantLen)
 	}
 }
+
+func TestInferRecordingTitleFromDir_UsesShowFolder(t *testing.T) {
+	dir := "/hdd01/vdr/video/Tuff_Stuff/_/2025-07-05.23.00.77-0.rec"
+	got := inferRecordingTitleFromDir(dir)
+	if got != "Tuff Stuff" {
+		t.Fatalf("inferRecordingTitleFromDir=%q, want %q", got, "Tuff Stuff")
+	}
+}

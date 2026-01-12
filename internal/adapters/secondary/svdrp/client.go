@@ -413,12 +413,22 @@ func (c *Client) GetRecordings(ctx context.Context) ([]domain.Recording, error) 
 						if r.Date.IsZero() && !info.Start.IsZero() {
 							r.Date = info.Start
 						}
+						if r.Date.IsZero() {
+							// Some entries (e.g. radio) have info E=0 and may not have a parsable ID/path.
+							r.Date = parseRecordingDateFromPath(dirPath)
+						}
 						if r.Length <= 0 && info.Duration > 0 {
 							r.Length = info.Duration
 						}
 						// If LSTR title looks like it accidentally includes time/length, prefer info title.
 						if strings.TrimSpace(info.Title) != "" && (strings.TrimSpace(r.Title) == "" || looksLikeTimeLengthPrefix(r.Title)) {
 							r.Title = info.Title
+						}
+						// Fallback: if still no title, infer from the folder structure.
+						if strings.TrimSpace(r.Title) == "" {
+							if inferred := inferRecordingTitleFromDir(dirPath); inferred != "" {
+								r.Title = inferred
+							}
 						}
 					}
 				}
@@ -445,6 +455,34 @@ func looksLikeTimeLengthPrefix(title string) bool {
 		return false
 	}
 	return recordingClockRe.MatchString(f[0]) && recordingLengthRe.MatchString(f[1])
+}
+
+func inferRecordingTitleFromDir(recordingDir string) string {
+	// Typical VDR folder layout:
+	//   /video/<Title>/_/2025-07-05.23.00.77-0.rec
+	// or
+	//   /video/<Folder>/<Title>/_/2025-...rec
+	// where "_" is used as a placeholder segment.
+	//
+	// We pick the nearest non-"_" parent folder name and normalize underscores.
+	if recordingDir == "" {
+		return ""
+	}
+	parent := filepath.Base(filepath.Dir(recordingDir))
+	if parent == "" || parent == "." || parent == string(filepath.Separator) {
+		return ""
+	}
+	if parent == "_" {
+		parent = filepath.Base(filepath.Dir(filepath.Dir(recordingDir)))
+	}
+	parent = strings.TrimSpace(parent)
+	if parent == "" || parent == "_" {
+		return ""
+	}
+	parent = strings.ReplaceAll(parent, "_", " ")
+	parent = strings.TrimSpace(parent)
+	parent = strings.Join(strings.Fields(parent), " ")
+	return parent
 }
 
 func readRecordingInfoSubtitle(recordingDir string) (string, error) {
