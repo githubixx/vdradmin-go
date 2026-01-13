@@ -50,7 +50,7 @@ vdradmin-go/
 
 ## Technology Stack
 
-- **Language**: Go 1.23+
+- **Language**: Go 1.25+
 - **Web**: Go 1.22+ internal router
 - **Templates**: html/template
 - **Config**: YAML with validation
