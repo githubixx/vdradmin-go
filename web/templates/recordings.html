@@ -29,7 +29,8 @@
                             hx-swap="outerHTML"
                             hx-include="#recordings-filters"
                             hx-on:htmx:beforeRequest="const q=document.getElementById('recording-search')?.value?.trim()||''; if (q && q.length < 3) { event.preventDefault(); }">
-                            <option value="date" {{if eq .Sort "date"}}selected{{end}}>Date</option>
+                            <option value="date" {{if eq .Sort "date"}}selected{{end}}>Date (newest first)</option>
+                            <option value="date_oldest" {{if eq .Sort "date_oldest"}}selected{{end}}>Date (oldest first)</option>
                             <option value="name" {{if eq .Sort "name"}}selected{{end}}>Name</option>
                             <option value="length" {{if eq .Sort "length"}}selected{{end}}>Length</option>
                         </select>

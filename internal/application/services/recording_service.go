@@ -129,6 +129,14 @@ func (s *RecordingService) SortRecordings(recordings []domain.Recording, sortBy 
 			}
 			return sorted[i].Path < sorted[j].Path
 		})
+	case "date_oldest":
+		// Oldest -> newest
+		sort.SliceStable(sorted, func(i, j int) bool {
+			if !sorted[i].Date.Equal(sorted[j].Date) {
+				return sorted[i].Date.Before(sorted[j].Date)
+			}
+			return sorted[i].Path < sorted[j].Path
+		})
 	case "length":
 		sort.SliceStable(sorted, func(i, j int) bool {
 			if sorted[i].Length != sorted[j].Length {
