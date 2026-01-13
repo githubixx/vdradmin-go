@@ -1,0 +1,33 @@
+name: release-notes-preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: "Start commit or tag (inclusive)"
+        required: true
+        default: "56de9eead44290f9602e703943b8dd6572a3251e"
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes preview
+        shell: bash
+        run: |
+          bash scripts/release-notes-preview.sh "${{ inputs.from }}" > release-notes-preview.md
+          cat release-notes-preview.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes-preview
+          path: release-notes-preview.md
