@@ -40,6 +40,55 @@ checksum:
 changelog:
   disable: false
 
+  # Use git log for changelog generation.
+  # This keeps things working locally and in CI without extra API calls.
+  use: git
+
+  # Keep commit ordering from git log (usually newest-first).
+  # Setting sort would sort alphabetically by message.
+  sort: ""
+
+  # Keep the release notes readable; commit SHAs are usually noise.
+  abbrev: -1
+
+  # Add simple icons based on Conventional Commit types.
+  # NOTE: This relies on commit subjects like "feat:", "fix:", "chore:", etc.
+  format: >-
+    {{- $m := .Message -}}
+    {{- if ne (trimprefix $m "feat") $m -}}✨ {{ $m }}
+    {{- else if ne (trimprefix $m "fix") $m -}}🐛 {{ $m }}
+    {{- else if ne (trimprefix $m "chore") $m -}}🧹 {{ $m }}
+    {{- else if ne (trimprefix $m "refactor") $m -}}♻️ {{ $m }}
+    {{- else if ne (trimprefix $m "perf") $m -}}⚡️ {{ $m }}
+    {{- else if ne (trimprefix $m "docs") $m -}}📝 {{ $m }}
+    {{- else if ne (trimprefix $m "build") $m -}}🏗️ {{ $m }}
+    {{- else if ne (trimprefix $m "ci") $m -}}🤖 {{ $m }}
+    {{- else if ne (trimprefix $m "test") $m -}}✅ {{ $m }}
+    {{- else if ne (trimprefix $m "deps") $m -}}⬆️ {{ $m }}
+    {{- else if ne (trimprefix $m "revert") $m -}}⏪ {{ $m }}
+    {{- else -}}{{ $m }}{{- end -}}
+
+  # Make changelogs easy to scan: Added / Fixed / Changed.
+  # Ordering ensures features (feat) always come first.
+  groups:
+    - title: "✨ Added"
+      regexp: '^feat(\([[:word:]-]+\))?!?:.+$'
+      order: 0
+    - title: "🐛 Fixed"
+      regexp: '^fix(\([[:word:]-]+\))?!?:.+$'
+      order: 1
+    - title: "🛠️ Changed"
+      regexp: '^(chore|refactor|perf|build|ci|docs|test|style|deps)(\([[:word:]-]+\))?!?:.+$'
+      order: 2
+    - title: "🧩 Other"
+      order: 999
+
+  filters:
+    exclude:
+      - '^Merge '
+      - '^merge '
+      - '^Merge pull request '
+
 release:
   draft: false
   prerelease: auto
