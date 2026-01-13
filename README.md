@@ -69,7 +69,9 @@ make build
 
 ## Usage / Deployment Options
 
-vdradmin-go can be run in multiple ways depending on your setup. Releases are built automatically via GitHub Actions when a new release tag is created.
+vdradmin-go can be run in multiple ways depending on your setup.
+
+Releases are built via GitHub Actions (GoReleaser) when you push a semantic version tag (e.g. `0.1.0` or `0.1.0-rc.1`). Version numbers are chosen manually.
 
 ### 1) Use the released binary (recommended)
 
