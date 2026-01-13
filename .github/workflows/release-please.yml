@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - master
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,6 +18,9 @@ jobs:
       - name: Run release-please
         uses: googleapis/release-please-action@v4
         with:
+          # Prefer a PAT when repository settings disallow PR creation with GITHUB_TOKEN.
+          # Configure it as a repo secret named RELEASE_PLEASE_TOKEN.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           skip-github-release: true
