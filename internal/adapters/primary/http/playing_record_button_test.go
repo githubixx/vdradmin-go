@@ -97,6 +97,9 @@ func TestPlayingToday_DisablesRecordWhenTimerExists(t *testing.T) {
 	timerNumericChannel := timer
 	timerNumericChannel.ID = 2
 	timerNumericChannel.ChannelID = "1"
+	// Real-world case: timer titles may not match EPG titles byte-for-byte.
+	// E.g. some setups show "alpha-retro| ..." in timers while EPG uses "alpha-retro: ...".
+	timerNumericChannel.Title = "Test Show|"
 
 	mock := &playingVDRMock{
 		channels: []domain.Channel{ch},
