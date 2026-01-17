@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -41,10 +42,18 @@ func (s *Server) Start() error {
 	)
 
 	if s.config.TLS.Enabled {
-		return s.server.ListenAndServeTLS(s.config.TLS.CertFile, s.config.TLS.KeyFile)
+		err := s.server.ListenAndServeTLS(s.config.TLS.CertFile, s.config.TLS.KeyFile)
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+		return nil
 	}
 
-	return s.server.ListenAndServe()
+	err := s.server.ListenAndServe()
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
 }
 
 // Shutdown gracefully shuts down the server
