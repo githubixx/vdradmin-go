@@ -102,7 +102,8 @@ func TestChannels_DisablesRecordOnlyForScheduledShow(t *testing.T) {
 		ID:        1,
 		Active:    true,
 		ChannelID: ch.ID,
-		Title:     scheduled.Title,
+		// Timer titles can differ from EPG titles (separator differences etc.).
+		Title:     scheduled.Title + "|",
 		Start:     scheduled.Start.Add(-2 * time.Minute),
 		Stop:      scheduled.Stop.Add(10 * time.Minute),
 	}

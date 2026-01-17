@@ -84,7 +84,8 @@ func TestSearch_DisablesRecordWhenTimerExists(t *testing.T) {
 		ID:        1,
 		Active:    true,
 		ChannelID: ch.ID,
-		Title:     scheduled.Title,
+		// Timer titles can be formatted differently than EPG titles (e.g. "alpha-retro|" vs "alpha-retro:").
+		Title:     scheduled.Title + "|",
 		Start:     scheduled.Start.Add(-2 * time.Minute),
 		Stop:      scheduled.Stop.Add(2 * time.Minute),
 	}

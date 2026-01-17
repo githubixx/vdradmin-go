@@ -3157,12 +3157,6 @@ func timerOccurrences(t domain.Timer, from, to time.Time) []timerOccurrence {
 	return out
 }
 
-func normalizeTitleForTimerMatch(s string) string {
-	s = strings.ToLower(strings.TrimSpace(s))
-	s = strings.Join(strings.Fields(s), " ")
-	return s
-}
-
 func scheduledTimerForEvent(
 	ev domain.EPGEvent,
 	loc *time.Location,
@@ -3172,73 +3166,11 @@ func scheduledTimerForEvent(
 	idByNumber map[int]string,
 	timersByID map[int]domain.Timer,
 ) (domain.Timer, bool) {
-	if loc == nil {
-		loc = time.Local
-	}
-
-	evTitle := normalizeTitleForTimerMatch(ev.Title)
-	if evTitle == "" {
-		return domain.Timer{}, false
-	}
-
-	lookupOccs := func() []timerOccurrence {
-		if ev.ChannelNumber > 0 {
-			if occs := occByChannelNumber[ev.ChannelNumber]; len(occs) > 0 {
-				return occs
-			}
-		}
-		if ev.ChannelID != "" {
-			if ev.ChannelNumber <= 0 {
-				if n := numberByID[ev.ChannelID]; n > 0 {
-					if occs := occByChannelNumber[n]; len(occs) > 0 {
-						return occs
-					}
-				}
-			}
-			if occs := occByChannelID[ev.ChannelID]; len(occs) > 0 {
-				return occs
-			}
-			if ev.ChannelNumber > 0 {
-				if occs := occByChannelID[strconv.Itoa(ev.ChannelNumber)]; len(occs) > 0 {
-					return occs
-				}
-			}
-		}
-		if ev.ChannelNumber > 0 {
-			if id := idByNumber[ev.ChannelNumber]; id != "" {
-				if occs := occByChannelID[id]; len(occs) > 0 {
-					return occs
-				}
-			}
-		}
-		return nil
-	}
-
-	occs := lookupOccs()
-	if len(occs) == 0 {
-		return domain.Timer{}, false
-	}
-
-	evStart := ev.Start.In(loc)
-	evStop := ev.Stop.In(loc)
-	if evStop.Before(evStart) {
-		evStop = evStart
-	}
-
-	for _, occ := range occs {
-		if !occ.Start.Before(evStop) || !evStart.Before(occ.Stop) {
-			continue
-		}
-		t, ok := timersByID[occ.TimerID]
-		if !ok {
-			continue
-		}
-		if normalizeTitleForTimerMatch(t.Title) == evTitle {
-			return t, true
-		}
-	}
-
-	return domain.Timer{}, false
+	// Keep scheduled detection consistent across the UI.
+	// Matching by timer title is unreliable (timers vs EPG can format titles differently).
+	// Instead, treat an event as scheduled when a timer on the same channel overlaps
+	// most of the event window (see overlappingTimerForEvent).
+	return overlappingTimerForEvent(ev, loc, occByChannelNumber, occByChannelID, numberByID, idByNumber, timersByID)
 }
 
 func isWeekdayMaskHTTP(daySpec string) bool {
