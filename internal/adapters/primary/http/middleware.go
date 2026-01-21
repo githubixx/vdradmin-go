@@ -97,6 +97,15 @@ func AuthMiddleware(cfg *config.AuthConfig) func(http.Handler) http.Handler {
 				return
 			}
 
+			// Always treat loopback as trusted. This avoids external players (VLC/mpv)
+			// repeatedly prompting for credentials when opening localhost URLs.
+			if isLoopbackRemote(r.RemoteAddr) {
+				ctx := context.WithValue(r.Context(), "user", cfg.AdminUser)
+				ctx = context.WithValue(ctx, "role", "admin")
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+
 			// Check if request is from local network
 			if isLocalNet(r.RemoteAddr, cfg.LocalNets) {
 				ctx := context.WithValue(r.Context(), "user", cfg.AdminUser)
@@ -246,6 +255,18 @@ func isLocalNet(remoteAddr string, localNets []string) bool {
 	}
 
 	return false
+}
+
+func isLoopbackRemote(remoteAddr string) bool {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		return false
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback()
 }
 
 func isAllowedOrigin(origin string, allowed []string) bool {

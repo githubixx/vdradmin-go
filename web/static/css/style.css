@@ -1434,6 +1434,33 @@ main {
     white-space: pre-wrap;
 }
 
+.archive-target-label {
+    color: var(--text-muted);
+    font-weight: 400;
+    display: block;
+    margin-bottom: 0.15rem;
+}
+
+.archive-target-value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.archive-target-frame {
+    margin-top: 0;
+    max-height: none;
+    overflow: visible;
+}
+
+.archive-target-item {
+    margin-bottom: 0.75rem;
+}
+
+.archive-target-item:last-child {
+    margin-bottom: 0;
+}
+
 /* Search Form */
 .search-form {
     display: flex;
