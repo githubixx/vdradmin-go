@@ -120,6 +120,7 @@ func SetupRoutes(handler *Handler, authCfg *config.AuthConfig, logger *slog.Logg
 	mux.Handle("GET /recordings/archive/jobs", chain(handler.RecordingArchiveJobs, adminMiddleware...))
 	mux.Handle("GET /recordings/archive/job", chain(handler.RecordingArchiveJob, adminMiddleware...))
 	mux.Handle("GET /recordings/archive/job/poll", chain(handler.RecordingArchiveJobPoll, adminMiddleware...))
+	mux.Handle("GET /recordings/archive/job/output", chain(handler.RecordingArchiveJobOutput, adminMiddleware...))
 	mux.Handle("GET /recordings/archive/job/status", chain(handler.RecordingArchiveJobStatus, adminMiddleware...))
 	mux.Handle("POST /recordings/archive/job/cancel", chain(handler.RecordingArchiveJobCancel, adminMiddleware...))
 

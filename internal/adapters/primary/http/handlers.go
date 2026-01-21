@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"log/slog"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -4439,13 +4441,52 @@ func (h *Handler) RecordingArchiveJob(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unknown job", http.StatusNotFound)
 		return
 	}
+	recordingTitle := "—"
+	if h.recordingService != nil {
+		if title, ok, err := h.findRecordingTitleByPath(r.Context(), snap.RecordingID); err == nil && ok {
+			recordingTitle = title
+		}
+	}
+	infoCopyText, infoCopyErr := archiveJobInfoCopyText(snap)
+	outputReady := archiveJobOutputReady(snap)
 	data := map[string]any{
-		"Job":        snap,
-		"JobID":      jobID,
-		"InstanceID": h.instanceID,
-		"PID":        h.pid,
+		"Job":              snap,
+		"JobID":            jobID,
+		"InstanceID":       h.instanceID,
+		"PID":              h.pid,
+		"RecordingTitle":   recordingTitle,
+		"InfoCopyText":     infoCopyText,
+		"InfoCopyError":    infoCopyErr,
+		"OutputVideoReady": outputReady,
+		"OutputVideoURL":   "/recordings/archive/job/output?id=" + url.QueryEscape(jobID),
 	}
 	h.renderTemplate(w, r, "recording_archive_job.html", data)
+}
+
+func (h *Handler) findRecordingTitleByPath(ctx context.Context, recordingPath string) (string, bool, error) {
+	recordingPath = strings.TrimSpace(recordingPath)
+	if recordingPath == "" {
+		return "", false, nil
+	}
+	recs, err := h.recordingService.GetAllRecordings(ctx)
+	if err != nil {
+		return "", false, err
+	}
+	for _, rec := range recs {
+		if strings.TrimSpace(rec.Path) != recordingPath {
+			continue
+		}
+		title := strings.TrimSpace(rec.Title)
+		sub := strings.TrimSpace(rec.Subtitle)
+		if title == "" {
+			return "", false, nil
+		}
+		if sub != "" {
+			return title + " — " + sub, true, nil
+		}
+		return title, true, nil
+	}
+	return "", false, nil
 }
 
 // RecordingArchiveJobPoll returns a small JSON payload for progress and incremental logs.
@@ -4487,14 +4528,21 @@ func (h *Handler) RecordingArchiveJobPoll(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	infoCopyText, infoCopyErr := archiveJobInfoCopyText(snap)
+	outputReady := archiveJobOutputReady(snap)
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"instance_id": h.instanceID,
-		"pid":         h.pid,
-		"id":          snap.ID,
-		"status":      snap.Status,
-		"error":       snap.Error,
-		"log_next":    next,
-		"log_lines":   newLines,
+		"instance_id":     h.instanceID,
+		"pid":             h.pid,
+		"id":              snap.ID,
+		"status":          snap.Status,
+		"error":           snap.Error,
+		"info_copy_text":  infoCopyText,
+		"info_copy_error": infoCopyErr,
+		"video_path":      snap.Preview.VideoPath,
+		"output_ready":    outputReady,
+		"output_url":      "/recordings/archive/job/output?id=" + url.QueryEscape(snap.ID),
+		"log_next":        next,
+		"log_lines":       newLines,
 		"progress": map[string]any{
 			"known_duration": snap.Progress.KnownDuration,
 			"percent":        snap.Progress.Percent,
@@ -4502,6 +4550,131 @@ func (h *Handler) RecordingArchiveJobPoll(w http.ResponseWriter, r *http.Request
 			"speed":          snap.Progress.Speed,
 		},
 	})
+}
+
+// RecordingArchiveJobOutput serves the finished archive output video file.
+func (h *Handler) RecordingArchiveJobOutput(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	jobID := normalizeArchiveJobID(r.URL.Query().Get("id"))
+	if jobID == "" {
+		http.Error(w, "Missing job id", http.StatusBadRequest)
+		return
+	}
+	snap, ok := h.archiveJobs.Get(jobID)
+	if !ok {
+		http.Error(w, "Unknown job", http.StatusNotFound)
+		return
+	}
+	videoPath := strings.TrimSpace(snap.Preview.VideoPath)
+	if videoPath == "" {
+		http.Error(w, "Missing output video path", http.StatusNotFound)
+		return
+	}
+	// Safety: only allow serving files inside the job's TargetDir.
+	targetDir := filepath.Clean(strings.TrimSpace(snap.Preview.TargetDir))
+	cleanVideo := filepath.Clean(videoPath)
+	if targetDir == "." || targetDir == "" {
+		http.Error(w, "Invalid target dir", http.StatusBadRequest)
+		return
+	}
+	rel, err := filepath.Rel(targetDir, cleanVideo)
+	if err != nil || rel == "." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || rel == ".." {
+		http.Error(w, "Refusing to serve file outside target dir", http.StatusBadRequest)
+		return
+	}
+	if _, err := os.Stat(cleanVideo); err != nil {
+		if os.IsNotExist(err) {
+			http.Error(w, "Output video not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Failed to stat output video", http.StatusInternalServerError)
+		return
+	}
+
+	// Prefer an inline content disposition so the browser can play it;
+	// users can still open/save it in their video player.
+	filename := filepath.Base(cleanVideo)
+	if filename != "" {
+		disp := "inline"
+		switch strings.ToLower(filepath.Ext(filename)) {
+		case ".mkv":
+			// Most browsers don't reliably play MKV inline.
+			disp = "attachment"
+		}
+		w.Header().Set("Content-Disposition", mime.FormatMediaType(disp, map[string]string{"filename": filename}))
+	}
+	ext := strings.ToLower(filepath.Ext(cleanVideo))
+	if ct := mime.TypeByExtension(ext); ct != "" {
+		w.Header().Set("Content-Type", ct)
+	} else if ext == ".mkv" {
+		w.Header().Set("Content-Type", "video/x-matroska")
+	}
+	http.ServeFile(w, r, cleanVideo)
+}
+
+func archiveJobInfoCopyText(snap archive.JobSnapshot) (text string, errMsg string) {
+	// Only attempt once the job is no longer running.
+	if snap.Status == archive.JobQueued || snap.Status == archive.JobRunning {
+		return "", ""
+	}
+	path := strings.TrimSpace(snap.Preview.InfoDstPath)
+	if path == "" {
+		return "", ""
+	}
+
+	const maxBytes = int64(256 * 1024)
+	b, truncated, err := readFileLimited(path, maxBytes)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", "info copy file not found"
+		}
+		return "", err.Error()
+	}
+	if len(b) == 0 {
+		return "", ""
+	}
+	out := string(b)
+	out = strings.ToValidUTF8(out, "�")
+	if truncated {
+		out += fmt.Sprintf("\n\n…(truncated to %d bytes)…", maxBytes)
+	}
+	return out, ""
+}
+
+func archiveJobOutputReady(snap archive.JobSnapshot) bool {
+	// Only claim readiness once the job is no longer running.
+	if snap.Status == archive.JobQueued || snap.Status == archive.JobRunning {
+		return false
+	}
+	path := strings.TrimSpace(snap.Preview.VideoPath)
+	if path == "" {
+		return false
+	}
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func readFileLimited(path string, maxBytes int64) (b []byte, truncated bool, err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, false, err
+	}
+	defer func() { _ = f.Close() }()
+	if maxBytes < 0 {
+		maxBytes = 0
+	}
+	// Read up to maxBytes+1 so we can detect truncation.
+	buf, err := io.ReadAll(io.LimitReader(f, maxBytes+1))
+	if err != nil {
+		return nil, false, err
+	}
+	if int64(len(buf)) > maxBytes {
+		return buf[:maxBytes], true, nil
+	}
+	return buf, false, nil
 }
 
 // RecordingArchiveJobStatus returns an HTML fragment with current progress/logs.
