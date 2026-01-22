@@ -1764,6 +1764,21 @@ func (h *Handler) EPGSearch(w http.ResponseWriter, r *http.Request) {
 
 	// Group results by local day, like the /epgsearch results view.
 	loc := time.Local
+	sort.SliceStable(views, func(i, j int) bool {
+		ai := views[i]
+		aj := views[j]
+		if !ai.Start.Equal(aj.Start) {
+			return ai.Start.Before(aj.Start)
+		}
+		// Tie-breakers for stable rendering.
+		if ai.ChannelName != aj.ChannelName {
+			return ai.ChannelName < aj.ChannelName
+		}
+		if ai.Title != aj.Title {
+			return ai.Title < aj.Title
+		}
+		return ai.EventID < aj.EventID
+	})
 	dayGroups := make([]searchDayGroup, 0)
 	var currentDay time.Time
 	currentIdx := -1
