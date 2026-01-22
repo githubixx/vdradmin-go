@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -56,5 +58,61 @@ func TestRecordingService_SortRecordings_DefaultNewestFirst(t *testing.T) {
 	}
 	if sorted[2].Path != "c" {
 		t.Fatalf("expected oldest last (path c), got %q", sorted[2].Path)
+	}
+}
+
+func TestRecordingService_GetAllRecordings_PrunesMissingDiskPathOnCacheHit(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "vdradmin-rec-*")
+	if err != nil {
+		t.Fatalf("MkdirTemp: %v", err)
+	}
+	// Remove the temp dir at the end in case the test fails early.
+	defer os.RemoveAll(tmpDir)
+
+	// Create a minimal `info` file to represent a valid VDR recording directory.
+	if err := os.WriteFile(filepath.Join(tmpDir, "info"), []byte("T Title\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(info): %v", err)
+	}
+
+	var calls int32
+	client := &mockVDRClient{
+		GetRecordingsFunc: func(ctx context.Context) ([]domain.Recording, error) {
+			atomic.AddInt32(&calls, 1)
+			return []domain.Recording{{Path: "1", Title: "A", DiskPath: tmpDir}}, nil
+		},
+	}
+
+	svc := NewRecordingService(client, time.Hour)
+	ctx := context.Background()
+
+	// First call should fetch and populate cache.
+	recs, err := svc.GetAllRecordings(ctx)
+	if err != nil {
+		t.Fatalf("GetAllRecordings(1): %v", err)
+	}
+	if len(recs) != 1 {
+		t.Fatalf("expected 1 recording, got %d", len(recs))
+	}
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("expected 1 backend call, got %d", got)
+	}
+
+	// Simulate out-of-band deletion on disk. In practice users often delete the
+	// recording contents/metadata; the directory may temporarily remain.
+	if err := os.Remove(filepath.Join(tmpDir, "info")); err != nil {
+		t.Fatalf("Remove(info): %v", err)
+	}
+
+	// Second call is within cache expiry, so it should be a cache hit, but it must
+	// prune the missing DiskPath entry.
+	recs, err = svc.GetAllRecordings(ctx)
+	if err != nil {
+		t.Fatalf("GetAllRecordings(2): %v", err)
+	}
+	if len(recs) != 0 {
+		t.Fatalf("expected 0 recordings after out-of-band delete, got %d", len(recs))
+	}
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("expected no additional backend calls on cache hit, got %d", got)
 	}
 }

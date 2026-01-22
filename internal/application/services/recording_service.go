@@ -2,7 +2,10 @@ package services
 
 import (
 	"context"
+	"path/filepath"
+	"os"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -50,7 +53,42 @@ func (s *RecordingService) GetAllRecordings(ctx context.Context) ([]domain.Recor
 		recordings := make([]domain.Recording, len(s.cache))
 		copy(recordings, s.cache)
 		s.cacheMu.RUnlock()
-		return recordings, nil
+
+		// If recordings are removed out-of-band (e.g. deleted on disk), the cached list
+		// can still contain entries. If we know the on-disk directory, prune missing ones
+		// without forcing a full backend refresh.
+		pruned := recordings[:0]
+		removed := false
+		for _, rec := range recordings {
+			diskPath := strings.TrimSpace(rec.DiskPath)
+			if diskPath == "" {
+				pruned = append(pruned, rec)
+				continue
+			}
+			if _, err := os.Stat(diskPath); err != nil {
+				if os.IsNotExist(err) {
+					removed = true
+					continue
+				}
+			}
+			// VDR recordings should have an `info` file. When a recording is removed
+			// manually, the directory may temporarily remain while core files are gone.
+			// Treat missing `info` as a strong signal the recording is no longer valid.
+			if _, err := os.Stat(filepath.Join(diskPath, "info")); err != nil {
+				if os.IsNotExist(err) {
+					removed = true
+					continue
+				}
+			}
+			pruned = append(pruned, rec)
+		}
+		if removed {
+			// Update cache so subsequent calls stay consistent.
+			s.cacheMu.Lock()
+			s.cache = append([]domain.Recording(nil), pruned...)
+			s.cacheMu.Unlock()
+		}
+		return pruned, nil
 	}
 	s.cacheMu.RUnlock()
 

@@ -275,6 +275,19 @@ func isSVDRPNoSchedule(err error) bool {
 	return strings.Contains(msg, "svdrp error 550") || strings.Contains(msg, "no schedule")
 }
 
+func isSVDRPRecordingNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	// VDR uses 550 for various "not found" conditions; when querying a recording path
+	// this usually indicates a stale in-memory entry for a recording deleted on disk.
+	if !strings.Contains(msg, "svdrp error 550") {
+		return false
+	}
+	return strings.Contains(msg, "record") || strings.Contains(msg, "not found") || strings.Contains(msg, "unknown")
+}
+
 // GetTimers retrieves all timers.
 func (c *Client) GetTimers(ctx context.Context) ([]domain.Timer, error) {
 	return withRetry(ctx, c, func() ([]domain.Timer, error) {
@@ -386,11 +399,16 @@ func (c *Client) GetRecordings(ctx context.Context) ([]domain.Recording, error) 
 					if isTransientConnErr(err) {
 						return nil, err
 					}
-					// If we can't resolve a path (protocol error), keep the entry.
+					// If VDR reports the recording does not exist, drop the entry.
+					if isSVDRPRecordingNotFound(err) {
+						continue
+					}
+					// Otherwise: protocol/feature mismatch; keep the entry.
 					recordings = append(recordings, r)
 					continue
 				}
 				if dirPath != "" {
+					r.DiskPath = dirPath
 					if _, statErr := os.Stat(dirPath); statErr != nil {
 						if os.IsNotExist(statErr) {
 							continue
