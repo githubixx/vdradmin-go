@@ -92,6 +92,47 @@ func TestClient_GetRecordings_FiltersMissingDirectories(t *testing.T) {
 	}
 }
 
+func TestClient_GetRecordings_FiltersWhenPathLookupNotFound(t *testing.T) {
+	base := t.TempDir()
+	existsDir := filepath.Join(base, "rec1")
+	if err := mkdirAll(existsDir); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	srv := newSVDRPTestServer(t, []svdrpConnScript{{
+		steps: []svdrpConnStep{
+			{expect: "UPDR", respond: []string{"250 updated"}},
+			{expect: "LSTR", respond: []string{
+				"250-1 02.01.26 20:15 1:30* CH~Title One~Sub~Desc",
+				"250-2 02.01.26 19:00 0:45 CH~Title Two",
+				"250 end",
+			}},
+			{expect: "LSTR 1 path", respond: []string{"250 " + existsDir}},
+			// Simulate stale VDR in-memory entry: path lookup fails.
+			{expect: "LSTR 2 path", respond: []string{"550 recording not found"}},
+		},
+	}})
+	defer srv.Close()
+
+	host, port := srv.Addr()
+	c := svdrp.NewClient(host, port, 2*time.Second)
+	defer func() { _ = c.Close() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	recs, err := c.GetRecordings(ctx)
+	if err != nil {
+		t.Fatalf("GetRecordings: %v", err)
+	}
+	if len(recs) != 1 {
+		t.Fatalf("expected 1 recording, got %d", len(recs))
+	}
+	if recs[0].Path != "1" {
+		t.Fatalf("expected recording id/path %q, got %q", "1", recs[0].Path)
+	}
+}
+
 func TestClient_GetChannels_RetriesOnTransientDisconnect(t *testing.T) {
 	// First connection: accept LSTC then drop connection before responding.
 	// Second connection: return a normal channels list.

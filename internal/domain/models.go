@@ -67,6 +67,9 @@ type Timer struct {
 // Recording represents a completed recording
 type Recording struct {
 	Path        string
+	// DiskPath is the resolved absolute path to the recording directory on disk.
+	// It may be empty if the backend cannot resolve it.
+	DiskPath    string
 	Title       string
 	Subtitle    string
 	Description string
