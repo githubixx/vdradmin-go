@@ -37,6 +37,7 @@ type Handler struct {
 	archiveJobs      *archive.JobManager
 	instanceID       string
 	pid              int
+	nowFunc          func() time.Time
 	epgService       *services.EPGService
 	timerService     *services.TimerService
 	recordingService *services.RecordingService
@@ -44,6 +45,13 @@ type Handler struct {
 	uiThemeDefault   string
 	hlsProxy         *HLSProxy
 	watchTVChannelMu sync.Mutex
+}
+
+func (h *Handler) now() time.Time {
+	if h != nil && h.nowFunc != nil {
+		return h.nowFunc()
+	}
+	return time.Now()
 }
 
 // NewHandler creates a new HTTP handler
@@ -65,6 +73,7 @@ func NewHandler(
 		archiveJobs:      archive.NewJobManager(),
 		instanceID:       fmt.Sprintf("%d", time.Now().UnixNano()),
 		pid:              os.Getpid(),
+		nowFunc:          time.Now,
 		epgService:       epgService,
 		timerService:     timerService,
 		recordingService: recordingService,
@@ -2657,7 +2666,7 @@ type timerTimelineRow struct {
 func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 	loc := time.Local
 
-	localNow := time.Now().In(loc)
+	localNow := h.now().In(loc)
 	todayStart := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 0, 0, 0, 0, loc)
 
 	// Keep collision/critical computation stable (do not shift based on UI day selection).
@@ -2762,7 +2771,7 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	now := time.Now()
+	now := h.now()
 	sort.SliceStable(views, func(i, j int) bool {
 		si := views[i].Start
 		sj := views[j].Start

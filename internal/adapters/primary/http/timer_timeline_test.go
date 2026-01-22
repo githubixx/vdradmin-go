@@ -390,18 +390,24 @@ func TestTimerList_RecurringTimerDaysCappedToNextWeek_OneTimeBeyondWeekStillIncl
 
 func TestTimerList_RecurringThuFriMidnight_ShowsBothUpcomingOccurrencesInList(t *testing.T) {
 	loc := time.Local
-	now := time.Now().In(loc)
-	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	realNow := time.Now().In(loc)
+	realTodayStart := time.Date(realNow.Year(), realNow.Month(), realNow.Day(), 0, 0, 0, 0, loc)
 
 	// Find the next Thursday and Friday (including today if it matches).
-	daysUntilThu := (int(time.Thursday) - int(todayStart.Weekday()) + 7) % 7
-	daysUntilFri := (int(time.Friday) - int(todayStart.Weekday()) + 7) % 7
-	thu := todayStart.Add(time.Duration(daysUntilThu) * 24 * time.Hour)
-	fri := todayStart.Add(time.Duration(daysUntilFri) * 24 * time.Hour)
+	daysUntilThu := (int(time.Thursday) - int(realTodayStart.Weekday()) + 7) % 7
+	daysUntilFri := (int(time.Friday) - int(realTodayStart.Weekday()) + 7) % 7
+	thu := realTodayStart.Add(time.Duration(daysUntilThu) * 24 * time.Hour)
+	fri := realTodayStart.Add(time.Duration(daysUntilFri) * 24 * time.Hour)
 	// Ensure Friday is after Thursday in the normal Thu/Fri pair.
 	if !fri.After(thu) {
 		fri = fri.Add(7 * 24 * time.Hour)
 	}
+
+	// Pin the handler's notion of "now" to a stable time inside the Thursday occurrence
+	// (00:00-01:00). This avoids flaky behavior when the real wall clock is already past
+	// the midnight airing.
+	fixedNow := thu.Add(30 * time.Minute)
+	todayStart := time.Date(fixedNow.Year(), fixedNow.Month(), fixedNow.Day(), 0, 0, 0, 0, loc)
 
 	ch := domain.Channel{ID: "S19.2E-1-100-10", Number: 1, Name: "ROCK ANTENNE"}
 
@@ -429,6 +435,7 @@ func TestTimerList_RecurringThuFriMidnight_ShowsBothUpcomingOccurrencesInList(t 
 		nil,
 		nil,
 	)
+	h.nowFunc = func() time.Time { return fixedNow }
 	h.SetUIThemeDefault("light")
 	h.SetTemplates(map[string]*template.Template{"timers.html": parsed})
 	h.SetConfig(&config.Config{VDR: config.VDRConfig{DVBCards: 2}}, "")
