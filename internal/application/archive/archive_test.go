@@ -95,6 +95,35 @@ func TestWriteConcatList_FormatsLines(t *testing.T) {
 	}
 }
 
+func TestWriteConcatList_EscapesSpecialChars(t *testing.T) {
+	dir := t.TempDir()
+	// Simulate a path with apostrophe like "Moni's_Grill".
+	subdir := filepath.Join(dir, "Moni's_Grill")
+	if err := os.MkdirAll(subdir, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	seg := filepath.Join(subdir, "00001.ts")
+	if err := os.WriteFile(seg, []byte("x"), 0644); err != nil {
+		t.Fatalf("write seg: %v", err)
+	}
+
+	listPath, err := WriteConcatList(dir, []string{seg})
+	if err != nil {
+		t.Fatalf("WriteConcatList: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Remove(listPath) })
+
+	b, err := os.ReadFile(listPath)
+	if err != nil {
+		t.Fatalf("read list: %v", err)
+	}
+	got := string(b)
+	// Apostrophe must be escaped as '\'' for ffmpeg concat demuxer.
+	if !strings.Contains(got, "Moni'\\''s_Grill") {
+		t.Fatalf("expected escaped apostrophe in concat list, got: %q", got)
+	}
+}
+
 func TestParseProgressLine(t *testing.T) {
 	k, v, ok := parseProgressLine("out_time_ms=123")
 	if !ok || k != "out_time_ms" || v != "123" {

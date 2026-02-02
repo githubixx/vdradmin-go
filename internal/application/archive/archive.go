@@ -285,8 +285,10 @@ func DiscoverSegments(recordingDir string) ([]string, error) {
 }
 
 func escapeConcatPath(p string) string {
-	// ffmpeg concat demuxer list uses single quotes; escape embedded single quotes.
-	return strings.ReplaceAll(p, "'", "\\'")
+	// ffmpeg concat demuxer uses single-quoted strings. To include a literal single
+	// quote, use the pattern '\'' (close quote, escaped quote, open quote).
+	// Backslashes are literal inside single quotes (no escaping needed).
+	return strings.ReplaceAll(p, "'", "'\\''")
 }
 
 // WriteConcatList writes a concat demuxer list file and returns its path.
