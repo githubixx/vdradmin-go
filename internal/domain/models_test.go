@@ -9,13 +9,9 @@ import (
 func TestChannel(t *testing.T) {
 	t.Run("ValidChannel", func(t *testing.T) {
 		ch := Channel{
-			ID:       "S19.2E-1-1089-28106",
-			Number:   1,
-			Name:     "Das Erste HD",
-			Provider: "ARD",
-			Freq:     "11494",
-			Source:   "S19.2E",
-			Group:    "ARD",
+			ID:     "S19.2E-1-1089-28106",
+			Number: 1,
+			Name:   "Das Erste HD",
 		}
 
 		if ch.ID == "" {
@@ -31,9 +27,11 @@ func TestChannel(t *testing.T) {
 
 	t.Run("MinimalChannel", func(t *testing.T) {
 		ch := Channel{
-			ID:     "test-id",
-			Number: 1,
-			Name:   "Test Channel",
+			ID:       "test-id",
+			Number:   1,
+			Name:     "Test Channel",
+			Provider: "",
+			Freq:     "",
 		}
 
 		if ch.ID != "test-id" || ch.Number != 1 || ch.Name != "Test Channel" {
@@ -59,19 +57,11 @@ func TestChannel(t *testing.T) {
 func TestEPGEvent(t *testing.T) {
 	t.Run("ValidEvent", func(t *testing.T) {
 		start := time.Date(2026, 2, 2, 20, 15, 0, 0, time.UTC)
-		stop := time.Date(2026, 2, 2, 21, 45, 0, 0, time.UTC)
 
 		event := EPGEvent{
-			EventID:       12345,
-			ChannelID:     "S19.2E-1-1089-28106",
-			ChannelNumber: 1,
-			ChannelName:   "Das Erste HD",
-			Title:         "Tagesschau",
-			Subtitle:      "Nachrichten",
-			Description:   "Die wichtigsten Nachrichten des Tages",
-			Start:         start,
-			Stop:          stop,
-			Duration:      90 * time.Minute,
+			EventID:  12345,
+			Start:    start,
+			Duration: 90 * time.Minute,
 		}
 
 		if event.EventID != 12345 {
@@ -87,8 +77,6 @@ func TestEPGEvent(t *testing.T) {
 
 	t.Run("EventWithVideoInfo", func(t *testing.T) {
 		event := EPGEvent{
-			EventID: 1,
-			Title:   "HD Movie",
 			Video: VideoInfo{
 				Format: "16:9",
 				HD:     true,
@@ -105,8 +93,6 @@ func TestEPGEvent(t *testing.T) {
 
 	t.Run("EventWithAudioInfo", func(t *testing.T) {
 		event := EPGEvent{
-			EventID: 1,
-			Title:   "Test",
 			Audio: []AudioInfo{
 				{Language: "de", Channels: 2},
 				{Language: "en", Channels: 2},
@@ -125,9 +111,7 @@ func TestEPGEvent(t *testing.T) {
 	t.Run("EventWithVPS", func(t *testing.T) {
 		vps := time.Date(2026, 2, 2, 20, 15, 0, 0, time.UTC)
 		event := EPGEvent{
-			EventID: 1,
-			Title:   "Test",
-			VPS:     &vps,
+			VPS: &vps,
 		}
 
 		if event.VPS == nil {
@@ -140,9 +124,7 @@ func TestEPGEvent(t *testing.T) {
 
 	t.Run("EventWithoutVPS", func(t *testing.T) {
 		event := EPGEvent{
-			EventID: 1,
-			Title:   "Test",
-			VPS:     nil,
+			VPS: nil,
 		}
 
 		if event.VPS != nil {
@@ -202,24 +184,11 @@ func TestAudioInfo(t *testing.T) {
 // TestTimer tests the Timer struct
 func TestTimer(t *testing.T) {
 	t.Run("ValidTimer", func(t *testing.T) {
-		day := time.Date(2026, 2, 2, 0, 0, 0, 0, time.UTC)
-		start := time.Date(2026, 2, 2, 20, 15, 0, 0, time.UTC)
-		stop := time.Date(2026, 2, 2, 21, 45, 0, 0, time.UTC)
-
 		timer := Timer{
 			ID:           1,
 			Active:       true,
-			ChannelID:    "S19.2E-1-1089-28106",
-			Day:          day,
-			Start:        start,
-			Stop:         stop,
 			DaySpec:      "2026-02-02",
 			StartMinutes: 1215, // 20:15
-			StopMinutes:  1305, // 21:45
-			Priority:     50,
-			Lifetime:     99,
-			Title:        "Tagesschau",
-			EventID:      12345,
 		}
 
 		if timer.ID != 1 {
@@ -238,15 +207,8 @@ func TestTimer(t *testing.T) {
 
 	t.Run("RecurringTimer", func(t *testing.T) {
 		timer := Timer{
-			ID:           2,
-			Active:       true,
-			ChannelID:    "test",
-			DaySpec:      "MTWTF--", // Monday to Friday
-			StartMinutes: 1200,      // 20:00
-			StopMinutes:  1320,      // 22:00
-			Priority:     50,
-			Lifetime:     7,
-			Title:        "Daily News",
+			DaySpec:  "MTWTF--", // Monday to Friday
+			Lifetime: 7,
 		}
 
 		if timer.DaySpec != "MTWTF--" {
@@ -259,9 +221,7 @@ func TestTimer(t *testing.T) {
 
 	t.Run("InactiveTimer", func(t *testing.T) {
 		timer := Timer{
-			ID:     3,
 			Active: false,
-			Title:  "Disabled Timer",
 		}
 
 		if timer.Active {
@@ -271,9 +231,7 @@ func TestTimer(t *testing.T) {
 
 	t.Run("TimerWithAux", func(t *testing.T) {
 		timer := Timer{
-			ID:    4,
-			Title: "Test",
-			Aux:   "<epgsearch>searchpattern=test</epgsearch>",
+			Aux: "<epgsearch>searchpattern=test</epgsearch>",
 		}
 
 		if timer.Aux == "" {
@@ -288,18 +246,11 @@ func TestTimer(t *testing.T) {
 // TestRecording tests the Recording struct
 func TestRecording(t *testing.T) {
 	t.Run("ValidRecording", func(t *testing.T) {
-		date := time.Date(2026, 2, 1, 20, 15, 0, 0, time.UTC)
 		rec := Recording{
-			Path:        "Tagesschau/2026-02-01.20.15.50-99.rec",
-			DiskPath:    "/hdd01/vdr/video/Tagesschau/2026-02-01.20.15.50-99.rec",
-			Title:       "Tagesschau",
-			Subtitle:    "Nachrichten",
-			Description: "Die wichtigsten Nachrichten",
-			Channel:     "Das Erste HD",
-			Date:        date,
-			Length:      15 * time.Minute,
-			Size:        1024 * 1024 * 1024, // 1GB
-			IsFolder:    false,
+			Path:     "Tagesschau/2026-02-01.20.15.50-99.rec",
+			DiskPath: "/hdd01/vdr/video/Tagesschau/2026-02-01.20.15.50-99.rec",
+			Title:    "Tagesschau",
+			Size:     1024 * 1024 * 1024, // 1GB
 		}
 
 		if rec.Path == "" {
@@ -318,13 +269,10 @@ func TestRecording(t *testing.T) {
 
 	t.Run("FolderRecording", func(t *testing.T) {
 		rec := Recording{
-			Path:     "Movies",
-			DiskPath: "/hdd01/vdr/video/Movies",
-			Title:    "Movies",
 			IsFolder: true,
 			Children: []*Recording{
-				{Title: "Movie 1", IsFolder: false},
-				{Title: "Movie 2", IsFolder: false},
+				{},
+				{},
 			},
 		}
 
@@ -338,9 +286,7 @@ func TestRecording(t *testing.T) {
 
 	t.Run("RecordingWithoutDiskPath", func(t *testing.T) {
 		rec := Recording{
-			Path:     "test.rec",
 			DiskPath: "",
-			Title:    "Test",
 		}
 
 		if rec.DiskPath != "" {
@@ -365,23 +311,12 @@ func TestRecording(t *testing.T) {
 // TestAutoTimer tests the AutoTimer struct
 func TestAutoTimer(t *testing.T) {
 	t.Run("ValidAutoTimer", func(t *testing.T) {
-		start := time.Date(0, 1, 1, 20, 0, 0, 0, time.UTC)
-		end := time.Date(0, 1, 1, 23, 0, 0, 0, time.UTC)
-
 		at := AutoTimer{
-			ID:            1,
 			Pattern:       "Tagesschau",
 			UseRegex:      false,
 			SearchIn:      SearchTitle,
 			ChannelFilter: []string{"Das Erste HD", "ZDF HD"},
-			TimeStart:     &start,
-			TimeEnd:       &end,
 			DayOfWeek:     []time.Weekday{time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday},
-			Priority:      50,
-			Lifetime:      7,
-			MarginStart:   5,
-			MarginEnd:     10,
-			Active:        true,
 			Done:          []int{1001, 1002},
 		}
 
@@ -407,11 +342,8 @@ func TestAutoTimer(t *testing.T) {
 
 	t.Run("RegexAutoTimer", func(t *testing.T) {
 		at := AutoTimer{
-			ID:       2,
-			Pattern:  "Tatort|Polizeiruf",
 			UseRegex: true,
 			SearchIn: SearchTitleSubtitle,
-			Active:   true,
 		}
 
 		if !at.UseRegex {
@@ -424,9 +356,7 @@ func TestAutoTimer(t *testing.T) {
 
 	t.Run("InactiveAutoTimer", func(t *testing.T) {
 		at := AutoTimer{
-			ID:      3,
-			Pattern: "test",
-			Active:  false,
+			Active: false,
 		}
 
 		if at.Active {
@@ -436,11 +366,8 @@ func TestAutoTimer(t *testing.T) {
 
 	t.Run("AutoTimerWithoutTimeRestriction", func(t *testing.T) {
 		at := AutoTimer{
-			ID:        4,
-			Pattern:   "test",
 			TimeStart: nil,
 			TimeEnd:   nil,
-			Active:    true,
 		}
 
 		if at.TimeStart != nil {
@@ -453,10 +380,7 @@ func TestAutoTimer(t *testing.T) {
 
 	t.Run("AutoTimerSearchAll", func(t *testing.T) {
 		at := AutoTimer{
-			ID:       5,
-			Pattern:  "documentary",
 			SearchIn: SearchAll,
-			Active:   true,
 		}
 
 		if at.SearchIn != SearchAll {
@@ -490,25 +414,19 @@ func TestSearchScope(t *testing.T) {
 func TestRecordingNested(t *testing.T) {
 	t.Run("NestedFolders", func(t *testing.T) {
 		root := Recording{
-			Path:     "Series",
-			Title:    "Series",
 			IsFolder: true,
 			Children: []*Recording{
 				{
-					Path:     "Series/Show1",
-					Title:    "Show1",
 					IsFolder: true,
 					Children: []*Recording{
-						{Path: "Series/Show1/Episode1.rec", Title: "Episode 1", IsFolder: false},
-						{Path: "Series/Show1/Episode2.rec", Title: "Episode 2", IsFolder: false},
+						{IsFolder: false},
+						{IsFolder: false},
 					},
 				},
 				{
-					Path:     "Series/Show2",
-					Title:    "Show2",
 					IsFolder: true,
 					Children: []*Recording{
-						{Path: "Series/Show2/Episode1.rec", Title: "Episode 1", IsFolder: false},
+						{IsFolder: false},
 					},
 				},
 			},
@@ -548,7 +466,6 @@ func TestTimerMinutesConversion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			timer := Timer{
-				ID:           1,
 				StartMinutes: tt.startMinutes,
 				StopMinutes:  tt.stopMinutes,
 			}
@@ -578,10 +495,6 @@ func TestEPGEventDuration(t *testing.T) {
 		stop := time.Date(2026, 2, 2, 22, 30, 0, 0, time.UTC)
 
 		event := EPGEvent{
-			EventID:  1,
-			Title:    "Movie",
-			Start:    start,
-			Stop:     stop,
 			Duration: stop.Sub(start),
 		}
 
@@ -596,10 +509,6 @@ func TestEPGEventDuration(t *testing.T) {
 		stop := time.Date(2026, 2, 3, 1, 0, 0, 0, time.UTC)
 
 		event := EPGEvent{
-			EventID:  1,
-			Title:    "Late Show",
-			Start:    start,
-			Stop:     stop,
 			Duration: stop.Sub(start),
 		}
 

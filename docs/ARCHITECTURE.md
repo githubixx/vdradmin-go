@@ -194,18 +194,21 @@ vdradmin-go employs a multi-layered testing approach with 250+ tests across 7 pa
 ### Unit Tests
 
 **Domain Layer** (`internal/domain/*_test.go`):
+
 - 86 test cases validating business rules and model behavior
 - Property-based tests using `testing/quick` for invariant checking
 - Tests for channel IDs, timer validation, recording paths, weekday masks
 - Zero external dependencies, extremely fast
 
 **Application Services** (`internal/application/services/*_test.go`):
+
 - Service orchestration with canonical mock implementations
 - Cache behavior validation (EPG, recordings, timers)
 - Business logic edge cases (timer conflicts, recording grouping)
 - Uses interface mocks, no real VDR required
 
 **HTTP Handlers** (`internal/adapters/primary/http/*_test.go`):
+
 - Request/response validation
 - Form parsing and validation
 - Error handling scenarios
@@ -214,12 +217,14 @@ vdradmin-go employs a multi-layered testing approach with 250+ tests across 7 pa
 ### Port Contract Tests
 
 **Reusable Test Suite** (`internal/ports/vdr_contract_test.go`):
+
 - 40 test cases defining expected VDRClient behavior
 - Validates all implementations (mock, SVDRP, future adapters)
 - Ensures consistent error handling and data structures
 - Prevents implementation drift
 
 Example usage:
+
 ```go
 func TestMyClient_ContractCompliance(t *testing.T) {
     factory := func(t *testing.T) ports.VDRClient {
@@ -232,6 +237,7 @@ func TestMyClient_ContractCompliance(t *testing.T) {
 ### Integration Tests
 
 **SVDRP Protocol Tests** (`internal/integration/svdrp_integration_test.go`):
+
 - Uses testcontainers-go to spin up real SVDRP stub server
 - 14 tests validating full protocol communication
 - Tests channel retrieval, timer CRUD, connection resilience
@@ -244,6 +250,7 @@ Run with: `go test -tags=integration ./internal/integration -v`
 ### Property-Based Testing
 
 **Invariant Validation** (`internal/domain/models_property_test.go`):
+
 - 10 property-based tests using `testing/quick`
 - Validates domain invariants across random inputs
 - Tests that succeed for all valid inputs in the domain
@@ -253,6 +260,7 @@ Run with: `go test -tags=integration ./internal/integration -v`
 ### Fuzz Testing
 
 **Protocol Parsing** (`internal/adapters/secondary/svdrp/fuzz_test.go`):
+
 - 4 fuzz functions for SVDRP response parsing
 - Tests: ParseSVDRPResponse, ParseChannelID, ParseEPGDescription, ParseTimestamp
 - Uses Go 1.18+ native fuzzing
@@ -262,6 +270,7 @@ Run with: `go test -tags=integration ./internal/integration -v`
 ### Race Detection
 
 **Concurrency Safety** (`internal/application/services/race_test.go`):
+
 - 9 concurrent access tests for service layer caches
 - Validates thread-safe operations under load
 - Tests EPG cache, recording cache, timer operations
@@ -295,6 +304,7 @@ go test ./internal/domain -run TestTimer -v
 ### Test Coverage Philosophy
 
 **What We Test:**
+
 - Domain logic and business rules (high coverage)
 - Port interface contracts (ensures consistency)
 - Protocol parsing (fuzz testing for robustness)
@@ -302,11 +312,13 @@ go test ./internal/domain -run TestTimer -v
 - Critical user flows (integration tests)
 
 **What We Don't Over-Test:**
+
 - Simple getters/setters
 - Framework code (Go stdlib, third-party libraries)
 - Unreachable error paths
 
 **Coverage Metrics:**
+
 - Domain: High coverage via unit + property tests
 - Services: ~47% (focus on cache logic and orchestration)
 - HTTP Handlers: ~36% (focus on critical paths)

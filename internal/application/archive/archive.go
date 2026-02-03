@@ -156,9 +156,7 @@ type Preview struct {
 
 func normalizeVideoExt(ext string) string {
 	ext = strings.ToLower(strings.TrimSpace(ext))
-	if strings.HasPrefix(ext, ".") {
-		ext = strings.TrimPrefix(ext, ".")
-	}
+	ext = strings.TrimPrefix(ext, ".")
 	if ext == "mp4" {
 		return "mp4"
 	}
