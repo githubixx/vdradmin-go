@@ -118,6 +118,71 @@ func (h *Handler) SetTemplates(templates map[string]*template.Template) {
 	h.templateMap = templates
 }
 
+// isPathWithinBase validates that requestedPath is within baseDir, protecting against path traversal.
+// It returns the cleaned absolute path if valid, or an error if the path would escape baseDir.
+// This prevents directory traversal attacks like "../../../../etc/passwd".
+func isPathWithinBase(baseDir, requestedPath string) (string, error) {
+	if baseDir == "" {
+		return "", fmt.Errorf("base directory not configured")
+	}
+	if requestedPath == "" {
+		return "", fmt.Errorf("requested path is empty")
+	}
+
+	// Clean and make absolute
+	cleanBase := filepath.Clean(baseDir)
+	if !filepath.IsAbs(cleanBase) {
+		return "", fmt.Errorf("base directory must be absolute: %s", baseDir)
+	}
+
+	// If the requested path is absolute, it's trying to escape - reject it
+	if filepath.IsAbs(requestedPath) {
+		return "", fmt.Errorf("absolute paths not allowed: %s", requestedPath)
+	}
+
+	// Join and clean the requested path with the base
+	fullPath := filepath.Join(cleanBase, requestedPath)
+	cleanPath := filepath.Clean(fullPath)
+
+	// Ensure the clean path is still within the base directory
+	// This check prevents path traversal via "..", symlinks, etc.
+	if !filepath.HasPrefix(cleanPath, cleanBase+string(filepath.Separator)) && cleanPath != cleanBase {
+		return "", fmt.Errorf("path escapes base directory: %s", requestedPath)
+	}
+
+	// Don't allow accessing exactly the base directory (require a subdirectory/file)
+	if cleanPath == cleanBase {
+		return "", fmt.Errorf("path must reference content within base directory")
+	}
+
+	return cleanPath, nil
+}
+
+// validateRecordingPath validates that a recording path is safe and within the video directory.
+// Recording paths from VDR are relative to the video directory and should never escape it.
+func (h *Handler) validateRecordingPath(recordingPath string) error {
+	if h.cfg == nil {
+		return fmt.Errorf("configuration not available")
+	}
+
+	videoDir := strings.TrimSpace(h.cfg.VDR.VideoDir)
+	if videoDir == "" {
+		return fmt.Errorf("video directory not configured")
+	}
+
+	// Basic validation: reject paths with suspicious patterns
+	if strings.Contains(recordingPath, "..") {
+		return fmt.Errorf("invalid recording path: contains '..'")
+	}
+	if strings.Contains(recordingPath, "\\") && filepath.Separator != '\\' {
+		return fmt.Errorf("invalid recording path: contains backslash")
+	}
+
+	// Validate the path would be within the video directory
+	_, err := isPathWithinBase(videoDir, recordingPath)
+	return err
+}
+
 // Home renders the home page
 func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
 	// Treat "/" as an entry point: redirect to the configured landing page.
@@ -1391,17 +1456,17 @@ func (h *Handler) applyRuntimeConfig(updated *config.Config) error {
 func (h *Handler) PlayingToday(w http.ResponseWriter, r *http.Request) {
 	loc := time.Now().Location()
 	localNow := time.Now().In(loc)
-	
+
 	dayStart, err := parseDayParam(r, loc)
 	if err != nil {
 		h.logger.Error("invalid day parameter", slog.Any("error", err))
 		dayStart = localNow
 		dayStart = time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), 0, 0, 0, 0, loc)
 	}
-	
+
 	// Parse start and end time parameters
 	startTimeStr, endTimeStr, startTime, endTime, timeErr := parsePlayingTimeParams(r, dayStart, localNow)
-	
+
 	data := map[string]any{}
 	data["Day"] = dayStart
 	data["PrevDay"] = dayStart.Add(-24 * time.Hour).Format("2006-01-02")
@@ -1508,7 +1573,7 @@ func (h *Handler) PlayingToday(w http.ResponseWriter, r *http.Request) {
 		// Include events that:
 		// - Are still running at startTime (started before but end after startTime)
 		// - Start within the selected time range (start >= startTime and start < endTime)
-		// 
+		//
 		// This ensures we show currently running programs plus upcoming ones,
 		// but exclude programs that have already ended before startTime.
 		if allEvents[i].Stop.After(startTime) && allEvents[i].Start.Before(endTime) {
@@ -1568,21 +1633,21 @@ func (h *Handler) PlayingToday(w http.ResponseWriter, r *http.Request) {
 // Returns the string values and parsed time.Time values along with any error.
 func parsePlayingTimeParams(r *http.Request, dayStart time.Time, localNow time.Time) (startTimeStr, endTimeStr string, startTime, endTime time.Time, err error) {
 	loc := dayStart.Location()
-	
+
 	// Get query parameters
 	startTimeStr = strings.TrimSpace(r.URL.Query().Get("start"))
 	endTimeStr = strings.TrimSpace(r.URL.Query().Get("end"))
-	
+
 	// Default start time: current time (rounded to current minute)
 	defaultStart := localNow
 	if !isSameDay(defaultStart, dayStart) {
 		// If viewing a different day, default to day start
 		defaultStart = dayStart
 	}
-	
+
 	// Default end time: midnight (end of selected day)
 	defaultEnd := time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), 23, 59, 59, 0, loc)
-	
+
 	// Parse start time
 	if startTimeStr == "" {
 		startTimeStr = defaultStart.Format("15:04")
@@ -1597,7 +1662,7 @@ func parsePlayingTimeParams(r *http.Request, dayStart time.Time, localNow time.T
 			startTime = time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), parsed.Hour(), parsed.Minute(), 0, 0, loc)
 		}
 	}
-	
+
 	// Parse end time
 	if endTimeStr == "" {
 		endTimeStr = "23:59"
@@ -1618,7 +1683,7 @@ func parsePlayingTimeParams(r *http.Request, dayStart time.Time, localNow time.T
 			}
 		}
 	}
-	
+
 	return startTimeStr, endTimeStr, startTime, endTime, err
 }
 
@@ -4108,6 +4173,13 @@ func (h *Handler) RecordingDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate the recording path to prevent directory traversal
+	if err := h.validateRecordingPath(path); err != nil {
+		h.logger.Warn("invalid recording path rejected", slog.String("path", path), slog.Any("error", err))
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
 	if err := h.recordingService.DeleteRecording(r.Context(), path); err != nil {
 		h.handleError(w, r, err)
 		return
@@ -4137,6 +4209,14 @@ func (h *Handler) RecordingArchivePrepare(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Invalid path", http.StatusBadRequest)
 		return
 	}
+
+	// Validate the recording path to prevent directory traversal
+	if err := h.validateRecordingPath(recID); err != nil {
+		h.logger.Warn("invalid recording path rejected in archive prepare", slog.String("path", recID), slog.Any("error", err))
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
 	if jobID, ok := h.archiveJobs.ActiveJobIDForRecording(recID); ok {
 		http.Redirect(w, r, "/recordings/archive/job?id="+url.QueryEscape(jobID), http.StatusFound)
 		return
@@ -4276,6 +4356,14 @@ func (h *Handler) RecordingArchiveStart(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Invalid path", http.StatusBadRequest)
 		return
 	}
+
+	// Validate the recording path to prevent directory traversal
+	if err := h.validateRecordingPath(recID); err != nil {
+		h.logger.Warn("invalid recording path rejected in archive start", slog.String("path", recID), slog.Any("error", err))
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
 	if jobID, ok := h.archiveJobs.ActiveJobIDForRecording(recID); ok {
 		redirect := "/recordings/archive/job?id=" + url.QueryEscape(jobID)
 		if r.Header.Get("HX-Request") != "" {

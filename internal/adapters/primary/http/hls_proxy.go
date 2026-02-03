@@ -83,6 +83,12 @@ func (p *HLSProxy) Start(channelNum string) error {
 
 // GetPlaylist serves the HLS playlist for a channel.
 func (p *HLSProxy) GetPlaylist(w http.ResponseWriter, r *http.Request, channelNum string) {
+	// Validate channel number to prevent directory traversal
+	if channelNum == "" || strings.Contains(channelNum, "/") || strings.Contains(channelNum, "\\") || strings.Contains(channelNum, "..") {
+		http.Error(w, "Invalid channel", http.StatusBadRequest)
+		return
+	}
+
 	stream, err := p.getStream(channelNum)
 	if err != nil {
 		w.Header().Set("Retry-After", "1")
@@ -153,6 +159,12 @@ func (p *HLSProxy) StopAll() {
 
 // GetSegment serves an HLS segment for a channel.
 func (p *HLSProxy) GetSegment(w http.ResponseWriter, r *http.Request, channelNum, segmentName string) {
+	// Validate channel number to prevent directory traversal
+	if channelNum == "" || strings.Contains(channelNum, "/") || strings.Contains(channelNum, "\\") || strings.Contains(channelNum, "..") {
+		http.Error(w, "Invalid channel", http.StatusBadRequest)
+		return
+	}
+
 	stream, err := p.getStream(channelNum)
 	if err != nil {
 		http.Error(w, "Stream not found", http.StatusNotFound)
@@ -215,6 +227,11 @@ func (p *HLSProxy) GetSegment(w http.ResponseWriter, r *http.Request, channelNum
 
 // ensureStream gets or creates an HLS stream for the given channel.
 func (p *HLSProxy) ensureStream(channelNum string) (*hlsStream, error) {
+	// Validate channel number to prevent directory traversal
+	if channelNum == "" || strings.Contains(channelNum, "/") || strings.Contains(channelNum, "\\") || strings.Contains(channelNum, "..") {
+		return nil, fmt.Errorf("invalid channel number")
+	}
+
 	// Check if stream already exists
 	if val, ok := p.streams.Load(channelNum); ok {
 		return val.(*hlsStream), nil
