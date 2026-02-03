@@ -209,3 +209,73 @@ func TestValidateRecordingPath_NoVideoDir(t *testing.T) {
 		t.Error("Expected error when video directory is not configured")
 	}
 }
+
+func TestValidateRecordingDir(t *testing.T) {
+	h := &Handler{
+		cfg: &config.Config{
+			VDR: config.VDRConfig{
+				VideoDir: "/var/lib/video.00",
+			},
+		},
+	}
+
+	tests := []struct {
+		name          string
+		recordingDir  string
+		shouldSucceed bool
+		reason        string
+	}{
+		{
+			name:          "Valid recording directory",
+			recordingDir:  "/var/lib/video.00/Recording1/2024-01-01.rec",
+			shouldSucceed: true,
+			reason:        "Absolute path within video dir should be allowed",
+		},
+		{
+			name:          "Recording at video dir root",
+			recordingDir:  "/var/lib/video.00",
+			shouldSucceed: true,
+			reason:        "Video dir itself should be allowed (recordings can be at root)",
+		},
+		{
+			name:          "Path escaping video dir",
+			recordingDir:  "/var/lib/other/recording",
+			shouldSucceed: false,
+			reason:        "Path outside video dir should be rejected",
+		},
+		{
+			name:          "Path escaping with traversal",
+			recordingDir:  "/var/lib/video.00/../../../etc/passwd",
+			shouldSucceed: false,
+			reason:        "Cleaned path that escapes should be rejected",
+		},
+		{
+			name:          "Empty path",
+			recordingDir:  "",
+			shouldSucceed: false,
+			reason:        "Empty path should be rejected",
+		},
+		{
+			name:          "Deep nested recording",
+			recordingDir:  "/var/lib/video.00/Shows/Drama/Series/Season1/Episode1.rec",
+			shouldSucceed: true,
+			reason:        "Deep nesting within video dir should work",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := h.validateRecordingDir(tt.recordingDir)
+
+			if tt.shouldSucceed {
+				if err != nil {
+					t.Errorf("Expected success but got error: %v (reason: %s)", err, tt.reason)
+				}
+			} else {
+				if err == nil {
+					t.Errorf("Expected error but got success (reason: %s)", tt.reason)
+				}
+			}
+		})
+	}
+}
