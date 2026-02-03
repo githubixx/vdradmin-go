@@ -183,6 +183,36 @@ func (h *Handler) validateRecordingPath(recordingPath string) error {
 	return err
 }
 
+// validateRecordingDir validates that an absolute recording directory path (as returned by VDR)
+// is within the configured video directory. This protects against malicious VDR responses
+// or compromised VDR instances trying to access files outside the video directory.
+func (h *Handler) validateRecordingDir(recordingDir string) error {
+	if h.cfg == nil {
+		return fmt.Errorf("configuration not available")
+	}
+
+	videoDir := strings.TrimSpace(h.cfg.VDR.VideoDir)
+	if videoDir == "" {
+		return fmt.Errorf("video directory not configured")
+	}
+
+	recordingDir = strings.TrimSpace(recordingDir)
+	if recordingDir == "" {
+		return fmt.Errorf("recording directory is empty")
+	}
+
+	// Clean both paths for comparison
+	cleanVideoDir := filepath.Clean(videoDir)
+	cleanRecDir := filepath.Clean(recordingDir)
+
+	// Ensure recording directory is within video directory (or exactly the video directory)
+	if !filepath.HasPrefix(cleanRecDir, cleanVideoDir+string(filepath.Separator)) && cleanRecDir != cleanVideoDir {
+		return fmt.Errorf("recording directory outside video directory: %s", recordingDir)
+	}
+
+	return nil
+}
+
 // Home renders the home page
 func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
 	// Treat "/" as an entry point: redirect to the configured landing page.
@@ -4236,6 +4266,17 @@ func (h *Handler) RecordingArchivePrepare(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Validate the absolute recording directory is within video directory
+	if err := h.validateRecordingDir(recDir); err != nil {
+		h.logger.Warn("invalid recording directory rejected in archive prepare", slog.String("dir", recDir), slog.Any("error", err))
+		h.renderTemplate(w, r, "recording_archive.html", map[string]any{
+			"Error":        "Invalid recording directory",
+			"RecordingID":  recID,
+			"RecordingDir": "",
+		})
+		return
+	}
+
 	infoPath := filepath.Join(recDir, "info")
 	infoBytes, err := os.ReadFile(infoPath)
 	if err != nil {
@@ -4394,6 +4435,13 @@ func (h *Handler) RecordingArchiveStart(w http.ResponseWriter, r *http.Request) 
 	}
 	if strings.TrimSpace(recDir) == "" {
 		http.Error(w, "Could not resolve recording directory", http.StatusBadRequest)
+		return
+	}
+
+	// Validate the absolute recording directory is within video directory
+	if err := h.validateRecordingDir(recDir); err != nil {
+		h.logger.Warn("invalid recording directory rejected in archive start", slog.String("dir", recDir), slog.Any("error", err))
+		http.Error(w, "Invalid recording directory", http.StatusBadRequest)
 		return
 	}
 

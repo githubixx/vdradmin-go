@@ -16,6 +16,15 @@ import (
 	"time"
 )
 
+// validatePath checks that a path doesn't contain directory traversal sequences.
+// This is a defensive check for paths that should have been validated by the caller.
+func validatePath(path string) error {
+	if strings.Contains(path, "..") {
+		return fmt.Errorf("path contains '..': %s", path)
+	}
+	return nil
+}
+
 type Kind string
 
 const (
@@ -254,10 +263,16 @@ type Plan struct {
 }
 
 // DiscoverSegments finds and sorts *.ts segments inside a recording directory.
+// The recordingDir path must be validated by the caller to ensure it's within
+// the allowed video directory before calling this function.
 func DiscoverSegments(recordingDir string) ([]string, error) {
 	recordingDir = strings.TrimSpace(recordingDir)
 	if recordingDir == "" {
 		return nil, errors.New("recordingDir is required")
+	}
+	// Defensive check: validate path doesn't contain traversal sequences
+	if err := validatePath(recordingDir); err != nil {
+		return nil, err
 	}
 	entries, err := os.ReadDir(recordingDir)
 	if err != nil {
@@ -291,9 +306,14 @@ func escapeConcatPath(p string) string {
 
 // WriteConcatList writes a concat demuxer list file and returns its path.
 // The caller is responsible for deleting the file.
+// The dir path must be validated by the caller before calling this function.
 func WriteConcatList(dir string, segments []string) (string, error) {
 	if len(segments) == 0 {
 		return "", errors.New("segments required")
+	}
+	// Defensive check: validate directory path
+	if err := validatePath(dir); err != nil {
+		return "", err
 	}
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", fmt.Errorf("mkdir concat dir: %w", err)
@@ -718,6 +738,20 @@ func runArchive(ctx context.Context, job *Job, plan Plan) error {
 	// If the job was canceled before the runner starts, avoid touching the filesystem.
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+
+	// Defensive validation: ensure paths don't contain traversal sequences
+	// (they should have been validated earlier, but this is defense in depth)
+	if err := validatePath(plan.Preview.TargetDir); err != nil {
+		return fmt.Errorf("invalid target dir: %w", err)
+	}
+	if err := validatePath(plan.Preview.VideoPath); err != nil {
+		return fmt.Errorf("invalid video path: %w", err)
+	}
+	if plan.InfoPath != "" {
+		if err := validatePath(plan.InfoPath); err != nil {
+			return fmt.Errorf("invalid info path: %w", err)
+		}
 	}
 
 	// Ensure target dir exists.

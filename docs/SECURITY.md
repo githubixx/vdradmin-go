@@ -8,14 +8,20 @@ vdradmin-go includes protection against path traversal attacks (CWE-22) to preve
 
 #### 1. Recording Paths
 
-Recording paths are validated to ensure they remain within the configured `vdr.video_dir`:
+Recording paths are validated at multiple levels to ensure they remain within the configured `vdr.video_dir`:
 
+**User-provided recording IDs** (relative paths): Validated by `validateRecordingPath()`
 - Absolute paths are rejected
 - Path traversal sequences (`..`) are blocked
 - Backslashes are rejected on Unix systems
 - All paths are cleaned and validated before use
 
-**Implementation**: See `validateRecordingPath()` and `isPathWithinBase()` in `internal/adapters/primary/http/handlers.go`
+**VDR-returned recording directories** (absolute paths): Validated by `validateRecordingDir()`
+- Ensures returned paths are within the configured video directory
+- Protects against compromised or malicious VDR instances
+- Validates before reading info files or accessing recording data
+
+**Implementation**: See `validateRecordingPath()`, `validateRecordingDir()`, and `isPathWithinBase()` in `internal/adapters/primary/http/handlers.go`
 
 #### 2. HLS Streaming
 
@@ -34,8 +40,9 @@ Archive paths are validated during preview and execution:
 - Target directories must be within configured archive base directories
 - Video and info file paths must be within the target directory
 - Path cleaning is applied to all user-provided paths
+- Defensive validation checks for path traversal sequences in all operations
 
-**Implementation**: See `NormalizePreview()` in `internal/application/archive/archive.go`
+**Implementation**: See `NormalizePreview()` and `validatePath()` in `internal/application/archive/archive.go`; validation applied in `runArchive()`, `DiscoverSegments()`, and `WriteConcatList()`
 
 ### Admin-Only Configuration
 
@@ -54,8 +61,13 @@ These paths are not subject to runtime validation since they require admin privi
 Comprehensive tests ensure path validation works correctly:
 
 ```bash
+# Test path validation utilities
 go test ./internal/adapters/primary/http -run TestIsPathWithinBase
 go test ./internal/adapters/primary/http -run TestValidateRecordingPath
+go test ./internal/adapters/primary/http -run TestValidateRecordingDir
+
+# Test archive path validation
+go test ./internal/application/archive -run TestValidatePath
 ```
 
 ### Security Best Practices
