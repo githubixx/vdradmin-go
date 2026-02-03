@@ -541,6 +541,6 @@ func testErrorHandling(t *testing.T, factory ClientFactory) {
 			}
 		}()
 
-		_, _ = client.GetChannels(nil)
+		_, _ = client.GetChannels(context.TODO())
 	})
 }

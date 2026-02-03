@@ -581,12 +581,6 @@ func (h *Handler) WatchTVNow(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
-var watchTVTransparentGIF = []byte{
-	0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0xff, 0xff, 0xff, 0x21, 0xf9, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x00,
-	0x01, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3b,
-}
-
 func writeWatchTVSnapshotError(w http.ResponseWriter, status int, msg string) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
@@ -1831,13 +1825,14 @@ func (h *Handler) EPGSearchList(w http.ResponseWriter, r *http.Request) {
 	views := make([]epgSearchView, 0, len(searches))
 	for _, s := range searches {
 		label := "-"
-		if s.UseChannel == "single" {
+		switch s.UseChannel {
+		case "single":
 			if n := nameByID[s.ChannelID]; n != "" {
 				label = n
 			} else if s.ChannelID != "" {
 				label = s.ChannelID
 			}
-		} else if s.UseChannel == "range" {
+		case "range":
 			from := nameByID[s.ChannelFrom]
 			to := nameByID[s.ChannelTo]
 			if from != "" && to != "" {
@@ -1871,11 +1866,6 @@ func (h *Handler) EPGSearchList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.renderTemplate(w, r, "epgsearch.html", data)
-}
-
-type epgSearchResultGroup struct {
-	Search  epgSearchView
-	Matches []domain.EPGEvent
 }
 
 type epgSearchResultEventView struct {
@@ -2234,11 +2224,6 @@ func (h *Handler) EPGSearchExecute(w http.ResponseWriter, r *http.Request) {
 		"DayGroups": dayGroups,
 	}
 	h.renderTemplate(w, r, "epgsearch_results.html", data)
-}
-
-type epgSearchFormModel struct {
-	Search   config.EPGSearch
-	Channels []domain.Channel
 }
 
 func (h *Handler) epgSearchFormData(r *http.Request, search config.EPGSearch) map[string]any {
