@@ -1390,18 +1390,27 @@ func (h *Handler) applyRuntimeConfig(updated *config.Config) error {
 // It is a replacement for the old /epg list which could be too large.
 func (h *Handler) PlayingToday(w http.ResponseWriter, r *http.Request) {
 	loc := time.Now().Location()
+	localNow := time.Now().In(loc)
+	
 	dayStart, err := parseDayParam(r, loc)
 	if err != nil {
 		h.logger.Error("invalid day parameter", slog.Any("error", err))
-		dayStart = time.Now().In(loc)
+		dayStart = localNow
 		dayStart = time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), 0, 0, 0, 0, loc)
 	}
-	dayEnd := dayStart.Add(24 * time.Hour)
-
+	
+	// Parse start and end time parameters
+	startTimeStr, endTimeStr, startTime, endTime, timeErr := parsePlayingTimeParams(r, dayStart, localNow)
+	
 	data := map[string]any{}
 	data["Day"] = dayStart
 	data["PrevDay"] = dayStart.Add(-24 * time.Hour).Format("2006-01-02")
 	data["NextDay"] = dayStart.Add(24 * time.Hour).Format("2006-01-02")
+	data["StartTime"] = startTimeStr
+	data["EndTime"] = endTimeStr
+	if timeErr != nil {
+		data["TimeError"] = timeErr.Error()
+	}
 
 	channels, err := h.epgService.GetChannels(r.Context())
 	if err != nil {
@@ -1424,6 +1433,7 @@ func (h *Handler) PlayingToday(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Fetch EPG for the entire day to ensure we get events that span across time boundaries
 	allEvents, err := h.epgService.GetEPG(r.Context(), "", dayStart)
 	if err != nil {
 		h.logger.Error("EPG fetch error on playing today", slog.Any("error", err))
@@ -1443,6 +1453,7 @@ func (h *Handler) PlayingToday(w http.ResponseWriter, r *http.Request) {
 			h.logger.Warn("timers fetch error for playing today", slog.Any("error", tErr))
 		} else {
 			from := dayStart.Add(-24 * time.Hour)
+			dayEnd := time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), 23, 59, 59, 0, loc)
 			to := dayEnd.Add(24 * time.Hour)
 			for _, t := range timers {
 				// Disable "Record" if any timer exists for the event window, even if inactive.
@@ -1493,8 +1504,14 @@ func (h *Handler) PlayingToday(w http.ResponseWriter, r *http.Request) {
 
 	eventsByChannel := make(map[string][]domain.EPGEvent)
 	for i := range allEvents {
-		// Keep events that overlap with the selected day.
-		if allEvents[i].Start.Before(dayEnd) && allEvents[i].Stop.After(dayStart) {
+		// Keep events that overlap with or are near the selected time range.
+		// Include events that:
+		// - Are still running at startTime (started before but end after startTime)
+		// - Start within the selected time range (start >= startTime and start < endTime)
+		// 
+		// This ensures we show currently running programs plus upcoming ones,
+		// but exclude programs that have already ended before startTime.
+		if allEvents[i].Stop.After(startTime) && allEvents[i].Start.Before(endTime) {
 			eventsByChannel[allEvents[i].ChannelID] = append(eventsByChannel[allEvents[i].ChannelID], allEvents[i])
 		}
 	}
@@ -1545,6 +1562,71 @@ func (h *Handler) PlayingToday(w http.ResponseWriter, r *http.Request) {
 	data["ChannelGroups"] = groups
 	data["ChannelJump"] = jump
 	h.renderTemplate(w, r, "playing.html", data)
+}
+
+// parsePlayingTimeParams parses start and end time parameters for the playing page.
+// Returns the string values and parsed time.Time values along with any error.
+func parsePlayingTimeParams(r *http.Request, dayStart time.Time, localNow time.Time) (startTimeStr, endTimeStr string, startTime, endTime time.Time, err error) {
+	loc := dayStart.Location()
+	
+	// Get query parameters
+	startTimeStr = strings.TrimSpace(r.URL.Query().Get("start"))
+	endTimeStr = strings.TrimSpace(r.URL.Query().Get("end"))
+	
+	// Default start time: current time (rounded to current minute)
+	defaultStart := localNow
+	if !isSameDay(defaultStart, dayStart) {
+		// If viewing a different day, default to day start
+		defaultStart = dayStart
+	}
+	
+	// Default end time: midnight (end of selected day)
+	defaultEnd := time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), 23, 59, 59, 0, loc)
+	
+	// Parse start time
+	if startTimeStr == "" {
+		startTimeStr = defaultStart.Format("15:04")
+		startTime = time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), defaultStart.Hour(), defaultStart.Minute(), 0, 0, loc)
+	} else {
+		parsed, parseErr := time.Parse("15:04", startTimeStr)
+		if parseErr != nil {
+			err = fmt.Errorf("invalid start time (expected HH:MM)")
+			startTimeStr = defaultStart.Format("15:04")
+			startTime = time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), defaultStart.Hour(), defaultStart.Minute(), 0, 0, loc)
+		} else {
+			startTime = time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), parsed.Hour(), parsed.Minute(), 0, 0, loc)
+		}
+	}
+	
+	// Parse end time
+	if endTimeStr == "" {
+		endTimeStr = "23:59"
+		endTime = defaultEnd
+	} else {
+		parsed, parseErr := time.Parse("15:04", endTimeStr)
+		if parseErr != nil {
+			if err == nil {
+				err = fmt.Errorf("invalid end time (expected HH:MM)")
+			}
+			endTimeStr = "23:59"
+			endTime = defaultEnd
+		} else {
+			endTime = time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), parsed.Hour(), parsed.Minute(), 59, 0, loc)
+			// If end time is before start time, assume it's the next day
+			if endTime.Before(startTime) {
+				endTime = endTime.Add(24 * time.Hour)
+			}
+		}
+	}
+	
+	return startTimeStr, endTimeStr, startTime, endTime, err
+}
+
+// isSameDay checks if two times are on the same day
+func isSameDay(t1, t2 time.Time) bool {
+	y1, m1, d1 := t1.Date()
+	y2, m2, d2 := t2.Date()
+	return y1 == y2 && m1 == m2 && d1 == d2
 }
 
 // EPGList shows EPG listing
