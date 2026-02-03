@@ -42,14 +42,19 @@ func NewRecordingService(vdrClient ports.VDRClient, cacheExpiry time.Duration) *
 
 // GetAllRecordings retrieves all recordings with caching
 func (s *RecordingService) GetAllRecordings(ctx context.Context) ([]domain.Recording, error) {
+	// Check cache expiry under lock
+	s.cacheMu.RLock()
+	cacheExpiry := s.cacheExpiry
+	s.cacheMu.RUnlock()
+
 	// If caching is disabled, always fetch fresh data.
-	if s.cacheExpiry <= 0 {
+	if cacheExpiry <= 0 {
 		return s.vdrClient.GetRecordings(ctx)
 	}
 
 	// Check cache
 	s.cacheMu.RLock()
-	if time.Now().Before(s.cacheTime.Add(s.cacheExpiry)) && len(s.cache) > 0 {
+	if time.Now().Before(s.cacheTime.Add(cacheExpiry)) && len(s.cache) > 0 {
 		recordings := make([]domain.Recording, len(s.cache))
 		copy(recordings, s.cache)
 		s.cacheMu.RUnlock()

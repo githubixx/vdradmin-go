@@ -14,51 +14,8 @@ import (
 
 	"github.com/githubixx/vdradmin-go/internal/application/services"
 	"github.com/githubixx/vdradmin-go/internal/domain"
+	"github.com/githubixx/vdradmin-go/internal/ports"
 )
-
-type channelsVDRMock struct {
-	channels []domain.Channel
-	epqErr   error
-	epq      []domain.EPGEvent
-	timers   []domain.Timer
-}
-
-func (m *channelsVDRMock) Connect(ctx context.Context) error { return nil }
-func (m *channelsVDRMock) Close() error                      { return nil }
-func (m *channelsVDRMock) Ping(ctx context.Context) error    { return nil }
-
-func (m *channelsVDRMock) GetChannels(ctx context.Context) ([]domain.Channel, error) {
-	return m.channels, nil
-}
-
-func (m *channelsVDRMock) GetEPG(ctx context.Context, channelID string, at time.Time) ([]domain.EPGEvent, error) {
-	if m.epqErr != nil {
-		return nil, m.epqErr
-	}
-	return m.epq, nil
-}
-
-func (m *channelsVDRMock) GetTimers(ctx context.Context) ([]domain.Timer, error) {
-	return m.timers, nil
-}
-
-func (m *channelsVDRMock) CreateTimer(ctx context.Context, timer *domain.Timer) error { return nil }
-func (m *channelsVDRMock) UpdateTimer(ctx context.Context, timer *domain.Timer) error { return nil }
-func (m *channelsVDRMock) DeleteTimer(ctx context.Context, timerID int) error         { return nil }
-
-func (m *channelsVDRMock) GetRecordings(ctx context.Context) ([]domain.Recording, error) {
-	return nil, nil
-}
-func (m *channelsVDRMock) DeleteRecording(ctx context.Context, path string) error { return nil }
-func (m *channelsVDRMock) GetCurrentChannel(ctx context.Context) (string, error)  { return "", nil }
-func (m *channelsVDRMock) SetCurrentChannel(ctx context.Context, channelID string) error {
-	return nil
-}
-func (m *channelsVDRMock) SendKey(ctx context.Context, key string) error { return nil }
-
-func (m *channelsVDRMock) GetRecordingDir(ctx context.Context, recordingID string) (string, error) {
-	return "", nil
-}
 
 func TestChannels_DisablesRecordOnlyForScheduledShow(t *testing.T) {
 	loc := time.Local
@@ -103,16 +60,15 @@ func TestChannels_DisablesRecordOnlyForScheduledShow(t *testing.T) {
 		Active:    true,
 		ChannelID: ch.ID,
 		// Timer titles can differ from EPG titles (separator differences etc.).
-		Title:     scheduled.Title + "|",
-		Start:     scheduled.Start.Add(-2 * time.Minute),
-		Stop:      scheduled.Stop.Add(10 * time.Minute),
+		Title: scheduled.Title + "|",
+		Start: scheduled.Start.Add(-2 * time.Minute),
+		Stop:  scheduled.Stop.Add(10 * time.Minute),
 	}
 
-	mock := &channelsVDRMock{
-		channels: []domain.Channel{ch},
-		epq:      []domain.EPGEvent{before, scheduled, after},
-		timers:   []domain.Timer{timer},
-	}
+	mock := ports.NewMockVDRClient().
+		WithChannels([]domain.Channel{ch}).
+		WithEPGEvents([]domain.EPGEvent{before, scheduled, after}).
+		WithTimers([]domain.Timer{timer})
 
 	epqService := services.NewEPGService(mock, 0)
 	timerService := services.NewTimerService(mock)

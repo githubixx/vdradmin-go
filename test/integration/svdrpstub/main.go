@@ -96,8 +96,16 @@ func handleConn(conn net.Conn, nextTimerID *atomic.Int64) {
 			id := nextTimerID.Add(1)
 			writeLine(w, fmt.Sprintf("250 %d", id))
 
-		case "MODT", "DELT", "CHAN", "HITK", "UPDR", "LSTR", "DELR":
+		case "LSTR":
+			// Recordings list - minimal test data
+			writeMulti(w, 250, []string{
+				"1 02.02.26 20:15 0:45* Test Recording~News Special",
+				"2 01.02.26 19:00 1:30 Another Recording~Documentary",
+			}, "2 recordings")
+
+		case "MODT", "DELT", "CHAN", "HITK", "UPDR", "DELR":
 			// Minimal success responses for commands the UI may trigger.
+			writeLine(w, "250 OK")
 			// LSTR path lookup: return an empty path.
 			if cmd == "LSTR" {
 				writeMulti(w, 250, []string{""}, "0")

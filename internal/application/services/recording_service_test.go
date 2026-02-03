@@ -9,11 +9,12 @@ import (
 	"time"
 
 	"github.com/githubixx/vdradmin-go/internal/domain"
+	"github.com/githubixx/vdradmin-go/internal/ports"
 )
 
 func TestRecordingService_GetAllRecordings_NoCacheWhenExpiryZero(t *testing.T) {
 	var calls int32
-	client := &mockVDRClient{
+	client := &ports.MockVDRClient{
 		GetRecordingsFunc: func(ctx context.Context) ([]domain.Recording, error) {
 			atomic.AddInt32(&calls, 1)
 			return []domain.Recording{{Path: "1", Title: "A"}}, nil
@@ -38,7 +39,7 @@ func TestRecordingService_GetAllRecordings_NoCacheWhenExpiryZero(t *testing.T) {
 }
 
 func TestRecordingService_SortRecordings_DefaultNewestFirst(t *testing.T) {
-	svc := NewRecordingService(&mockVDRClient{}, 0)
+	svc := NewRecordingService(ports.NewMockVDRClient(), 0)
 
 	recs := []domain.Recording{
 		{Path: "b", Title: "B", Date: time.Date(2026, 1, 2, 10, 0, 0, 0, time.Local)},
@@ -75,7 +76,7 @@ func TestRecordingService_GetAllRecordings_PrunesMissingDiskPathOnCacheHit(t *te
 	}
 
 	var calls int32
-	client := &mockVDRClient{
+	client := &ports.MockVDRClient{
 		GetRecordingsFunc: func(ctx context.Context) ([]domain.Recording, error) {
 			atomic.AddInt32(&calls, 1)
 			return []domain.Recording{{Path: "1", Title: "A", DiskPath: tmpDir}}, nil

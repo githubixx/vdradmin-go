@@ -14,6 +14,7 @@ import (
 
 	"github.com/githubixx/vdradmin-go/internal/application/services"
 	"github.com/githubixx/vdradmin-go/internal/domain"
+	"github.com/githubixx/vdradmin-go/internal/ports"
 )
 
 func TestSearch_SortsDayGroupsChronologically(t *testing.T) {
@@ -39,14 +40,12 @@ func TestSearch_SortsDayGroupsChronologically(t *testing.T) {
 		Stop:          time.Date(2026, 1, 22, 22, 45, 0, 0, loc),
 	}
 
-	mock := &searchVDRMock{
-		channels: []domain.Channel{
+	mock := ports.NewMockVDRClient().
+		WithChannels([]domain.Channel{
 			{ID: "C-1-2-3", Number: 1, Name: "3sat HD"},
 			{ID: "C-9-9-9", Number: 9, Name: "BR Fernsehen Nord HD"},
-		},
-		epg:    []domain.EPGEvent{later, sooner},
-		timers: nil,
-	}
+		}).
+		WithEPGEvents([]domain.EPGEvent{later, sooner})
 
 	epgService := services.NewEPGService(mock, 0)
 	timerService := services.NewTimerService(mock)

@@ -15,43 +15,8 @@ import (
 	"github.com/githubixx/vdradmin-go/internal/application/services"
 	"github.com/githubixx/vdradmin-go/internal/domain"
 	"github.com/githubixx/vdradmin-go/internal/infrastructure/config"
+	"github.com/githubixx/vdradmin-go/internal/ports"
 )
-
-type epgSearchVDRMock struct {
-	channels []domain.Channel
-	epg      []domain.EPGEvent
-	timers   []domain.Timer
-}
-
-func (m *epgSearchVDRMock) Connect(ctx context.Context) error { return nil }
-func (m *epgSearchVDRMock) Close() error                      { return nil }
-func (m *epgSearchVDRMock) Ping(ctx context.Context) error    { return nil }
-
-func (m *epgSearchVDRMock) GetChannels(ctx context.Context) ([]domain.Channel, error) {
-	return m.channels, nil
-}
-func (m *epgSearchVDRMock) GetEPG(ctx context.Context, channelID string, at time.Time) ([]domain.EPGEvent, error) {
-	return m.epg, nil
-}
-func (m *epgSearchVDRMock) GetTimers(ctx context.Context) ([]domain.Timer, error) {
-	return m.timers, nil
-}
-
-func (m *epgSearchVDRMock) CreateTimer(ctx context.Context, timer *domain.Timer) error { return nil }
-func (m *epgSearchVDRMock) UpdateTimer(ctx context.Context, timer *domain.Timer) error { return nil }
-func (m *epgSearchVDRMock) DeleteTimer(ctx context.Context, timerID int) error         { return nil }
-
-func (m *epgSearchVDRMock) GetRecordings(ctx context.Context) ([]domain.Recording, error) {
-	return nil, nil
-}
-
-func (m *epgSearchVDRMock) GetRecordingDir(ctx context.Context, recordingID string) (string, error) {
-	return "", nil
-}
-func (m *epgSearchVDRMock) DeleteRecording(ctx context.Context, path string) error        { return nil }
-func (m *epgSearchVDRMock) GetCurrentChannel(ctx context.Context) (string, error)         { return "", nil }
-func (m *epgSearchVDRMock) SetCurrentChannel(ctx context.Context, channelID string) error { return nil }
-func (m *epgSearchVDRMock) SendKey(ctx context.Context, key string) error                 { return nil }
 
 func TestEPGSearch_DisablesRecordWhenTimerOverlaps(t *testing.T) {
 	loc := time.Local
@@ -89,11 +54,10 @@ func TestEPGSearch_DisablesRecordWhenTimerOverlaps(t *testing.T) {
 		Stop:      scheduled.Stop.Add(2 * time.Minute), // overlaps Show B by 2 minutes
 	}
 
-	mock := &epgSearchVDRMock{
-		channels: []domain.Channel{ch},
-		epg:      []domain.EPGEvent{scheduled, other},
-		timers:   []domain.Timer{timer},
-	}
+	mock := ports.NewMockVDRClient().
+		WithChannels([]domain.Channel{ch}).
+		WithEPGEvents([]domain.EPGEvent{scheduled, other}).
+		WithTimers([]domain.Timer{timer})
 
 	epgService := services.NewEPGService(mock, 0)
 	timerService := services.NewTimerService(mock)
