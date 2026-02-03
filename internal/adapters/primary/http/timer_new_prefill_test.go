@@ -10,59 +10,15 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/githubixx/vdradmin-go/internal/application/services"
 	"github.com/githubixx/vdradmin-go/internal/domain"
+	"github.com/githubixx/vdradmin-go/internal/ports"
 )
-
-type timerNewPrefillVDRMock struct {
-	channels []domain.Channel
-}
-
-func (m *timerNewPrefillVDRMock) Connect(ctx context.Context) error { return nil }
-func (m *timerNewPrefillVDRMock) Close() error                      { return nil }
-func (m *timerNewPrefillVDRMock) Ping(ctx context.Context) error    { return nil }
-
-func (m *timerNewPrefillVDRMock) GetChannels(ctx context.Context) ([]domain.Channel, error) {
-	return m.channels, nil
-}
-
-func (m *timerNewPrefillVDRMock) GetEPG(ctx context.Context, channelID string, at time.Time) ([]domain.EPGEvent, error) {
-	return []domain.EPGEvent{}, nil
-}
-
-func (m *timerNewPrefillVDRMock) GetTimers(ctx context.Context) ([]domain.Timer, error) {
-	return []domain.Timer{}, nil
-}
-
-func (m *timerNewPrefillVDRMock) CreateTimer(ctx context.Context, timer *domain.Timer) error {
-	return nil
-}
-func (m *timerNewPrefillVDRMock) UpdateTimer(ctx context.Context, timer *domain.Timer) error {
-	return nil
-}
-func (m *timerNewPrefillVDRMock) DeleteTimer(ctx context.Context, timerID int) error { return nil }
-
-func (m *timerNewPrefillVDRMock) GetRecordings(ctx context.Context) ([]domain.Recording, error) {
-	return nil, nil
-}
-
-func (m *timerNewPrefillVDRMock) GetRecordingDir(ctx context.Context, recordingID string) (string, error) {
-	return "", nil
-}
-func (m *timerNewPrefillVDRMock) DeleteRecording(ctx context.Context, path string) error { return nil }
-func (m *timerNewPrefillVDRMock) GetCurrentChannel(ctx context.Context) (string, error) {
-	return "", nil
-}
-func (m *timerNewPrefillVDRMock) SetCurrentChannel(ctx context.Context, channelID string) error {
-	return nil
-}
-func (m *timerNewPrefillVDRMock) SendKey(ctx context.Context, key string) error { return nil }
 
 func TestTimerNew_PrefillsFromQueryParams(t *testing.T) {
 	ch := domain.Channel{ID: "C-1-2-3", Number: 1, Name: "SWR BW HD"}
-	mock := &timerNewPrefillVDRMock{channels: []domain.Channel{ch}}
+	mock := ports.NewMockVDRClient().WithChannels([]domain.Channel{ch})
 
 	epqService := services.NewEPGService(mock, 0)
 

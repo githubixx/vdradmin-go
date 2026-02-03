@@ -1,7 +1,6 @@
 package http
 
 import (
-	"context"
 	"html/template"
 	"io"
 	"log/slog"
@@ -10,57 +9,18 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/githubixx/vdradmin-go/internal/application/services"
 	"github.com/githubixx/vdradmin-go/internal/domain"
+	"github.com/githubixx/vdradmin-go/internal/ports"
 )
 
-type recordingsVDRMock struct {
-	recordings []domain.Recording
-}
-
-func (m *recordingsVDRMock) Connect(ctx context.Context) error { return nil }
-func (m *recordingsVDRMock) Close() error                      { return nil }
-func (m *recordingsVDRMock) Ping(ctx context.Context) error    { return nil }
-
-func (m *recordingsVDRMock) GetChannels(ctx context.Context) ([]domain.Channel, error) {
-	return nil, nil
-}
-func (m *recordingsVDRMock) GetEPG(ctx context.Context, channelID string, at time.Time) ([]domain.EPGEvent, error) {
-	return nil, nil
-}
-func (m *recordingsVDRMock) GetTimers(ctx context.Context) ([]domain.Timer, error) { return nil, nil }
-func (m *recordingsVDRMock) CreateTimer(ctx context.Context, timer *domain.Timer) error {
-	return nil
-}
-func (m *recordingsVDRMock) UpdateTimer(ctx context.Context, timer *domain.Timer) error {
-	return nil
-}
-func (m *recordingsVDRMock) DeleteTimer(ctx context.Context, timerID int) error { return nil }
-
-func (m *recordingsVDRMock) GetRecordings(ctx context.Context) ([]domain.Recording, error) {
-	return m.recordings, nil
-}
-
-func (m *recordingsVDRMock) GetRecordingDir(ctx context.Context, recordingID string) (string, error) {
-	return "", nil
-}
-func (m *recordingsVDRMock) DeleteRecording(ctx context.Context, path string) error { return nil }
-func (m *recordingsVDRMock) GetCurrentChannel(ctx context.Context) (string, error)  { return "", nil }
-func (m *recordingsVDRMock) SetCurrentChannel(ctx context.Context, channelID string) error {
-	return nil
-}
-func (m *recordingsVDRMock) SendKey(ctx context.Context, key string) error { return nil }
-
 func TestRecordings_SearchThresholdAndFiltering(t *testing.T) {
-	mock := &recordingsVDRMock{
-		recordings: []domain.Recording{
-			{Path: "1", Title: "Foo Bar", Subtitle: "Pilot", Channel: "ARD"},
-			{Path: "2", Title: "Something Else", Subtitle: "Foo In Subtitle", Channel: "ZDF"},
-			{Path: "path-token-zzz", Title: "Another One", Subtitle: "Other", Channel: "3sat"},
-		},
-	}
+	mock := ports.NewMockVDRClient().WithRecordings([]domain.Recording{
+		{Path: "1", Title: "Foo Bar", Subtitle: "Pilot", Channel: "ARD"},
+		{Path: "2", Title: "Something Else", Subtitle: "Foo In Subtitle", Channel: "ZDF"},
+		{Path: "path-token-zzz", Title: "Another One", Subtitle: "Other", Channel: "3sat"},
+	})
 
 	recordingService := services.NewRecordingService(mock, 0)
 

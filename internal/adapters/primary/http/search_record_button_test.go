@@ -14,45 +14,8 @@ import (
 
 	"github.com/githubixx/vdradmin-go/internal/application/services"
 	"github.com/githubixx/vdradmin-go/internal/domain"
+	"github.com/githubixx/vdradmin-go/internal/ports"
 )
-
-type searchVDRMock struct {
-	channels []domain.Channel
-	epg      []domain.EPGEvent
-	timers   []domain.Timer
-}
-
-func (m *searchVDRMock) Connect(ctx context.Context) error { return nil }
-func (m *searchVDRMock) Close() error                      { return nil }
-func (m *searchVDRMock) Ping(ctx context.Context) error    { return nil }
-
-func (m *searchVDRMock) GetChannels(ctx context.Context) ([]domain.Channel, error) {
-	return m.channels, nil
-}
-
-func (m *searchVDRMock) GetEPG(ctx context.Context, channelID string, at time.Time) ([]domain.EPGEvent, error) {
-	return m.epg, nil
-}
-
-func (m *searchVDRMock) GetTimers(ctx context.Context) ([]domain.Timer, error) {
-	return m.timers, nil
-}
-
-func (m *searchVDRMock) CreateTimer(ctx context.Context, timer *domain.Timer) error { return nil }
-func (m *searchVDRMock) UpdateTimer(ctx context.Context, timer *domain.Timer) error { return nil }
-func (m *searchVDRMock) DeleteTimer(ctx context.Context, timerID int) error         { return nil }
-
-func (m *searchVDRMock) GetRecordings(ctx context.Context) ([]domain.Recording, error) {
-	return nil, nil
-}
-
-func (m *searchVDRMock) GetRecordingDir(ctx context.Context, recordingID string) (string, error) {
-	return "", nil
-}
-func (m *searchVDRMock) DeleteRecording(ctx context.Context, path string) error        { return nil }
-func (m *searchVDRMock) GetCurrentChannel(ctx context.Context) (string, error)         { return "", nil }
-func (m *searchVDRMock) SetCurrentChannel(ctx context.Context, channelID string) error { return nil }
-func (m *searchVDRMock) SendKey(ctx context.Context, key string) error                 { return nil }
 
 func TestSearch_DisablesRecordWhenTimerExists(t *testing.T) {
 	loc := time.Local
@@ -85,16 +48,15 @@ func TestSearch_DisablesRecordWhenTimerExists(t *testing.T) {
 		Active:    true,
 		ChannelID: ch.ID,
 		// Timer titles can be formatted differently than EPG titles (e.g. "alpha-retro|" vs "alpha-retro:").
-		Title:     scheduled.Title + "|",
-		Start:     scheduled.Start.Add(-2 * time.Minute),
-		Stop:      scheduled.Stop.Add(2 * time.Minute),
+		Title: scheduled.Title + "|",
+		Start: scheduled.Start.Add(-2 * time.Minute),
+		Stop:  scheduled.Stop.Add(2 * time.Minute),
 	}
 
-	mock := &searchVDRMock{
-		channels: []domain.Channel{ch},
-		epg:      []domain.EPGEvent{scheduled, other},
-		timers:   []domain.Timer{timer},
-	}
+	mock := ports.NewMockVDRClient().
+		WithChannels([]domain.Channel{ch}).
+		WithEPGEvents([]domain.EPGEvent{scheduled, other}).
+		WithTimers([]domain.Timer{timer})
 
 	epgService := services.NewEPGService(mock, 0)
 	timerService := services.NewTimerService(mock)

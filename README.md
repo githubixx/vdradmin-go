@@ -4,9 +4,9 @@
 
 ## Note
 
-I'm using `vdradmin-go` on a daily base and it contains some tests to ensure some quality. Still, the code isn't that mature. Expect bugs. Some features have beta quality, some only alpha quality and some elements might not work at all. So be careful esp. with features that change something on the file system like deleting recordings and things like that!
+I'm using `vdradmin-go` on a daily basis and it has a comprehensive test suite (250+ tests with race detection, fuzz testing, and integration tests) to ensure quality. Still, the code isn't that mature. Expect bugs. Some features have beta quality, some only alpha quality and some elements might not work at all. So be careful especially with features that change something on the file system like deleting recordings and things like that!
 
-This code was mainly generated with Claude Code (initial conversion of `vdradmin-am` Perl code to Go) and GPT-5.2 (everything else). Originally, I just wanted to see how far I can get converting the Perl code base of `vdradmin-am` (~7500 lines of code) to Go and more recent technologies. But turned it worked very well and got a useable application at the end.
+This code was mainly generated with Claude Code (initial conversion of `vdradmin-am` Perl code to Go) and GPT-5.2 (everything else). Originally, I just wanted to see how far I can get converting the Perl code base of `vdradmin-am` (~7500 lines of code) to Go and more recent technologies. But it turned out it worked very well and got a useable application at the end.
 
 ## Screenshots
 
@@ -171,7 +171,7 @@ Releases are built via GitHub Actions (GoReleaser) when a semantic version tag i
 - Download the `linux_amd64` archive from the latest [GitHub Release](https://github.com/githubixx/vdradmin-go/releases). E.g.:
 
 ```bash
-export VDRADMIN_GO_VERSION="0.2.1"
+export VDRADMIN_GO_VERSION="0.3.0"
 
 wget https://github.com/githubixx/vdradmin-go/releases/download/${VDRADMIN_GO_VERSION}/vdradmin-go_${VDRADMIN_GO_VERSION}_linux_amd64.tar.gz
 ```
@@ -201,7 +201,7 @@ tar xvfz vdradmin-go_${VDRADMIN_GO_VERSION}_linux_amd64.tar.gz
 - Pull the image from GitHub Container Registry:
 
 ```bash
-export VDRADMIN_GO_VERSION="0.2.1"
+export VDRADMIN_GO_VERSION="0.3.0"
 
 docker pull ghcr.io/githubixx/vdradmin-go:${VDRADMIN_GO_VERSION}
 ```
@@ -320,24 +320,79 @@ If you use `vdr-plugin-streamdev-server`, its HTTP server commonly runs on port 
 
 Note: streamdev’s default outputs are typically TS/PES/ES, which most browsers do not play directly; you may need an external remux/transcode step to get true in-browser playback.
 
-## Integration Tests (Docker)
+## Testing
 
-There is an optional integration test (build tag `integration`) that spins up:
+vdradmin-go has a comprehensive test suite covering multiple testing strategies:
 
-- an SVDRP stub container (fake VDR)
-- a `vdradmin-go` container (to mimic real deployment)
-
-and asserts that `/timers` renders the timer timeline with `ok`/`collision`/`critical` blocks.
+### Running Tests
 
 ```bash
-# Requires Docker
-go test -tags=integration ./internal/integration -run TestContainers -count=1
+# Run all tests (unit + race detection)
+make test
 
-# Optional: reuse a prebuilt app image (faster)
-docker build -f deployments/Dockerfile -t vdradmin-go-it-app:local .
-VDRADMIN_GO_APP_IMAGE=vdradmin-go-it-app:local \
-  go test -tags=integration ./internal/integration -run TestContainers -count=1
+# Run tests with coverage report
+make test-coverage
+
+# Run integration tests (requires Docker)
+go test -tags=integration ./internal/integration -v
+
+# Run fuzz tests (optional, time-intensive)
+go test -fuzz=FuzzParseSVDRPResponse -fuzztime=5m ./internal/adapters/secondary/svdrp/
 ```
+
+### Test Coverage
+
+- **250+ tests** across 7 packages
+- **Unit tests**: Domain models, services, handlers, SVDRP protocol
+- **Integration tests**: Real SVDRP protocol communication with testcontainers
+- **Property-based tests**: Domain invariants using `testing/quick`
+- **Fuzz tests**: SVDRP protocol parsing with Go 1.18+ fuzzing
+- **Race detection**: Concurrent access validation (automatically enabled by `make test`)
+- **Port contract tests**: VDRClient interface compliance validation
+
+### Test Architecture
+
+The test suite follows the same hexagonal architecture as the application:
+
+- **Domain tests** (`internal/domain/*_test.go`): Model validation, business rules, property-based testing
+- **Port contract tests** (`internal/ports/vdr_contract_test.go`): Reusable test suite ensuring all VDRClient implementations behave consistently
+- **Service tests** (`internal/application/services/*_test.go`): Use case orchestration with canonical mocks
+- **Adapter tests** (`internal/adapters/**/*_test.go`): HTTP handlers, SVDRP protocol parsing, fuzz testing
+- **Integration tests** (`internal/integration/svdrp_integration_test.go`): Full protocol validation with Docker containers
+- **Race tests** (`internal/application/services/race_test.go`): Concurrency safety validation
+
+### Integration Tests (Docker)
+
+Integration tests use testcontainers-go to spin up a real SVDRP stub server and verify:
+
+- Channel list retrieval and parsing
+- Timer CRUD operations (Create, Read, Update, Delete)
+- Connection resilience and automatic reconnection
+- Timeout handling and context cancellation
+- Concurrent operations safety
+- Timer collision detection
+- Channel ID format parsing
+
+```bash
+# Run all integration tests (requires Docker)
+go test -tags=integration ./internal/integration -v
+
+# Run specific integration test
+go test -tags=integration ./internal/integration -run TestSVDRP_RealProtocol_ChannelListRetrieval -v
+```
+
+### Coverage Metrics
+
+Recent coverage (via `make test-coverage`):
+
+- HTTP handlers: ~36%
+- SVDRP adapter: ~57%
+- Archive service: ~31%
+- Application services: ~47%
+- Port interfaces: ~79%
+- Config infrastructure: ~32%
+
+Note: Coverage percentages reflect tested code paths. Low percentages often indicate error handling paths that require specific VDR states to trigger.
 
 ## License
 

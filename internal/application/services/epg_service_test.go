@@ -7,11 +7,12 @@ import (
 	"time"
 
 	"github.com/githubixx/vdradmin-go/internal/domain"
+	"github.com/githubixx/vdradmin-go/internal/ports"
 )
 
 func TestEPGService_GetEPG_UsesCache(t *testing.T) {
 	var calls int32
-	client := &mockVDRClient{
+	client := &ports.MockVDRClient{
 		GetEPGFunc: func(ctx context.Context, channelID string, at time.Time) ([]domain.EPGEvent, error) {
 			atomic.AddInt32(&calls, 1)
 			return []domain.EPGEvent{{EventID: 1, ChannelID: channelID, Title: "X", Start: time.Unix(10, 0), Stop: time.Unix(20, 0)}}, nil
@@ -37,7 +38,7 @@ func TestEPGService_GetEPG_UsesCache(t *testing.T) {
 
 func TestEPGService_GetChannels_UsesCache(t *testing.T) {
 	var calls int32
-	client := &mockVDRClient{
+	client := &ports.MockVDRClient{
 		GetChannelsFunc: func(ctx context.Context) ([]domain.Channel, error) {
 			atomic.AddInt32(&calls, 1)
 			return []domain.Channel{{ID: "C-1-2-3", Number: 1, Name: "Ch"}}, nil
@@ -62,7 +63,7 @@ func TestEPGService_GetChannels_UsesCache(t *testing.T) {
 }
 
 func TestEPGService_WantedChannels_FiltersChannels(t *testing.T) {
-	client := &mockVDRClient{
+	client := &ports.MockVDRClient{
 		GetChannelsFunc: func(ctx context.Context) ([]domain.Channel, error) {
 			return []domain.Channel{
 				{ID: "C-1-2-3", Number: 1, Name: "One"},
@@ -87,7 +88,7 @@ func TestEPGService_WantedChannels_FiltersChannels(t *testing.T) {
 }
 
 func TestEPGService_WantedChannels_FiltersAllEPG(t *testing.T) {
-	client := &mockVDRClient{
+	client := &ports.MockVDRClient{
 		GetEPGFunc: func(ctx context.Context, channelID string, at time.Time) ([]domain.EPGEvent, error) {
 			return []domain.EPGEvent{
 				{EventID: 1, ChannelID: "C-1-2-3", Title: "A", Start: time.Unix(10, 0), Stop: time.Unix(20, 0)},
@@ -113,7 +114,7 @@ func TestEPGService_WantedChannels_FiltersAllEPG(t *testing.T) {
 
 func TestEPGService_WantedChannels_SkipsBackendForUnwantedChannel(t *testing.T) {
 	var calls int32
-	client := &mockVDRClient{
+	client := &ports.MockVDRClient{
 		GetEPGFunc: func(ctx context.Context, channelID string, at time.Time) ([]domain.EPGEvent, error) {
 			atomic.AddInt32(&calls, 1)
 			return []domain.EPGEvent{{EventID: 1, ChannelID: channelID, Title: "X", Start: time.Unix(10, 0), Stop: time.Unix(20, 0)}}, nil

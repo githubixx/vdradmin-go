@@ -16,68 +16,30 @@ import (
 	"github.com/githubixx/vdradmin-go/internal/application/services"
 	"github.com/githubixx/vdradmin-go/internal/domain"
 	"github.com/githubixx/vdradmin-go/internal/infrastructure/config"
+	"github.com/githubixx/vdradmin-go/internal/ports"
 )
-
-type timerCreateVDRMock struct {
-	mu sync.Mutex
-
-	events []domain.EPGEvent
-
-	created []*domain.Timer
-}
-
-func (m *timerCreateVDRMock) Connect(ctx context.Context) error { return nil }
-func (m *timerCreateVDRMock) Close() error                      { return nil }
-func (m *timerCreateVDRMock) Ping(ctx context.Context) error    { return nil }
-func (m *timerCreateVDRMock) GetChannels(ctx context.Context) ([]domain.Channel, error) {
-	return nil, nil
-}
-
-func (m *timerCreateVDRMock) GetEPG(ctx context.Context, channelID string, at time.Time) ([]domain.EPGEvent, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	out := make([]domain.EPGEvent, len(m.events))
-	copy(out, m.events)
-	return out, nil
-}
-
-func (m *timerCreateVDRMock) GetTimers(ctx context.Context) ([]domain.Timer, error) { return nil, nil }
-
-func (m *timerCreateVDRMock) CreateTimer(ctx context.Context, timer *domain.Timer) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	cp := *timer
-	m.created = append(m.created, &cp)
-	return nil
-}
-
-func (m *timerCreateVDRMock) UpdateTimer(ctx context.Context, timer *domain.Timer) error { return nil }
-func (m *timerCreateVDRMock) DeleteTimer(ctx context.Context, timerID int) error         { return nil }
-func (m *timerCreateVDRMock) GetRecordings(ctx context.Context) ([]domain.Recording, error) {
-	return nil, nil
-}
-
-func (m *timerCreateVDRMock) GetRecordingDir(ctx context.Context, recordingID string) (string, error) {
-	return "", nil
-}
-func (m *timerCreateVDRMock) DeleteRecording(ctx context.Context, path string) error { return nil }
-func (m *timerCreateVDRMock) GetCurrentChannel(ctx context.Context) (string, error)  { return "", nil }
-func (m *timerCreateVDRMock) SetCurrentChannel(ctx context.Context, channelID string) error {
-	return nil
-}
-func (m *timerCreateVDRMock) SendKey(ctx context.Context, key string) error { return nil }
 
 func TestTimerCreate_UsesConfiguredDefaultMargins(t *testing.T) {
 	start := time.Date(2026, 1, 3, 20, 0, 0, 0, time.Local)
 	stop := time.Date(2026, 1, 3, 21, 0, 0, 0, time.Local)
 
-	mock := &timerCreateVDRMock{events: []domain.EPGEvent{{
+	var mu sync.Mutex
+	var created []*domain.Timer
+
+	mock := ports.NewMockVDRClient().WithEPGEvents([]domain.EPGEvent{{
 		EventID:   123,
 		ChannelID: "C-1-2-3",
 		Title:     "Show",
 		Start:     start,
 		Stop:      stop,
-	}}}
+	}})
+	mock.CreateTimerFunc = func(ctx context.Context, timer *domain.Timer) error {
+		mu.Lock()
+		defer mu.Unlock()
+		cp := *timer
+		created = append(created, &cp)
+		return nil
+	}
 
 	epgSvc := services.NewEPGService(mock, 0)
 	timerSvc := services.NewTimerService(mock)
@@ -110,19 +72,19 @@ func TestTimerCreate_UsesConfiguredDefaultMargins(t *testing.T) {
 		t.Fatalf("expected %d, got %d", http.StatusSeeOther, resp.StatusCode)
 	}
 
-	mock.mu.Lock()
-	defer mock.mu.Unlock()
-	if len(mock.created) != 1 {
-		t.Fatalf("expected 1 created timer, got %d", len(mock.created))
+	mu.Lock()
+	defer mu.Unlock()
+	if len(created) != 1 {
+		t.Fatalf("expected 1 created timer, got %d", len(created))
 	}
-	created := mock.created[0]
+	timer := created[0]
 
 	expectedStart := start.Add(-7 * time.Minute)
 	expectedStop := stop.Add(11 * time.Minute)
-	if !created.Start.Equal(expectedStart) {
-		t.Fatalf("expected Start %s, got %s", expectedStart.Format(time.RFC3339), created.Start.Format(time.RFC3339))
+	if !timer.Start.Equal(expectedStart) {
+		t.Fatalf("expected Start %s, got %s", expectedStart.Format(time.RFC3339), timer.Start.Format(time.RFC3339))
 	}
-	if !created.Stop.Equal(expectedStop) {
-		t.Fatalf("expected Stop %s, got %s", expectedStop.Format(time.RFC3339), created.Stop.Format(time.RFC3339))
+	if !timer.Stop.Equal(expectedStop) {
+		t.Fatalf("expected Stop %s, got %s", expectedStop.Format(time.RFC3339), timer.Stop.Format(time.RFC3339))
 	}
 }

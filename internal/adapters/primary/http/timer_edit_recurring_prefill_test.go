@@ -10,56 +10,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/githubixx/vdradmin-go/internal/application/services"
 	"github.com/githubixx/vdradmin-go/internal/domain"
+	"github.com/githubixx/vdradmin-go/internal/ports"
 )
-
-type timerEditPrefillVDRMock struct {
-	channels []domain.Channel
-	timers   []domain.Timer
-}
-
-func (m *timerEditPrefillVDRMock) Connect(ctx context.Context) error { return nil }
-func (m *timerEditPrefillVDRMock) Close() error                      { return nil }
-func (m *timerEditPrefillVDRMock) Ping(ctx context.Context) error    { return nil }
-
-func (m *timerEditPrefillVDRMock) GetChannels(ctx context.Context) ([]domain.Channel, error) {
-	return m.channels, nil
-}
-
-func (m *timerEditPrefillVDRMock) GetEPG(ctx context.Context, channelID string, at time.Time) ([]domain.EPGEvent, error) {
-	return []domain.EPGEvent{}, nil
-}
-
-func (m *timerEditPrefillVDRMock) GetTimers(ctx context.Context) ([]domain.Timer, error) {
-	return m.timers, nil
-}
-
-func (m *timerEditPrefillVDRMock) CreateTimer(ctx context.Context, timer *domain.Timer) error {
-	return nil
-}
-func (m *timerEditPrefillVDRMock) UpdateTimer(ctx context.Context, timer *domain.Timer) error {
-	return nil
-}
-func (m *timerEditPrefillVDRMock) DeleteTimer(ctx context.Context, timerID int) error { return nil }
-
-func (m *timerEditPrefillVDRMock) GetRecordings(ctx context.Context) ([]domain.Recording, error) {
-	return nil, nil
-}
-
-func (m *timerEditPrefillVDRMock) GetRecordingDir(ctx context.Context, recordingID string) (string, error) {
-	return "", nil
-}
-func (m *timerEditPrefillVDRMock) DeleteRecording(ctx context.Context, path string) error { return nil }
-func (m *timerEditPrefillVDRMock) GetCurrentChannel(ctx context.Context) (string, error) {
-	return "", nil
-}
-func (m *timerEditPrefillVDRMock) SetCurrentChannel(ctx context.Context, channelID string) error {
-	return nil
-}
-func (m *timerEditPrefillVDRMock) SendKey(ctx context.Context, key string) error { return nil }
 
 func TestTimerEdit_PrefillsWeeklyTimer(t *testing.T) {
 	ch := domain.Channel{ID: "C-1-2-3", Number: 1, Name: "SWR BW HD"}
@@ -76,7 +31,9 @@ func TestTimerEdit_PrefillsWeeklyTimer(t *testing.T) {
 		Aux:          "",
 	}
 
-	mock := &timerEditPrefillVDRMock{channels: []domain.Channel{ch}, timers: []domain.Timer{weekly}}
+	mock := ports.NewMockVDRClient().
+		WithChannels([]domain.Channel{ch}).
+		WithTimers([]domain.Timer{weekly})
 
 	epgService := services.NewEPGService(mock, 0)
 	timerService := services.NewTimerService(mock)
