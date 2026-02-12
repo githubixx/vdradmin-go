@@ -13,7 +13,7 @@
     --danger-color: #ef4444;
     --warning-color: #f59e0b;
 
-    /* Background like screenshot: light → dark grey diagonal */
+    /* Background: light → dark grey diagonal */
     --bg-color: #c4cbd6;
     --bg-image:
         radial-gradient(900px 520px at 20% 18%, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.00) 60%),

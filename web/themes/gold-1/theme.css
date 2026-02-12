@@ -62,8 +62,7 @@
 }
 
 /*
-  Button styling: glossy pill look like the screenshot.
-    We keep this theme self-contained by scoping overrides to `data-theme="gold-1"`.
+  We keep this theme self-contained by scoping overrides to `data-theme="gold-1"`.
 */
 :root[data-theme="gold-1"] .btn {
     font-weight: 600;

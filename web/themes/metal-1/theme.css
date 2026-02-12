@@ -3,7 +3,7 @@
 /* Metal Theme - vdradmin-go */
 
 :root[data-theme="metal-1"] {
-    /* Fonts: thin, techno-ish like the screenshot */
+    /* Fonts: thin, techno-ish */
     --font-sans: 'Barlow Condensed', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     --font-display: 'Michroma', 'Barlow Condensed', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
@@ -44,7 +44,7 @@
     --text-color: rgba(241, 245, 249, 0.92);
     --text-muted: rgba(203, 213, 225, 0.74);
 
-    /* Border like screenshot: light edge on dark glass */
+    /* Border: light edge on dark glass */
     --border-color: rgba(255, 255, 255, 0.18);
 
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.55), 0 16px 40px rgba(0, 0, 0, 0.62);
@@ -63,7 +63,7 @@
 }
 
 /*
-  Flare effects on panels (like the screenshot): subtle corner blooms + edge highlights.
+  Flare effects on panels: subtle corner blooms + edge highlights.
   Scoped to the Metal theme only.
 */
 :root[data-theme="metal-1"] .card,
