@@ -392,9 +392,9 @@ func (c *Client) GetRecordings(ctx context.Context) ([]domain.Recording, error) 
 		for _, line := range lines {
 			r, err := parseRecording(line)
 			if err == nil {
-								// Resolve the actual recording directory from VDR and filter out
+				// Resolve the actual recording directory from VDR and filter out
 				// entries that no longer exist on disk (e.g. deleted out-of-band).
-								dirPath, err := c.getRecordingDirPathLocked(ctx, r.Path)
+				dirPath, err := c.getRecordingDirPathLocked(ctx, r.Path)
 				if err != nil {
 					if isTransientConnErr(err) {
 						return nil, err
