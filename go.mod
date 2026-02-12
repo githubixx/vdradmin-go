@@ -2,11 +2,12 @@ module github.com/githubixx/vdradmin-go
 
 go 1.25.0
 
-require go.yaml.in/yaml/v4 v4.0.0-rc.3
+require go.yaml.in/yaml/v4 v4.0.0-rc.4
 
 require (
 	github.com/docker/go-connections v0.5.0
 	github.com/testcontainers/testcontainers-go v0.35.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -64,5 +65,4 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20240318140521-94a12d6c2237 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240401170217-c3f982113cda // indirect
 	google.golang.org/protobuf v1.35.2 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
