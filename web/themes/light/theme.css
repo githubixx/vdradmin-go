@@ -1,0 +1,40 @@
+/* Light Theme - vdradmin-go */
+
+:root[data-theme="light"] {
+    --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+    --primary-color: #7c3aed;
+    --primary-hover: #6d28d9;
+    --secondary-color: #64748b;
+    --success-color: #10b981;
+    --danger-color: #ef4444;
+    --warning-color: #f59e0b;
+
+    --bg-color: #f6f7fb;
+    --bg-image: radial-gradient(900px 500px at 15% 10%, rgba(124, 58, 237, 0.10), transparent 60%),
+        radial-gradient(800px 520px at 85% 15%, rgba(14, 165, 233, 0.09), transparent 55%),
+        radial-gradient(900px 700px at 50% 90%, rgba(245, 158, 11, 0.06), transparent 55%);
+
+    /* Used as `background:` on panels (can be a gradient). */
+    --surface-color: #ffffff;
+    --surface-hover: rgba(2, 6, 23, 0.02);
+
+    --text-color: #0f172a;
+    --text-muted: rgba(15, 23, 42, 0.70);
+    --border-color: rgba(15, 23, 42, 0.10);
+
+    --shadow: 0 1px 2px rgba(2, 6, 23, 0.06), 0 12px 24px rgba(2, 6, 23, 0.06);
+    --shadow-lg: 0 2px 4px rgba(2, 6, 23, 0.08), 0 18px 44px rgba(2, 6, 23, 0.12);
+
+    --nav-active-bg: linear-gradient(180deg, rgba(124, 58, 237, 0.14), rgba(124, 58, 237, 0.08));
+    --nav-active-border: rgba(124, 58, 237, 0.22);
+    --nav-active-shadow: 0 10px 26px rgba(124, 58, 237, 0.16);
+
+    /* Burger menu localized dim overlay (around the dropdown) */
+    --menu-scrim-color: rgba(0, 0, 0, 0.18);
+    --menu-scrim-padding: 20px;
+    --radius: 0.75rem;
+    --spacing: 1rem;
+    color-scheme: light;
+}

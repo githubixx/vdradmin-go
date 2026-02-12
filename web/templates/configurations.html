@@ -1,13 +1,14 @@
 {{define "configurations.html"}}
 <!DOCTYPE html>
-<html lang="en" {{if eq .ThemeMode "dark"}}data-theme="dark"{{else if eq .ThemeMode "light"}}data-theme="light"{{end}} data-theme-default="{{.ThemeDefault}}">
+<html lang="en" {{if ne .ThemeMode "system"}}data-theme="{{.ThemeMode}}"{{end}} data-theme-default="{{.ThemeDefault}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Configurations - VDRAdmin-go</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/base.css?v=20260212-2">
+    {{if and .ThemeMode (ne .ThemeMode "system")}}<link rel="stylesheet" href="/themes/{{.ThemeMode}}/theme.css">{{end}}
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script src="/static/js/theme.js?v=20260104" defer></script>
+    <script src="/static/js/theme.js?v=20260212" defer></script>
 </head>
 <body>
     {{template "nav_header" .}}
@@ -71,9 +72,11 @@
                 <div class="config-grid">
                     <label for="ui_theme">Default theme</label>
                     <select id="ui_theme" name="ui_theme">
-                        <option value="system" {{if and .Config (eq .Config.UI.Theme "system")}}selected{{end}}>System</option>
-                        <option value="light" {{if and .Config (eq .Config.UI.Theme "light")}}selected{{end}}>Light</option>
-                        <option value="dark" {{if and .Config (eq .Config.UI.Theme "dark")}}selected{{end}}>Dark</option>
+                        {{- range .AvailableThemes -}}
+                            <option value="{{.ID}}" {{if and $.Config (eq $.Config.UI.Theme .ID)}}selected{{end}}>
+                                {{- .Label -}}
+                            </option>
+                        {{- end -}}
                     </select>
 
                     <label for="ui_login_page">Login Page</label>

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 40" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="rgba(255,255,255,0.55)"/>
+      <stop offset="0.35" stop-color="rgba(255,255,255,0.18)"/>
+      <stop offset="0.7" stop-color="rgba(255,255,255,0.00)"/>
+    </linearGradient>
+    <radialGradient id="spark" cx="0.88" cy="0.18" r="0.22">
+      <stop offset="0" stop-color="rgba(255,255,255,0.95)"/>
+      <stop offset="0.35" stop-color="rgba(255,255,255,0.35)"/>
+      <stop offset="1" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <clipPath id="clip">
+      <rect x="2" y="2" width="96" height="36" rx="18" ry="18"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#clip)">
+    <!-- Diagonal gloss sweep -->
+    <path d="M-10,34 L40,-6 L110,6 L60,46 Z" fill="url(#g)" opacity="0.9"/>
+
+    <!-- Subtle top rim highlight -->
+    <rect x="4" y="5" width="92" height="10" rx="8" ry="8" fill="rgba(255,255,255,0.18)"/>
+
+    <!-- Sparkle -->
+    <circle cx="88" cy="8" r="14" fill="url(#spark)" opacity="0.85"/>
+  </g>
+</svg>

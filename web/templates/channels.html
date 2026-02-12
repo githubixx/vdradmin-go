@@ -1,12 +1,13 @@
 {{define "channels.html"}}
 <!DOCTYPE html>
-<html lang="en" {{if eq .ThemeMode "dark"}}data-theme="dark"{{else if eq .ThemeMode "light"}}data-theme="light"{{end}} data-theme-default="{{.ThemeDefault}}">
+<html lang="en" {{if ne .ThemeMode "system"}}data-theme="{{.ThemeMode}}"{{end}} data-theme-default="{{.ThemeDefault}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Channels - VDRAdmin-go</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <script src="/static/js/theme.js?v=20260104" defer></script>
+    <link rel="stylesheet" href="/static/css/base.css?v=20260212-2">
+    {{if and .ThemeMode (ne .ThemeMode "system")}}<link rel="stylesheet" href="/themes/{{.ThemeMode}}/theme.css">{{end}}
+    <script src="/static/js/theme.js?v=20260212" defer></script>
 </head>
 <body class="page-channels">
     {{template "nav_header" .}}

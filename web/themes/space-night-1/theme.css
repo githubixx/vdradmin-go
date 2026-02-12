@@ -1,0 +1,97 @@
+/* Space Night Theme - vdradmin-go */
+
+:root[data-theme="space-night-1"] {
+    --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+    /* Muted cyan/teal (less eye-searing on dark UI) */
+    --primary-color: #3ab3c5;
+    --primary-hover: #5bcfe0;
+    --secondary-color: #94a3b8;
+    --success-color: #10b981;
+    --danger-color: #ef4444;
+    --warning-color: #f59e0b;
+
+    --bg-color: #070615;
+
+    /*
+      Background goals (screenshot-inspired):
+      - deep violet space
+      - subtle nebula glows
+      - stars (tiny sharp dots + a few larger)
+      - diagonal light streak accents (cyan + magenta)
+      - subtle crosshair/cross accents
+
+      Note: base.css only consumes `background-image`, so this stays gradient-only.
+    */
+    --bg-image:
+        /* Vignette */
+        radial-gradient(1200px 800px at 50% 50%, rgba(0, 0, 0, 0.00), rgba(0, 0, 0, 0.55) 70%, rgba(0, 0, 0, 0.75) 100%),
+
+        /* Planet-ish glow (top right) */
+        radial-gradient(520px 520px at 86% 22%, rgba(45, 226, 230, 0.18) 0%, rgba(45, 226, 230, 0.08) 35%, rgba(45, 226, 230, 0.00) 62%),
+
+        /* Nebula glows */
+        radial-gradient(900px 650px at 18% 32%, rgba(236, 72, 153, 0.16) 0%, rgba(236, 72, 153, 0.00) 62%),
+        radial-gradient(980px 720px at 62% 70%, rgba(124, 58, 237, 0.22) 0%, rgba(124, 58, 237, 0.00) 64%),
+        radial-gradient(860px 560px at 42% 18%, rgba(45, 226, 230, 0.10) 0%, rgba(45, 226, 230, 0.00) 58%),
+
+        /* Cyan streaks */
+        linear-gradient(135deg, rgba(45, 226, 230, 0.00) 0%, rgba(45, 226, 230, 0.00) 32%, rgba(45, 226, 230, 0.18) 34%, rgba(45, 226, 230, 0.00) 36%, rgba(45, 226, 230, 0.00) 100%),
+        linear-gradient(135deg, rgba(45, 226, 230, 0.00) 0%, rgba(45, 226, 230, 0.00) 44%, rgba(45, 226, 230, 0.14) 46%, rgba(45, 226, 230, 0.00) 48%, rgba(45, 226, 230, 0.00) 100%),
+
+        /* Magenta streak */
+        linear-gradient(200deg, rgba(236, 72, 153, 0.00) 0%, rgba(236, 72, 153, 0.00) 52%, rgba(236, 72, 153, 0.15) 54%, rgba(236, 72, 153, 0.00) 56%, rgba(236, 72, 153, 0.00) 100%),
+
+        /* Cross-like accents (subtle crosshair lines) */
+        linear-gradient(90deg, rgba(255, 255, 255, 0.00) 0%, rgba(255, 255, 255, 0.00) 88.25%, rgba(255, 255, 255, 0.08) 88.35%, rgba(255, 255, 255, 0.00) 88.45%, rgba(255, 255, 255, 0.00) 100%),
+        linear-gradient(0deg, rgba(255, 255, 255, 0.00) 0%, rgba(255, 255, 255, 0.00) 18.25%, rgba(255, 255, 255, 0.08) 18.35%, rgba(255, 255, 255, 0.00) 18.45%, rgba(255, 255, 255, 0.00) 100%),
+
+        /* Starfield: small crisp stars */
+        radial-gradient(1px 1px at 6% 20%, rgba(255, 255, 255, 0.85) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 12% 64%, rgba(255, 255, 255, 0.75) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 18% 40%, rgba(255, 255, 255, 0.70) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 22% 14%, rgba(255, 255, 255, 0.70) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 28% 72%, rgba(255, 255, 255, 0.70) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 34% 30%, rgba(255, 255, 255, 0.72) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 40% 56%, rgba(255, 255, 255, 0.80) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 46% 18%, rgba(255, 255, 255, 0.76) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 52% 78%, rgba(255, 255, 255, 0.74) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 58% 36%, rgba(255, 255, 255, 0.72) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 64% 14%, rgba(255, 255, 255, 0.74) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 68% 62%, rgba(255, 255, 255, 0.80) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 72% 42%, rgba(255, 255, 255, 0.70) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 78% 30%, rgba(255, 255, 255, 0.76) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 82% 74%, rgba(255, 255, 255, 0.72) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 88% 52%, rgba(255, 255, 255, 0.74) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 92% 22%, rgba(255, 255, 255, 0.82) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 96% 68%, rgba(255, 255, 255, 0.76) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+
+        /* A few larger soft stars */
+        radial-gradient(2px 2px at 14% 28%, rgba(255, 255, 255, 0.55) 0 2px, rgba(255, 255, 255, 0.00) 5px),
+        radial-gradient(2px 2px at 36% 66%, rgba(255, 255, 255, 0.50) 0 2px, rgba(255, 255, 255, 0.00) 5px),
+        radial-gradient(2px 2px at 74% 18%, rgba(255, 255, 255, 0.55) 0 2px, rgba(255, 255, 255, 0.00) 5px),
+        radial-gradient(2px 2px at 84% 62%, rgba(255, 255, 255, 0.50) 0 2px, rgba(255, 255, 255, 0.00) 5px);
+
+    /* Make panels/menus readable over a busy background (more opaque than default dark). */
+    --surface-color: linear-gradient(180deg, rgba(12, 14, 28, 0.92), rgba(12, 14, 28, 0.86));
+    --surface-hover: rgba(255, 255, 255, 0.04);
+
+    --text-color: rgba(226, 232, 240, 0.96);
+    --text-muted: rgba(148, 163, 184, 0.82);
+    --border-color: rgba(255, 255, 255, 0.10);
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 16px 40px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.35), 0 28px 70px rgba(0, 0, 0, 0.55);
+
+    --nav-active-bg: linear-gradient(180deg, rgba(58, 179, 197, 0.20), rgba(58, 179, 197, 0.08));
+    --nav-active-border: rgba(58, 179, 197, 0.22);
+    --nav-active-shadow: 0 14px 34px rgba(58, 179, 197, 0.18);
+
+    --menu-scrim-color: rgba(0, 0, 0, 0.55);
+    --menu-scrim-padding: 20px;
+
+    --radius: 0.75rem;
+    --spacing: 1rem;
+    color-scheme: dark;
+}

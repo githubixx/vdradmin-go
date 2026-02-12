@@ -1,0 +1,257 @@
+/* Luxury 1 Theme - vdradmin-go */
+
+:root[data-theme="luxury-1"] {
+    /* Use Dark theme typography */
+    --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+    /* Luxury palette: gold + deep wine */
+    --primary-color: #d4af37;
+    --primary-hover: #f2dc8a;
+    --secondary-color: #b08d2c;
+    --success-color: #d4af37;
+    --danger-color: #d4af37;
+    --warning-color: #d4af37;
+
+    --bg-color: #050203;
+    --bg-image:
+        radial-gradient(900px 560px at 55% 18%, rgba(92, 6, 28, 0.38) 0%, rgba(5, 2, 3, 0.00) 62%),
+        radial-gradient(780px 620px at 22% 78%, rgba(120, 10, 40, 0.22) 0%, rgba(5, 2, 3, 0.00) 60%),
+        linear-gradient(135deg, #050203 0%, #14040a 42%, #050203 100%);
+
+    /* Deep glass panels */
+    --surface-color: linear-gradient(180deg, rgba(38, 6, 12, 0.92) 0%, rgba(15, 3, 6, 0.92) 100%);
+    --surface-hover: rgba(212, 175, 55, 0.08);
+
+    --text-color: rgba(250, 242, 220, 0.94);
+    --text-muted: rgba(235, 222, 190, 0.74);
+    --border-color: rgba(212, 175, 55, 0.38);
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.55), 0 18px 48px rgba(0, 0, 0, 0.58);
+    --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.55), 0 30px 90px rgba(0, 0, 0, 0.68);
+
+    --nav-active-bg: linear-gradient(180deg, rgba(212, 175, 55, 0.16), rgba(212, 175, 55, 0.06));
+    --nav-active-border: rgba(242, 220, 138, 0.38);
+    --nav-active-shadow: 0 14px 34px rgba(212, 175, 55, 0.12);
+
+    /* Keep burger menu readable; don't let page background shine through */
+    --menu-scrim-color: rgba(0, 0, 0, 0.62);
+    /* Avoid overflow-induced scrollbar/layout shifts when opening the menu near viewport edges */
+    --menu-scrim-padding: 0px;
+
+    --radius: 0.75rem;
+    --spacing: 1rem;
+    color-scheme: dark;
+}
+
+/* Guard against any horizontal/vertical scrollbar-induced layout shift when the menu opens */
+:root[data-theme="luxury-1"] body {
+    overflow-x: hidden;
+    scrollbar-gutter: stable;
+}
+
+/*
+  Luxury 1 goal: mimic gold-rimmed glossy UI elements.
+  We use CSS for the rim + depth, and small SVG overlays for the specular gloss sweep.
+*/
+
+:root[data-theme="luxury-1"] .btn {
+    position: relative;
+    border-color: transparent;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.00) 55%),
+        radial-gradient(120% 140% at 30% 15%, rgba(120, 10, 40, 0.65) 0%, rgba(5, 2, 3, 0.00) 62%),
+        linear-gradient(180deg, rgba(16, 3, 7, 0.92), rgba(6, 2, 3, 0.92));
+    color: rgba(250, 242, 220, 0.94);
+
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.10),
+        inset 0 -20px 26px rgba(0, 0, 0, 0.35),
+        0 1px 2px rgba(0, 0, 0, 0.55),
+        0 0 22px rgba(212, 175, 55, 0.22),
+        0 0 60px rgba(120, 10, 40, 0.18),
+        0 26px 80px rgba(0, 0, 0, 0.52);
+}
+
+/* Gold rim (gradient ring) */
+:root[data-theme="luxury-1"] .btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 4px;
+    background: linear-gradient(135deg, #fff2b8 0%, #d4af37 25%, #8a6518 55%, #f2dc8a 78%, #b8892c 100%);
+    pointer-events: none;
+
+    -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    opacity: 0.95;
+}
+
+/* Gloss sweep overlay */
+:root[data-theme="luxury-1"] .btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+
+    background-image: url('/static/img/themes/luxury-1/gloss-pill.svg');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    mix-blend-mode: screen;
+    opacity: 0.85;
+}
+
+:root[data-theme="luxury-1"] .btn:hover {
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        inset 0 -20px 26px rgba(0, 0, 0, 0.38),
+        0 2px 6px rgba(0, 0, 0, 0.55),
+        0 0 28px rgba(242, 220, 138, 0.28),
+        0 0 76px rgba(120, 10, 40, 0.22),
+        0 34px 110px rgba(0, 0, 0, 0.58);
+    filter: brightness(1.03);
+}
+
+:root[data-theme="luxury-1"] .btn:active {
+    filter: brightness(0.98);
+}
+
+/* Ensure the burger icon lines stay readable on the dark header */
+:root[data-theme="luxury-1"] .burger-icon::before,
+:root[data-theme="luxury-1"] .burger-icon::after {
+    background: rgba(250, 242, 220, 0.92);
+}
+
+:root[data-theme="luxury-1"] .nav-burger-button .burger-icon {
+    background-image: linear-gradient(rgba(250, 242, 220, 0.92), rgba(250, 242, 220, 0.92));
+}
+
+/* Panels / cards: gold edge + glossy highlight */
+:root[data-theme="luxury-1"] .card,
+:root[data-theme="luxury-1"] .epg-item,
+:root[data-theme="luxury-1"] .timer-item,
+:root[data-theme="luxury-1"] .recording-item {
+    position: relative;
+    overflow: hidden;
+    border-color: rgba(212, 175, 55, 0.45);
+}
+
+:root[data-theme="luxury-1"] .card::before,
+:root[data-theme="luxury-1"] .epg-item::before,
+:root[data-theme="luxury-1"] .timer-item::before,
+:root[data-theme="luxury-1"] .recording-item::before,
+:root[data-theme="luxury-1"] .nav-burger-menu::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+
+    background-image: url('/static/img/themes/luxury-1/gloss-panel.svg');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    mix-blend-mode: screen;
+    opacity: 0.55;
+}
+
+/* Menu panel: more opaque to keep links readable */
+:root[data-theme="luxury-1"] .nav-burger-menu {
+    /* Keep base layout (absolute positioning) to avoid the menu jumping */
+    position: absolute;
+    overflow: hidden;
+    border-color: rgba(212, 175, 55, 0.45);
+    background-color: rgba(10, 3, 5, 0.94);
+    background-image: var(--surface-color);
+}
+
+/* EPG time column: add a smoother, softer glass background */
+:root[data-theme="luxury-1"] .epg-time {
+    padding: 0.55rem 0.65rem 0.5rem;
+    border-radius: calc(var(--radius) - 0.2rem);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.00) 55%),
+        linear-gradient(180deg, rgba(18, 4, 8, 0.78), rgba(8, 2, 4, 0.78));
+    border: 1px solid rgba(212, 175, 55, 0.22);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        inset 0 -18px 26px rgba(0, 0, 0, 0.30);
+}
+
+:root[data-theme="luxury-1"] .epg-time time {
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.55);
+}
+
+/* EPG item container: smoother/softer glass with less harsh edges */
+:root[data-theme="luxury-1"] .epg-item {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.00) 58%),
+        radial-gradient(120% 140% at 28% 18%, rgba(120, 10, 40, 0.22) 0%, rgba(0, 0, 0, 0.00) 62%),
+        var(--surface-color);
+    border-color: rgba(212, 175, 55, 0.26);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        inset 0 -26px 46px rgba(0, 0, 0, 0.26),
+        0 18px 48px rgba(0, 0, 0, 0.52);
+    backdrop-filter: blur(10px);
+}
+
+:root[data-theme="luxury-1"] .epg-item::before {
+    opacity: 0.38;
+}
+
+/* Titles / day headers: keep strong, luxurious contrast */
+:root[data-theme="luxury-1"] .channels-day {
+    /* Match .epg-item background (uses --surface-color) */
+    background: var(--surface-color);
+    color: var(--text-color);
+    box-shadow: var(--shadow);
+    border: none;
+
+    position: relative;
+    overflow: hidden;
+    padding: 0.55rem 0.85rem;
+}
+
+/* Gold rim (thick) */
+:root[data-theme="luxury-1"] .channels-day::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 4px;
+    background: linear-gradient(135deg, #fff2b8 0%, #d4af37 25%, #8a6518 55%, #f2dc8a 78%, #b8892c 100%);
+    pointer-events: none;
+
+    -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    opacity: 0.95;
+}
+
+/* Gloss sweep */
+:root[data-theme="luxury-1"] .channels-day::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background-image: url('/static/img/themes/luxury-1/gloss-panel.svg');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    mix-blend-mode: screen;
+    opacity: 0.55;
+}
+
+:root[data-theme="luxury-1"] .badge {
+    background-color: rgba(212, 175, 55, 0.92);
+    color: rgba(12, 6, 8, 0.92);
+}

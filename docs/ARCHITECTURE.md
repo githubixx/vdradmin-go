@@ -103,7 +103,11 @@ vdradmin-go/
 │           └── config.go
 ├── web/
 │   ├── templates/             # HTML templates
+│   ├── themes/                # Theme CSS + metadata (theme.yaml + theme.css)
 │   └── static/                # CSS, minimal JS
+│       ├── css/
+│       ├── js/
+│       └── img/
 ├── configs/                   # Configuration files
 ├── deployments/               # Docker, systemd
 └── docs/                     # Documentation
@@ -175,7 +179,7 @@ HTTP → Handler → TimerService → EPGService → VDRClient (interface) → S
 
 - **htmx**: Dynamic UI without JavaScript frameworks
 - **Modern CSS**: Grid, Flexbox, CSS Variables
-- **Minimal JavaScript**: Only from htmx
+- **Minimal JavaScript**: htmx plus small helper scripts (for example `web/static/js/theme.js`)
 
 ### Configuration
 
@@ -189,13 +193,12 @@ HTTP → Handler → TimerService → EPGService → VDRClient (interface) → S
 
 ## Testing Strategy
 
-vdradmin-go employs a multi-layered testing approach with 250+ tests across 7 packages, ensuring reliability from domain logic to external integrations.
+vdradmin-go employs a multi-layered testing approach covering domain logic, services, HTTP handlers, and external integrations.
 
 ### Unit Tests
 
 **Domain Layer** (`internal/domain/*_test.go`):
 
-- 86 test cases validating business rules and model behavior
 - Property-based tests using `testing/quick` for invariant checking
 - Tests for channel IDs, timer validation, recording paths, weekday masks
 - Zero external dependencies, extremely fast
@@ -218,7 +221,6 @@ vdradmin-go employs a multi-layered testing approach with 250+ tests across 7 pa
 
 **Reusable Test Suite** (`internal/ports/vdr_contract_test.go`):
 
-- 40 test cases defining expected VDRClient behavior
 - Validates all implementations (mock, SVDRP, future adapters)
 - Ensures consistent error handling and data structures
 - Prevents implementation drift
@@ -239,7 +241,7 @@ func TestMyClient_ContractCompliance(t *testing.T) {
 **SVDRP Protocol Tests** (`internal/integration/svdrp_integration_test.go`):
 
 - Uses testcontainers-go to spin up real SVDRP stub server
-- 14 tests validating full protocol communication
+- Validates full protocol communication
 - Tests channel retrieval, timer CRUD, connection resilience
 - Concurrent operation safety
 - Context timeout handling
@@ -247,11 +249,12 @@ func TestMyClient_ContractCompliance(t *testing.T) {
 
 Run with: `go test -tags=integration ./internal/integration -v`
 
+Editor note: integration tests use the `integration` build tag. If your editor reports "No packages found" for these files, configure gopls with `-tags=integration` (for example via VS Code workspace settings).
+
 ### Property-Based Testing
 
 **Invariant Validation** (`internal/domain/models_property_test.go`):
 
-- 10 property-based tests using `testing/quick`
 - Validates domain invariants across random inputs
 - Tests that succeed for all valid inputs in the domain
 - Examples: channel number ranges, timer priority bounds, recording size validation
@@ -271,7 +274,6 @@ Run with: `go test -tags=integration ./internal/integration -v`
 
 **Concurrency Safety** (`internal/application/services/race_test.go`):
 
-- 9 concurrent access tests for service layer caches
 - Validates thread-safe operations under load
 - Tests EPG cache, recording cache, timer operations
 - Automatically enabled by `make test` via `-race` flag

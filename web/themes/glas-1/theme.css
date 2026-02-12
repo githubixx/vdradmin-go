@@ -1,0 +1,92 @@
+/* Glas 1 Theme - vdradmin-go */
+
+:root[data-theme="glas-1"] {
+    /* Use Dark theme typography */
+    --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+    /* Neutral glossy palette */
+    --primary-color: #cfd6e1;
+    --primary-hover: #dde3ec;
+    --secondary-color: #64748b;
+    --success-color: #10b981;
+    --danger-color: #ef4444;
+    --warning-color: #f59e0b;
+
+    /* Background like screenshot: light → dark grey diagonal */
+    --bg-color: #c4cbd6;
+    --bg-image:
+        radial-gradient(900px 520px at 20% 18%, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.00) 60%),
+        radial-gradient(750px 520px at 80% 55%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.00) 58%),
+        linear-gradient(135deg, #d9e0ea 0%, #8a94a3 55%, #4e5663 100%);
+
+    /* Glassy panels (more opaque so content stays readable) */
+    --surface-color: linear-gradient(
+        180deg,
+        rgba(240, 244, 250, 0.82) 0%,
+        rgba(232, 237, 245, 0.66) 45%,
+        rgba(224, 230, 240, 0.58) 100%
+    );
+    --surface-hover: rgba(15, 23, 42, 0.08);
+
+    --text-color: #0b1220;
+    --text-muted: rgba(15, 23, 42, 0.76);
+    --border-color: rgba(15, 23, 42, 0.18);
+
+    --shadow: 0 1px 2px rgba(2, 6, 23, 0.12), 0 18px 48px rgba(2, 6, 23, 0.20);
+    --shadow-lg: 0 2px 6px rgba(2, 6, 23, 0.16), 0 28px 80px rgba(2, 6, 23, 0.26);
+
+    --nav-active-bg: linear-gradient(180deg, rgba(15, 23, 42, 0.14), rgba(15, 23, 42, 0.06));
+    --nav-active-border: rgba(15, 23, 42, 0.20);
+    --nav-active-shadow: 0 14px 34px rgba(2, 6, 23, 0.12);
+
+    --menu-scrim-color: rgba(0, 0, 0, 0.30);
+    --menu-scrim-padding: 20px;
+    --radius: 0.75rem;
+    --spacing: 1rem;
+    color-scheme: light;
+}
+
+/*
+  Base button styles assume white text on .btn-primary.
+  Glas 1 uses a light glossy primary fill like the screenshot.
+*/
+:root[data-theme="glas-1"] .btn-primary,
+:root[data-theme="glas-1"] .btn-primary:hover {
+    color: rgba(8, 10, 13, 0.94);
+    text-shadow: none;
+}
+
+:root[data-theme="glas-1"] .badge,
+:root[data-theme="glas-1"] .channels-day {
+    color: rgba(8, 10, 13, 0.94);
+    text-shadow: none;
+}
+
+/* More glow on buttons (requested) */
+:root[data-theme="glas-1"] .btn {
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.75),
+        0 1px 2px rgba(2, 6, 23, 0.10),
+    0 22px 64px rgba(2, 6, 23, 0.24),
+        0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+
+:root[data-theme="glas-1"] .btn:hover {
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.80),
+        0 2px 6px rgba(2, 6, 23, 0.14),
+        0 28px 84px rgba(2, 6, 23, 0.28),
+        0 0 0 1px rgba(255, 255, 255, 0.65);
+}
+
+/* Main menu panel: prevent background bleed-through */
+:root[data-theme="glas-1"] .nav-burger-menu {
+    background-color: rgba(200, 208, 220, 0.98);
+    background-image: var(--surface-color);
+}
+
+/* /now channel name: base uses --primary-color which is very light here */
+:root[data-theme="glas-1"] .epg-channel {
+    color: rgba(8, 10, 13, 0.94);
+}
