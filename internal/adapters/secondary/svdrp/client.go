@@ -33,11 +33,11 @@ func (c *Client) GrabJpeg(ctx context.Context, width int, height int) ([]byte, e
 		defer c.mu.Unlock()
 
 		cmd := fmt.Sprintf("GRAB .jpg 80 %d %d", width, height)
-		if err := c.sendCommandLocked(cmd); err != nil {
+		if err := c.sendCommandLocked(ctx, cmd); err != nil {
 			return nil, err
 		}
 
-		lines, err := c.readResponseLocked()
+		lines, err := c.readResponseLocked(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -135,7 +135,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	c.rw = bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 
 	// Read welcome message.
-	if _, err := c.readResponseLocked(); err != nil {
+	if _, err := c.readResponseLocked(ctx); err != nil {
 		c.closeConnectionLocked()
 		return fmt.Errorf("failed to read welcome: %w", err)
 	}
@@ -168,10 +168,10 @@ func (c *Client) Ping(ctx context.Context) error {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 
-		if err := c.sendCommandLocked("STAT disk"); err != nil {
+		if err := c.sendCommandLocked(ctx, "STAT disk"); err != nil {
 			return struct{}{}, err
 		}
-		_, err := c.readResponseLocked()
+		_, err := c.readResponseLocked(ctx)
 		return struct{}{}, err
 	})
 	return err
@@ -183,11 +183,11 @@ func (c *Client) GetChannels(ctx context.Context) ([]domain.Channel, error) {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 
-		if err := c.sendCommandLocked("LSTC"); err != nil {
+		if err := c.sendCommandLocked(ctx, "LSTC"); err != nil {
 			return nil, err
 		}
 
-		lines, err := c.readResponseLocked()
+		lines, err := c.readResponseLocked(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -225,11 +225,11 @@ func (c *Client) GetEPG(ctx context.Context, channelID string, at time.Time) ([]
 			}
 		}
 
-		if err := c.sendCommandLocked(cmd); err != nil {
+		if err := c.sendCommandLocked(ctx, cmd); err != nil {
 			return nil, err
 		}
 
-		lines, err := c.readResponseLocked()
+		lines, err := c.readResponseLocked(ctx)
 		if err != nil {
 			// Some channels simply have no EPG (e.g. no schedule). Treat as empty.
 			if channelID != "" && isSVDRPNoSchedule(err) {
@@ -239,10 +239,10 @@ func (c *Client) GetEPG(ctx context.Context, channelID string, at time.Time) ([]
 			// Some VDR versions don't support the optional timestamp argument.
 			if channelID != "" && !at.IsZero() && isSVDRPUnknownOption(err) {
 				cmd = fmt.Sprintf("LSTE %s", channelID)
-				if err := c.sendCommandLocked(cmd); err != nil {
+				if err := c.sendCommandLocked(ctx, cmd); err != nil {
 					return nil, err
 				}
-				lines, err = c.readResponseLocked()
+				lines, err = c.readResponseLocked(ctx)
 				if err != nil {
 					if isSVDRPNoSchedule(err) {
 						return []domain.EPGEvent{}, nil
@@ -294,11 +294,11 @@ func (c *Client) GetTimers(ctx context.Context) ([]domain.Timer, error) {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 
-		if err := c.sendCommandLocked("LSTT"); err != nil {
+		if err := c.sendCommandLocked(ctx, "LSTT"); err != nil {
 			return nil, err
 		}
 
-		lines, err := c.readResponseLocked()
+		lines, err := c.readResponseLocked(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -322,10 +322,10 @@ func (c *Client) CreateTimer(ctx context.Context, timer *domain.Timer) error {
 		defer c.mu.Unlock()
 
 		timerStr := formatTimer(timer)
-		if err := c.sendCommandLocked(fmt.Sprintf("NEWT %s", timerStr)); err != nil {
+		if err := c.sendCommandLocked(ctx, fmt.Sprintf("NEWT %s", timerStr)); err != nil {
 			return err
 		}
-		_, err := c.readResponseLocked()
+		_, err := c.readResponseLocked(ctx)
 		return err
 	})
 }
@@ -337,10 +337,10 @@ func (c *Client) UpdateTimer(ctx context.Context, timer *domain.Timer) error {
 		defer c.mu.Unlock()
 
 		timerStr := formatTimer(timer)
-		if err := c.sendCommandLocked(fmt.Sprintf("MODT %d %s", timer.ID, timerStr)); err != nil {
+		if err := c.sendCommandLocked(ctx, fmt.Sprintf("MODT %d %s", timer.ID, timerStr)); err != nil {
 			return err
 		}
-		_, err := c.readResponseLocked()
+		_, err := c.readResponseLocked(ctx)
 		return err
 	})
 }
@@ -351,10 +351,10 @@ func (c *Client) DeleteTimer(ctx context.Context, timerID int) error {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 
-		if err := c.sendCommandLocked(fmt.Sprintf("DELT %d", timerID)); err != nil {
+		if err := c.sendCommandLocked(ctx, fmt.Sprintf("DELT %d", timerID)); err != nil {
 			return err
 		}
-		_, err := c.readResponseLocked()
+		_, err := c.readResponseLocked(ctx)
 		return err
 	})
 }
@@ -368,8 +368,8 @@ func (c *Client) GetRecordings(ctx context.Context) ([]domain.Recording, error) 
 		// If recordings were removed directly on disk (outside VDR), VDR may still
 		// have a stale in-memory list. Best-effort trigger a rescan/update.
 		// Not all VDR versions expose this via SVDRP, so ignore protocol errors.
-		if err := c.sendCommandLocked("UPDR"); err == nil {
-			if _, err := c.readResponseLocked(); err != nil {
+		if err := c.sendCommandLocked(ctx, "UPDR"); err == nil {
+			if _, err := c.readResponseLocked(ctx); err != nil {
 				if isTransientConnErr(err) {
 					return nil, err
 				}
@@ -379,11 +379,11 @@ func (c *Client) GetRecordings(ctx context.Context) ([]domain.Recording, error) 
 			return nil, err
 		}
 
-		if err := c.sendCommandLocked("LSTR"); err != nil {
+		if err := c.sendCommandLocked(ctx, "LSTR"); err != nil {
 			return nil, err
 		}
 
-		lines, err := c.readResponseLocked()
+		lines, err := c.readResponseLocked(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -394,7 +394,7 @@ func (c *Client) GetRecordings(ctx context.Context) ([]domain.Recording, error) 
 			if err == nil {
 				// Resolve the actual recording directory from VDR and filter out
 				// entries that no longer exist on disk (e.g. deleted out-of-band).
-				dirPath, err := c.getRecordingDirPathLocked(r.Path)
+				dirPath, err := c.getRecordingDirPathLocked(ctx, r.Path)
 				if err != nil {
 					if isTransientConnErr(err) {
 						return nil, err
@@ -574,16 +574,16 @@ func readRecordingInfoMeta(recordingDir string) (recordingInfoMeta, error) {
 	return out, nil
 }
 
-func (c *Client) getRecordingDirPathLocked(id string) (string, error) {
+func (c *Client) getRecordingDirPathLocked(ctx context.Context, id string) (string, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return "", nil
 	}
 
-	if err := c.sendCommandLocked(fmt.Sprintf("LSTR %s path", id)); err != nil {
+	if err := c.sendCommandLocked(ctx, fmt.Sprintf("LSTR %s path", id)); err != nil {
 		return "", err
 	}
-	lines, err := c.readResponseLocked()
+	lines, err := c.readResponseLocked(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -598,7 +598,7 @@ func (c *Client) GetRecordingDir(ctx context.Context, recordingID string) (strin
 	return withRetry(ctx, c, func() (string, error) {
 		c.mu.Lock()
 		defer c.mu.Unlock()
-		return c.getRecordingDirPathLocked(recordingID)
+		return c.getRecordingDirPathLocked(ctx, recordingID)
 	})
 }
 
@@ -608,10 +608,10 @@ func (c *Client) DeleteRecording(ctx context.Context, path string) error {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 
-		if err := c.sendCommandLocked(fmt.Sprintf("DELR %s", path)); err != nil {
+		if err := c.sendCommandLocked(ctx, fmt.Sprintf("DELR %s", path)); err != nil {
 			return err
 		}
-		_, err := c.readResponseLocked()
+		_, err := c.readResponseLocked(ctx)
 		return err
 	})
 }
@@ -622,10 +622,10 @@ func (c *Client) GetCurrentChannel(ctx context.Context) (string, error) {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 
-		if err := c.sendCommandLocked("CHAN"); err != nil {
+		if err := c.sendCommandLocked(ctx, "CHAN"); err != nil {
 			return "", err
 		}
-		lines, err := c.readResponseLocked()
+		lines, err := c.readResponseLocked(ctx)
 		if err != nil || len(lines) == 0 {
 			return "", err
 		}
@@ -639,10 +639,10 @@ func (c *Client) SetCurrentChannel(ctx context.Context, channelID string) error 
 		c.mu.Lock()
 		defer c.mu.Unlock()
 
-		if err := c.sendCommandLocked(fmt.Sprintf("CHAN %s", channelID)); err != nil {
+		if err := c.sendCommandLocked(ctx, fmt.Sprintf("CHAN %s", channelID)); err != nil {
 			return err
 		}
-		_, err := c.readResponseLocked()
+		_, err := c.readResponseLocked(ctx)
 		return err
 	})
 }
@@ -653,10 +653,10 @@ func (c *Client) SendKey(ctx context.Context, key string) error {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 
-		if err := c.sendCommandLocked(fmt.Sprintf("HITK %s", key)); err != nil {
+		if err := c.sendCommandLocked(ctx, fmt.Sprintf("HITK %s", key)); err != nil {
 			return err
 		}
-		_, err := c.readResponseLocked()
+		_, err := c.readResponseLocked(ctx)
 		return err
 	})
 }
@@ -681,10 +681,16 @@ func withRetry[T any](ctx context.Context, c *Client, fn func() (T, error)) (T, 
 	var lastErr error
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return zero, err
+		}
 		if err := c.ensureConnected(ctx); err != nil {
 			return zero, err
 		}
 
+		if err := ctx.Err(); err != nil {
+			return zero, err
+		}
 		result, err := fn()
 		if err == nil {
 			return result, nil
@@ -724,10 +730,16 @@ func withRetryWrite(ctx context.Context, c *Client, fn func() error) error {
 	backoff := 60 * time.Millisecond
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if err := c.ensureConnected(ctx); err != nil {
 			return err
 		}
 
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		err := fn()
 		if err == nil {
 			return nil
@@ -784,36 +796,59 @@ func isTransientConnErr(err error) bool {
 		strings.Contains(msg, "use of closed network connection")
 }
 
-func (c *Client) sendCommandLocked(cmd string) error {
+func (c *Client) sendCommandLocked(ctx context.Context, cmd string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if c.conn == nil {
 		return domain.ErrConnection
 	}
 
-	_ = c.conn.SetWriteDeadline(time.Now().Add(c.timeout))
+	deadline := time.Now().Add(c.timeout)
+	if ctxDeadline, ok := ctx.Deadline(); ok && ctxDeadline.Before(deadline) {
+		deadline = ctxDeadline
+	}
+	_ = c.conn.SetWriteDeadline(deadline)
 
 	if _, err := c.rw.WriteString(cmd + "\r\n"); err != nil {
 		c.closeConnectionLocked()
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		return fmt.Errorf("%w: %w", errSVDRPSendFailed, err)
 	}
 	if err := c.rw.Flush(); err != nil {
 		c.closeConnectionLocked()
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		return fmt.Errorf("%w: %w", errSVDRPSendFailed, err)
 	}
 	return nil
 }
 
-func (c *Client) readResponseLocked() ([]string, error) {
+func (c *Client) readResponseLocked(ctx context.Context) ([]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if c.conn == nil {
 		return nil, domain.ErrConnection
 	}
 
-	_ = c.conn.SetReadDeadline(time.Now().Add(c.timeout))
+	deadline := time.Now().Add(c.timeout)
+	if ctxDeadline, ok := ctx.Deadline(); ok && ctxDeadline.Before(deadline) {
+		deadline = ctxDeadline
+	}
+	_ = c.conn.SetReadDeadline(deadline)
 
 	var lines []string
 	for {
 		line, err := c.rw.ReadString('\n')
 		if err != nil {
 			c.closeConnectionLocked()
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 			return nil, err
 		}
 

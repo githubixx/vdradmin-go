@@ -11,12 +11,14 @@ vdradmin-go includes protection against path traversal attacks (CWE-22) to preve
 Recording paths are validated at multiple levels to ensure they remain within the configured `vdr.video_dir`:
 
 **User-provided recording IDs** (relative paths): Validated by `validateRecordingPath()`
+
 - Absolute paths are rejected
 - Path traversal sequences (`..`) are blocked
 - Backslashes are rejected on Unix systems
 - All paths are cleaned and validated before use
 
 **VDR-returned recording directories** (absolute paths): Validated by `validateRecordingDir()`
+
 - Ensures returned paths are within the configured video directory
 - Protects against compromised or malicious VDR instances
 - Validates before reading info files or accessing recording data

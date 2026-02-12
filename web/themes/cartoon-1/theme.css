@@ -1,0 +1,93 @@
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap');
+
+/* Cartoon 1 Theme - vdradmin-go */
+
+:root[data-theme="cartoon-1"] {
+    --font-sans: 'Fredoka', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Fredoka', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+    /* Glossy candy accents (pink/cyan) */
+    --primary-color: #e24bd0;
+    --primary-hover: #ff74e1;
+    --secondary-color: #60a5fa;
+    --success-color: #22c55e;
+    --danger-color: #fb7185;
+    --warning-color: #fbbf24;
+
+    --bg-color: #050515;
+
+    /*
+      Screenshot-inspired goals:
+      - deep midnight base
+      - neon-ish purple/pink glow
+      - icy cyan highlights
+      - tiny star sparkles
+    */
+    --bg-image:
+        /* Vignette */
+        radial-gradient(1200px 900px at 50% 45%, rgba(0, 0, 0, 0.00), rgba(0, 0, 0, 0.65) 70%, rgba(0, 0, 0, 0.80) 100%),
+
+        /* Big candy glows */
+        radial-gradient(820px 620px at 28% 12%, rgba(226, 75, 208, 0.22) 0%, rgba(226, 75, 208, 0.00) 62%),
+        radial-gradient(900px 700px at 82% 28%, rgba(96, 165, 250, 0.18) 0%, rgba(96, 165, 250, 0.00) 62%),
+        radial-gradient(980px 760px at 66% 86%, rgba(168, 85, 247, 0.22) 0%, rgba(168, 85, 247, 0.00) 64%),
+
+        /* Soft bokeh blobs (cartoon-y, not techy) */
+        radial-gradient(180px 140px at 14% 18%, rgba(255, 116, 225, 0.22) 0%, rgba(255, 116, 225, 0.10) 35%, rgba(255, 116, 225, 0.00) 70%),
+        radial-gradient(220px 180px at 20% 72%, rgba(96, 165, 250, 0.16) 0%, rgba(96, 165, 250, 0.08) 38%, rgba(96, 165, 250, 0.00) 74%),
+        radial-gradient(260px 220px at 80% 76%, rgba(226, 75, 208, 0.18) 0%, rgba(226, 75, 208, 0.09) 40%, rgba(226, 75, 208, 0.00) 76%),
+        radial-gradient(200px 160px at 86% 22%, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.05) 30%, rgba(255, 255, 255, 0.00) 68%),
+
+        /* Gentle swirl highlights (suggests cartoon space wisps) */
+        conic-gradient(from 210deg at 18% 20%, rgba(96, 165, 250, 0.00) 0deg, rgba(96, 165, 250, 0.12) 34deg, rgba(96, 165, 250, 0.00) 78deg, rgba(96, 165, 250, 0.00) 360deg),
+        conic-gradient(from 120deg at 82% 26%, rgba(226, 75, 208, 0.00) 0deg, rgba(226, 75, 208, 0.11) 28deg, rgba(226, 75, 208, 0.00) 70deg, rgba(226, 75, 208, 0.00) 360deg),
+
+        /* Star sparkles */
+        radial-gradient(1px 1px at 6% 44%, rgba(255, 255, 255, 0.72) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 8% 24%, rgba(255, 255, 255, 0.82) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 14% 60%, rgba(255, 255, 255, 0.70) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 22% 14%, rgba(255, 255, 255, 0.78) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 32% 44%, rgba(255, 255, 255, 0.70) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 42% 18%, rgba(255, 255, 255, 0.74) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 54% 70%, rgba(255, 255, 255, 0.72) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 62% 34%, rgba(255, 255, 255, 0.74) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 74% 16%, rgba(255, 255, 255, 0.78) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 86% 58%, rgba(255, 255, 255, 0.70) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+        radial-gradient(1px 1px at 92% 22%, rgba(255, 255, 255, 0.80) 0 1px, rgba(255, 255, 255, 0.00) 2px),
+
+        /* Colored mini-sparkles */
+        radial-gradient(1px 1px at 16% 36%, rgba(96, 165, 250, 0.85) 0 1px, rgba(96, 165, 250, 0.00) 3px),
+        radial-gradient(1px 1px at 78% 44%, rgba(226, 75, 208, 0.80) 0 1px, rgba(226, 75, 208, 0.00) 3px),
+
+        /* A couple larger soft sparkles */
+        radial-gradient(2px 2px at 18% 32%, rgba(255, 255, 255, 0.52) 0 2px, rgba(255, 255, 255, 0.00) 6px),
+        radial-gradient(2px 2px at 68% 54%, rgba(255, 255, 255, 0.46) 0 2px, rgba(255, 255, 255, 0.00) 6px);
+
+    /* Panels: glossy purple glass */
+    --surface-color: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.05) 0%,
+        rgba(226, 75, 208, 0.09) 14%,
+        rgba(90, 54, 170, 0.12) 38%,
+        rgba(10, 10, 24, 0.92) 100%
+    );
+    --surface-hover: rgba(255, 255, 255, 0.04);
+
+    --text-color: rgba(245, 242, 255, 0.96);
+    --text-muted: rgba(210, 205, 235, 0.84);
+    --border-color: rgba(255, 255, 255, 0.12);
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 16px 40px rgba(0, 0, 0, 0.50);
+    --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.35), 0 28px 70px rgba(0, 0, 0, 0.60);
+
+    --nav-active-bg: linear-gradient(180deg, rgba(226, 75, 208, 0.22), rgba(96, 165, 250, 0.10));
+    --nav-active-border: rgba(255, 116, 225, 0.22);
+    --nav-active-shadow: 0 14px 34px rgba(226, 75, 208, 0.18);
+
+    --menu-scrim-color: rgba(0, 0, 0, 0.68);
+    --menu-scrim-padding: 20px;
+
+    --radius: 1rem;
+    --spacing: 1rem;
+    color-scheme: dark;
+}

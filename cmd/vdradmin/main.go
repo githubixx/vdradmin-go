@@ -15,6 +15,7 @@ import (
 	"github.com/githubixx/vdradmin-go/internal/adapters/secondary/svdrp"
 	"github.com/githubixx/vdradmin-go/internal/application/services"
 	"github.com/githubixx/vdradmin-go/internal/infrastructure/config"
+	"github.com/githubixx/vdradmin-go/internal/infrastructure/theme"
 )
 
 var (
@@ -79,6 +80,14 @@ func main() {
 	recordingService := services.NewRecordingService(vdrClient, cfg.Cache.RecordingExpiry)
 	autoTimerService := services.NewAutoTimerService(vdrClient, timerService, epgService)
 
+	// Initialize theme manager
+	themeManager := theme.NewManager("web/themes")
+	if err := themeManager.Discover(); err != nil {
+		logger.Error("failed to discover themes", slog.Any("error", err))
+		os.Exit(1)
+	}
+	logger.Info("themes discovered", slog.Any("themes", themeManager.GetAvailableThemes()))
+
 	// Load templates - each page gets its own template set
 	templates := make(map[string]*template.Template)
 	pages := []string{"index.html", "epg.html", "playing.html", "watch.html", "timers.html", "timer_edit.html", "recordings.html", "recording_archive.html", "recording_archive_jobs.html", "recording_archive_job.html", "recording_archive_job_status.html", "archive_profiles.html", "search.html", "search_results.html", "epgsearch.html", "epgsearch_edit.html", "epgsearch_results.html", "event.html", "channels.html", "configurations.html"}
@@ -107,6 +116,7 @@ func main() {
 	// Set template map in handler
 	httpHandler.SetTemplates(templates)
 	httpHandler.SetUIThemeDefault(cfg.UI.Theme)
+	httpHandler.SetThemeManager(themeManager)
 
 	// Setup routes
 	mux := httpAdapter.SetupRoutes(httpHandler, &cfg.Auth, logger)

@@ -23,6 +23,7 @@ import (
 	"github.com/githubixx/vdradmin-go/internal/application/services"
 	"github.com/githubixx/vdradmin-go/internal/domain"
 	"github.com/githubixx/vdradmin-go/internal/infrastructure/config"
+	"github.com/githubixx/vdradmin-go/internal/infrastructure/theme"
 	"github.com/githubixx/vdradmin-go/internal/ports"
 )
 
@@ -35,6 +36,7 @@ type Handler struct {
 	configPath       string
 	vdrClient        ports.VDRClient
 	archiveJobs      *archive.JobManager
+	themeManager     *theme.Manager
 	instanceID       string
 	pid              int
 	nowFunc          func() time.Time
@@ -111,6 +113,11 @@ func (h *Handler) SetVDRClient(client ports.VDRClient) {
 // SetUIThemeDefault configures the default theme mode (system/light/dark).
 func (h *Handler) SetUIThemeDefault(theme string) {
 	h.uiThemeDefault = normalizeTheme(theme)
+}
+
+// SetThemeManager sets the theme manager for dynamic theme loading.
+func (h *Handler) SetThemeManager(manager *theme.Manager) {
+	h.themeManager = manager
 }
 
 // SetTemplates sets the template map
@@ -211,6 +218,43 @@ func (h *Handler) validateRecordingDir(recordingDir string) error {
 	}
 
 	return nil
+}
+
+// ServeTheme serves the theme.css file for a given theme.
+func (h *Handler) ServeTheme(w http.ResponseWriter, r *http.Request) {
+	themeName := r.PathValue("name")
+	if themeName == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Check if theme manager is available
+	if h.themeManager == nil {
+		h.logger.Error("theme manager not initialized")
+		http.Error(w, "Theme manager not available", http.StatusInternalServerError)
+		return
+	}
+
+	// Get theme
+	theme, ok := h.themeManager.GetTheme(themeName)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Serve theme.css file
+	themeCSSPath := filepath.Join(theme.Path, "theme.css")
+	if _, err := os.Stat(themeCSSPath); os.IsNotExist(err) {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Set content type
+	w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+
+	// Serve file
+	http.ServeFile(w, r, themeCSSPath)
 }
 
 // Home renders the home page
@@ -970,6 +1014,10 @@ func (h *Handler) Configurations(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) configurationsBaseData(r *http.Request) map[string]any {
 	data := map[string]any{}
+	type themeOption struct {
+		ID    string
+		Label string
+	}
 	if h.cfg != nil {
 		data["Config"] = h.cfg
 		profiles := h.archiveProfilesFromConfig(h.cfg)
@@ -992,6 +1040,31 @@ func (h *Handler) configurationsBaseData(r *http.Request) map[string]any {
 		} else {
 			h.logger.Warn("channels fetch error for configurations", slog.Any("error", err))
 			data["AllChannels"] = []domain.Channel{}
+		}
+	}
+	// Add available themes for dropdown
+	if h.themeManager != nil {
+		options := []themeOption{{ID: "system", Label: "System (auto)"}}
+		for _, id := range h.themeManager.GetAvailableThemes() {
+			label := id
+			if th, ok := h.themeManager.GetTheme(id); ok {
+				if v := strings.TrimSpace(th.Name); v != "" {
+					label = v
+				}
+			}
+			options = append(options, themeOption{ID: id, Label: label})
+		}
+		if len(options) > 1 {
+			sort.SliceStable(options[1:], func(i, j int) bool {
+				return strings.ToLower(options[1+i].Label) < strings.ToLower(options[1+j].Label)
+			})
+		}
+		data["AvailableThemes"] = options
+	} else {
+		data["AvailableThemes"] = []themeOption{
+			{ID: "system", Label: "System (auto)"},
+			{ID: "dark", Label: "Dark"},
+			{ID: "light", Label: "Light"},
 		}
 	}
 	return data
@@ -1430,6 +1503,14 @@ func (h *Handler) buildConfigFromForm(form url.Values) (*config.Config, error) {
 			return nil, fmt.Errorf("invalid default margin end")
 		}
 		updated.Timer.DefaultMarginEnd = n
+	}
+
+	// Validate theme with theme manager
+	if h.themeManager != nil && updated.UI.Theme != "" {
+		if !h.themeManager.IsValidTheme(updated.UI.Theme) {
+			availableThemes := append([]string{"system"}, h.themeManager.GetAvailableThemes()...)
+			return nil, fmt.Errorf("invalid ui.theme: %q (available: %s)", updated.UI.Theme, strings.Join(availableThemes, ", "))
+		}
 	}
 
 	if err := updated.Validate(); err != nil {
@@ -5008,14 +5089,12 @@ func (h *Handler) renderTemplate(w http.ResponseWriter, r *http.Request, name st
 }
 
 func normalizeTheme(theme string) string {
-	switch theme {
-	case "light", "dark", "system":
-		return theme
-	case "":
-		return "system"
-	default:
+	// Allow empty string to default to system
+	if theme == "" {
 		return "system"
 	}
+	// Return theme as-is - validation happens at config load time and via theme manager
+	return theme
 }
 
 func themeFromRequest(_ *http.Request, fallback string) string {

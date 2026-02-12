@@ -317,9 +317,12 @@ func (c *Config) Validate() error {
 
 	switch c.UI.Theme {
 	case "", "system", "light", "dark":
-		// ok
+		// Built-in themes: ok
 	default:
-		return fmt.Errorf("invalid ui.theme: %q (must be system, light, or dark)", c.UI.Theme)
+		// Custom theme names are validated by theme manager at runtime
+		if c.UI.Theme == "" {
+			c.UI.Theme = "system"
+		}
 	}
 
 	// Normalize/validate UI login page.

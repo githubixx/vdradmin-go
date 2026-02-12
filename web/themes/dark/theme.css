@@ -1,0 +1,38 @@
+/* Dark Theme - vdradmin-go */
+
+:root[data-theme="dark"] {
+    --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+    --primary-color: #a78bfa;
+    --primary-hover: #c4b5fd;
+    --secondary-color: #64748b;
+    --success-color: #10b981;
+    --danger-color: #ef4444;
+    --warning-color: #f59e0b;
+
+    --bg-color: #070814;
+    --bg-image: radial-gradient(1100px 650px at 40% -10%, rgba(124, 58, 237, 0.30), transparent 60%),
+        radial-gradient(900px 620px at 90% 10%, rgba(236, 72, 153, 0.18), transparent 55%),
+        radial-gradient(900px 700px at 10% 90%, rgba(14, 165, 233, 0.18), transparent 55%);
+
+    --surface-color: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
+    --surface-hover: rgba(255, 255, 255, 0.04);
+
+    --text-color: rgba(226, 232, 240, 0.96);
+    --text-muted: rgba(148, 163, 184, 0.82);
+    --border-color: rgba(255, 255, 255, 0.10);
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 16px 40px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.35), 0 28px 70px rgba(0, 0, 0, 0.55);
+
+    --nav-active-bg: linear-gradient(180deg, rgba(167, 139, 250, 0.20), rgba(167, 139, 250, 0.10));
+    --nav-active-border: rgba(167, 139, 250, 0.22);
+    --nav-active-shadow: 0 14px 34px rgba(167, 139, 250, 0.22);
+
+    --menu-scrim-color: rgba(0, 0, 0, 0.32);
+    --menu-scrim-padding: 20px;
+    --radius: 0.75rem;
+    --spacing: 1rem;
+    color-scheme: dark;
+}

@@ -23,6 +23,7 @@ This code was mainly generated with Claude Code (initial conversion of `vdradmin
 - **Modern Architecture**: Hexagonal (ports & adapters) architecture for maintainability
 - **Clean Code**: Following Go best practices and SOLID principles
 - **Modern UI**: [htmx](https://htmx.org/) for dynamic interactions, modern CSS, minimal JavaScript
+- **Customizable**: Modular theme system with built-in light/dark themes and support for custom themes
 - **Type Safety**: Strong typing with comprehensive error handling
 - **Performance**: Concurrent operations, efficient caching
 - **Security**: Secure authentication, input validation, HTTPS support
@@ -63,10 +64,12 @@ vdradmin-go/
 │   │   ├── primary/http/        # HTTP server, handlers, middleware, HLS proxy
 │   │   └── secondary/svdrp/     # SVDRP integration to talk to VDR
 │   ├── infrastructure/
-│   │   └── config/              # Config loading + validation
+│   │   ├── config/              # Config loading + validation
+│   │   └── theme/               # Theme discovery and management
 │   └── integration/             # Container-based integration tests
 ├── web/
 │   ├── templates/               # HTML templates
+│   ├── themes/                  # Theme CSS and metadata (light, dark, custom)
 │   └── static/                  # Frontend assets
 │       ├── css/
 │       └── js/
@@ -92,6 +95,7 @@ vdradmin-go/
 - **Config**: YAML with validation
 - **Logging**: slog (stdlib)
 - **Frontend**: htmx + modern CSS
+- **Themes**: Modular CSS theme system with automatic discovery
 
 ## Requirements
 
@@ -258,6 +262,43 @@ docker compose -f deployments/docker-compose.yml up -d
 ## Configuration
 
 See `configs/config.example.yaml` for full configuration options.
+
+## Themes
+
+vdradmin-go includes a modular theme system for easy customization:
+
+### Built-in themes
+
+- **System** (default): Automatically follows OS/browser dark/light mode preference
+- **Light**: Always use light theme
+- **Dark**: Always use dark theme
+- **Spaceship (orange)**: Futuristic spaceship HUD interface with glowing orange accents and angular design
+- **Spaceship variants**: `spaceship-cyan-(light|dark)`, `spaceship-grey-(light|dark)`, `spaceship-blue-(light|dark)`, `spaceship-green-(light|dark)`, `spaceship-yellow-(light|dark)`, `spaceship-red-(light|dark)`, `spaceship-purple-(light|dark)`, `spaceship-magenta-(light|dark)`, `spaceship-mono-(light|dark)`
+
+### Custom themes
+
+Create custom themes by copying an existing theme directory:
+
+```bash
+# Copy built-in theme as starting point
+cp -r web/themes/light web/themes/mytheme
+
+# Edit colors in theme.css (40 CSS variables)
+nano web/themes/mytheme/theme.css
+
+# Update metadata
+nano web/themes/mytheme/theme.yaml
+```
+
+Custom themes appear automatically in **Configurations** → **Theme** dropdown after restart.
+
+For complete documentation on creating custom themes, including:
+
+- CSS variable reference
+- Color customization examples
+- Troubleshooting guide
+
+See `docs/THEMES.md`.
 
 ## Archive recordings
 

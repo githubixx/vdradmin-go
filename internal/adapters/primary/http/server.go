@@ -147,5 +147,8 @@ func SetupRoutes(handler *Handler, authCfg *config.AuthConfig, logger *slog.Logg
 	fs := http.FileServer(http.Dir("web/static"))
 	mux.Handle("GET /static/", http.StripPrefix("/static/", fs))
 
+	// Theme files
+	mux.Handle("GET /themes/{name}/theme.css", chain(handler.ServeTheme, commonMiddleware...))
+
 	return mux
 }

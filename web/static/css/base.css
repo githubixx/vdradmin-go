@@ -1,9 +1,12 @@
-/* Modern CSS with CSS Variables and Grid/Flexbox */
+/* Base Styles - vdradmin-go */
+/* Structure and layout only - theme variables loaded separately */
 
 /* Webfonts (Google Fonts) */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@500;600;700&display=swap');
 
-:root {
+/* System theme support - NO explicit theme variables, just respects OS preference */
+/* Light theme as fallback for system theme */
+:root:not([data-theme]) {
     --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
@@ -19,7 +22,6 @@
         radial-gradient(800px 520px at 85% 15%, rgba(14, 165, 233, 0.09), transparent 55%),
         radial-gradient(900px 700px at 50% 90%, rgba(245, 158, 11, 0.06), transparent 55%);
 
-    /* Used as `background:` on panels (can be a gradient). */
     --surface-color: #ffffff;
     --surface-hover: rgba(2, 6, 23, 0.02);
 
@@ -34,7 +36,6 @@
     --nav-active-border: rgba(124, 58, 237, 0.22);
     --nav-active-shadow: 0 10px 26px rgba(124, 58, 237, 0.16);
 
-    /* Burger menu localized dim overlay (around the dropdown) */
     --menu-scrim-color: rgba(0, 0, 0, 0.18);
     --menu-scrim-padding: 20px;
     --radius: 0.75rem;
@@ -66,38 +67,20 @@
         --nav-active-shadow: 0 14px 34px rgba(167, 139, 250, 0.22);
 
         --menu-scrim-color: rgba(0, 0, 0, 0.32);
+        --menu-scrim-padding: 20px;
+        --radius: 0.75rem;
+        --spacing: 1rem;
+
+        --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+        --secondary-color: #64748b;
+        --success-color: #10b981;
+        --danger-color: #ef4444;
+        --warning-color: #f59e0b;
+
         color-scheme: dark;
     }
-}
-
-:root[data-theme="dark"] {
-    --primary-color: #a78bfa;
-    --primary-hover: #c4b5fd;
-    --bg-color: #070814;
-    --bg-image: radial-gradient(1100px 650px at 40% -10%, rgba(124, 58, 237, 0.30), transparent 60%),
-        radial-gradient(900px 620px at 90% 10%, rgba(236, 72, 153, 0.18), transparent 55%),
-        radial-gradient(900px 700px at 10% 90%, rgba(14, 165, 233, 0.18), transparent 55%);
-
-    --surface-color: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
-    --surface-hover: rgba(255, 255, 255, 0.04);
-
-    --text-color: rgba(226, 232, 240, 0.96);
-    --text-muted: rgba(148, 163, 184, 0.82);
-    --border-color: rgba(255, 255, 255, 0.10);
-
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 16px 40px rgba(0, 0, 0, 0.45);
-    --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.35), 0 28px 70px rgba(0, 0, 0, 0.55);
-
-    --nav-active-bg: linear-gradient(180deg, rgba(167, 139, 250, 0.20), rgba(167, 139, 250, 0.10));
-    --nav-active-border: rgba(167, 139, 250, 0.22);
-    --nav-active-shadow: 0 14px 34px rgba(167, 139, 250, 0.22);
-
-    --menu-scrim-color: rgba(0, 0, 0, 0.32);
-    color-scheme: dark;
-}
-
-:root[data-theme="light"] {
-    color-scheme: light;
 }
 
 * {
@@ -116,9 +99,19 @@ body {
     line-height: 1.6;
     color: var(--text-color);
     background-color: var(--bg-color);
-    background-image: var(--bg-image);
+    background-image: var(--bg-image-selected, var(--bg-image));
     background-attachment: fixed;
     text-rendering: optimizeLegibility;
+}
+
+/*
+  Form controls: use a UI/system font, but keep the Channels selector pill
+  (`.nav-channel-form select`) on the browser default styling.
+*/
+form:not(.nav-channel-form) input,
+form:not(.nav-channel-form) select,
+form:not(.nav-channel-form) textarea {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 /* Classic vdradmin-am-like start screen (scoped to home only) */
@@ -699,17 +692,17 @@ main {
 
 /* Card Component */
 .card {
-    background: var(--surface-color);
-    border: 1px solid var(--border-color);
+    background: var(--panel-surface, var(--surface-color));
+    border: 1px solid var(--panel-border, var(--border-color));
     border-radius: var(--radius);
     padding: calc(var(--spacing) * 1.5);
-    box-shadow: var(--shadow);
+    box-shadow: var(--panel-shadow, var(--shadow));
     transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .card:hover {
     transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--panel-shadow-lg, var(--shadow-lg));
 }
 
 .card h3 {
@@ -835,11 +828,11 @@ main {
     display: grid;
     grid-template-columns: auto 1fr auto;
     gap: var(--spacing);
-    background: var(--surface-color);
-    border: 1px solid var(--border-color);
+    background: var(--panel-surface, var(--surface-color));
+    border: 1px solid var(--panel-border, var(--border-color));
     border-radius: var(--radius);
     padding: var(--spacing);
-    box-shadow: var(--shadow);
+    box-shadow: var(--panel-shadow, var(--shadow));
 }
 
 .epg-time {
@@ -1180,6 +1173,7 @@ main {
 .epg-description {
     color: var(--text-muted);
     display: -webkit-box;
+    line-clamp: 2;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
@@ -1188,6 +1182,7 @@ main {
 /* Event popup: show full description text */
 .event-popup .epg-description {
     display: block;
+    line-clamp: unset;
     -webkit-line-clamp: unset;
     overflow: visible;
 }
@@ -1293,11 +1288,11 @@ main {
     display: grid;
     grid-template-columns: 1fr auto;
     gap: var(--spacing);
-    background: var(--surface-color);
-    border: 1px solid var(--border-color);
+    background: var(--panel-surface, var(--surface-color));
+    border: 1px solid var(--panel-border, var(--border-color));
     border-radius: var(--radius);
     padding: var(--spacing);
-    box-shadow: var(--shadow);
+    box-shadow: var(--panel-shadow, var(--shadow));
     border-left: 4px solid var(--success-color);
 }
 
@@ -1359,11 +1354,11 @@ main {
     display: grid;
     grid-template-columns: 1fr auto;
     gap: var(--spacing);
-    background: var(--surface-color);
-    border: 1px solid var(--border-color);
+    background: var(--panel-surface, var(--surface-color));
+    border: 1px solid var(--panel-border, var(--border-color));
     border-radius: var(--radius);
     padding: var(--spacing);
-    box-shadow: var(--shadow);
+    box-shadow: var(--panel-shadow, var(--shadow));
 }
 
 .recording-info h3 {
@@ -1652,6 +1647,21 @@ main {
     color: var(--text-color);
 }
 
+/*
+  Configuration multi-selects (e.g., Available/Wanted channels):
+  keep selected option backgrounds consistent with the theme instead of the
+  browser/OS default grey selection highlight.
+*/
+.config-grid select[multiple] option {
+    background-color: var(--surface-color);
+    color: var(--text-color);
+}
+
+.config-grid select[multiple] option:checked {
+    background-color: var(--surface-color);
+    color: var(--text-color);
+}
+
 .timer-radio-group {
     display: flex;
     align-items: center;
@@ -1768,4 +1778,406 @@ footer a:hover {
 .htmx-request {
     opacity: 0.5;
     pointer-events: none;
+}
+
+/* Spaceship HUD theme component styling (shared by spaceship* variants)
+   Each spaceship theme provides variables like:
+   - --primary-color, --primary-hover, --border-color, --text-color
+   - --primary-rgb, --primary-hover-rgb, --accent-rgb, --accent2-rgb
+*/
+
+/* Custom scrollbar glow */
+:root[data-theme^="spaceship"] {
+    /*
+      Selected spaceship background ("old" look): denser grid + subtle depth.
+      Keep theme-provided --bg-image intact for later background selection.
+    */
+    --bg-image-selected:
+        radial-gradient(circle at 20% 20%, rgba(var(--primary-rgb, 124, 58, 237), 0.20), transparent 55%),
+        radial-gradient(circle at 85% 15%, rgba(var(--accent-rgb, 236, 72, 153), 0.14), transparent 58%),
+        radial-gradient(circle at 15% 88%, rgba(var(--accent2-rgb, 14, 165, 233), 0.12), transparent 60%),
+        repeating-linear-gradient(
+            0deg,
+            rgba(var(--primary-rgb, 124, 58, 237), 0.045) 0px,
+            rgba(var(--primary-rgb, 124, 58, 237), 0.045) 1px,
+            transparent 1px,
+            transparent 10px
+        ),
+        repeating-linear-gradient(
+            90deg,
+            rgba(var(--primary-rgb, 124, 58, 237), 0.045) 0px,
+            rgba(var(--primary-rgb, 124, 58, 237), 0.045) 1px,
+            transparent 1px,
+            transparent 10px
+        ),
+        repeating-linear-gradient(
+            0deg,
+            rgba(var(--primary-rgb, 124, 58, 237), 0.08) 0px,
+            rgba(var(--primary-rgb, 124, 58, 237), 0.08) 1px,
+            transparent 1px,
+            transparent 52px
+        ),
+        repeating-linear-gradient(
+            90deg,
+            rgba(var(--primary-rgb, 124, 58, 237), 0.08) 0px,
+            rgba(var(--primary-rgb, 124, 58, 237), 0.08) 1px,
+            transparent 1px,
+            transparent 52px
+        ),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.35));
+
+    --panel-surface: linear-gradient(
+        135deg,
+        rgba(var(--primary-rgb), 0.08),
+        rgba(var(--accent-rgb), 0.05)
+    );
+    --panel-border: rgba(var(--primary-rgb), 0.35);
+    --panel-shadow: 0 0 2px rgba(var(--primary-rgb), 0.4),
+        0 0 8px rgba(var(--primary-rgb), 0.2),
+        0 4px 16px rgba(0, 0, 0, 0.6);
+    --panel-shadow-lg: 0 0 4px rgba(var(--primary-rgb), 0.6),
+        0 0 16px rgba(var(--primary-rgb), 0.3),
+        0 8px 32px rgba(0, 0, 0, 0.8);
+}
+
+:root[data-theme^="spaceship"] *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+:root[data-theme^="spaceship"] *::-webkit-scrollbar-track {
+    background: rgba(var(--primary-rgb), 0.05);
+    border: 1px solid rgba(var(--primary-rgb), 0.2);
+}
+
+:root[data-theme^="spaceship"] *::-webkit-scrollbar-thumb {
+    background: linear-gradient(
+        180deg,
+        rgba(var(--primary-rgb), 0.5),
+        rgba(var(--accent-rgb), 0.3)
+    );
+    border: 1px solid rgba(var(--primary-rgb), 0.6);
+    box-shadow: 0 0 8px rgba(var(--primary-rgb), 0.4);
+}
+
+:root[data-theme^="spaceship"] *::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(
+        180deg,
+        rgba(var(--primary-rgb), 0.7),
+        rgba(var(--accent-rgb), 0.5)
+    );
+    box-shadow: 0 0 12px rgba(var(--primary-rgb), 0.6);
+}
+
+/* Angular corner decorations for cards */
+:root[data-theme^="spaceship"] .card::before,
+:root[data-theme^="spaceship"] .epg-item::before,
+:root[data-theme^="spaceship"] .timer-item::before,
+:root[data-theme^="spaceship"] .recording-item::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    width: 20px;
+    height: 20px;
+    border-top: 2px solid var(--primary-color);
+    border-left: 2px solid var(--primary-color);
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+:root[data-theme^="spaceship"] .card::after,
+:root[data-theme^="spaceship"] .epg-item::after,
+:root[data-theme^="spaceship"] .timer-item::after,
+:root[data-theme^="spaceship"] .recording-item::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    right: -1px;
+    width: 20px;
+    height: 20px;
+    border-bottom: 2px solid var(--primary-color);
+    border-right: 2px solid var(--primary-color);
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+:root[data-theme^="spaceship"] .card,
+:root[data-theme^="spaceship"] .epg-item,
+:root[data-theme^="spaceship"] .timer-item,
+:root[data-theme^="spaceship"] .recording-item {
+    position: relative;
+}
+
+/* Glowing text effect for headings */
+:root[data-theme^="spaceship"] h1,
+:root[data-theme^="spaceship"] h2,
+:root[data-theme^="spaceship"] h3,
+:root[data-theme^="spaceship"] .nav-brand h1 {
+    text-shadow:
+        0 0 10px rgba(var(--primary-rgb), 0.5),
+        0 0 20px rgba(var(--primary-rgb), 0.2);
+    letter-spacing: 0.05em;
+}
+
+/* Channels list titles: use the theme's sans font (Rajdhani) */
+:root[data-theme^="spaceship"] .channels-title {
+    font-family: var(--font-sans);
+    text-shadow:
+        0 0 1px rgba(255, 255, 255, 0.35),
+        0 0 10px rgba(var(--primary-rgb), 0.55),
+        0 0 20px rgba(var(--primary-rgb), 0.25);
+}
+
+/* Edgy/square panels for Spaceship HUD look */
+/* Corner shape is controlled by the theme via --radius. */
+
+/* Enhanced button glow */
+:root[data-theme^="spaceship"] .btn-primary {
+    background: linear-gradient(
+        135deg,
+        rgba(var(--primary-rgb), 0.9),
+        rgba(var(--accent-rgb), 0.7)
+    );
+    border-color: rgba(var(--primary-rgb), 0.8);
+    box-shadow:
+        0 0 8px rgba(var(--primary-rgb), 0.6),
+        0 0 16px rgba(var(--primary-rgb), 0.3),
+        inset 0 0 8px rgba(255, 255, 255, 0.2);
+    text-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme^="spaceship"] .btn-primary:hover {
+    background: linear-gradient(
+        135deg,
+        rgba(var(--primary-hover-rgb), 1),
+        rgba(var(--accent2-rgb), 0.9)
+    );
+    box-shadow:
+        0 0 12px rgba(var(--primary-rgb), 0.8),
+        0 0 24px rgba(var(--primary-rgb), 0.4),
+        inset 0 0 12px rgba(255, 255, 255, 0.3);
+}
+
+/* Header with HUD styling */
+:root[data-theme^="spaceship"] header {
+    border-bottom: 2px solid var(--primary-color);
+    box-shadow:
+        0 0 16px rgba(var(--primary-rgb), 0.4),
+        0 4px 24px rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(12px);
+}
+
+/* Navigation links with tech styling (keep burger menu typography consistent with base theme) */
+:root[data-theme^="spaceship"] .nav-links a {
+    border: 1px solid transparent;
+    transition: all 0.3s ease;
+}
+
+:root[data-theme^="spaceship"] .nav-links a:hover {
+    border-color: var(--primary-color);
+    box-shadow:
+        0 0 8px rgba(var(--primary-rgb), 0.4),
+        inset 0 0 8px rgba(var(--primary-rgb), 0.1);
+}
+
+/* Badge with HUD styling */
+:root[data-theme^="spaceship"] .badge {
+    background: linear-gradient(
+        135deg,
+        rgba(var(--primary-rgb), 0.8),
+        rgba(var(--accent-rgb), 0.6)
+    );
+    border: 1px solid var(--primary-color);
+    box-shadow:
+        0 0 8px rgba(var(--primary-rgb), 0.5),
+        inset 0 0 4px rgba(255, 255, 255, 0.2);
+    text-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
+:root[data-theme^="spaceship"] .epg-actions .btn-secondary:not([disabled]):not(:disabled) {
+    border-color: rgba(var(--primary-rgb), 0.8);
+    box-shadow:
+        0 0 8px rgba(var(--primary-rgb), 0.6),
+        0 0 16px rgba(var(--primary-rgb), 0.3),
+        inset 0 0 8px rgba(255, 255, 255, 0.18);
+}
+
+:root[data-theme^="spaceship"] .epg-actions .btn-secondary:not([disabled]):not(:disabled):hover {
+    border-color: rgba(var(--primary-rgb), 0.9);
+    box-shadow:
+        0 0 12px rgba(var(--primary-rgb), 0.8),
+        0 0 24px rgba(var(--primary-rgb), 0.4),
+        inset 0 0 12px rgba(255, 255, 255, 0.24);
+}
+
+/* Input fields with tech styling */
+:root[data-theme^="spaceship"] input[type="text"],
+:root[data-theme^="spaceship"] input[type="number"],
+:root[data-theme^="spaceship"] input[type="password"],
+:root[data-theme^="spaceship"] input[type="time"],
+:root[data-theme^="spaceship"] select,
+:root[data-theme^="spaceship"] textarea {
+    box-shadow: inset 0 0 8px rgba(var(--primary-rgb), 0.1);
+}
+
+:root[data-theme^="spaceship"] input[type="text"]:focus,
+:root[data-theme^="spaceship"] input[type="number"]:focus,
+:root[data-theme^="spaceship"] input[type="password"]:focus,
+:root[data-theme^="spaceship"] input[type="time"]:focus,
+:root[data-theme^="spaceship"] select:focus,
+:root[data-theme^="spaceship"] textarea:focus {
+    border-color: var(--primary-color);
+    box-shadow:
+        0 0 8px rgba(var(--primary-rgb), 0.6),
+        inset 0 0 12px rgba(var(--primary-rgb), 0.15);
+    outline: none;
+}
+
+/* Progress bar with scanning effect */
+:root[data-theme^="spaceship"] .progress {
+    background: rgba(var(--primary-rgb), 0.1);
+    box-shadow: inset 0 0 8px rgba(var(--primary-rgb), 0.2);
+}
+
+:root[data-theme^="spaceship"] .progress-bar {
+    background: linear-gradient(
+        90deg,
+        rgba(var(--primary-rgb), 0.8),
+        rgba(var(--accent2-rgb), 0.8),
+        rgba(var(--primary-rgb), 0.8)
+    );
+    box-shadow:
+        0 0 12px rgba(var(--primary-rgb), 0.8),
+        0 0 24px rgba(var(--primary-rgb), 0.4);
+    animation: progress-scan 2s linear infinite;
+}
+
+/* Timer timeline with HUD styling */
+:root[data-theme^="spaceship"] .timeline-track {
+    background: rgba(var(--primary-rgb), 0.08);
+    box-shadow: inset 0 0 8px rgba(var(--primary-rgb), 0.15);
+}
+
+:root[data-theme^="spaceship"] .timeline-block {
+    border: 1px solid var(--primary-color);
+    box-shadow:
+        0 0 8px rgba(var(--primary-rgb), 0.6),
+        inset 0 0 4px rgba(var(--primary-rgb), 0.3);
+}
+
+/* Data table with grid lines */
+:root[data-theme^="spaceship"] .data-table th {
+    background: rgba(var(--primary-rgb), 0.15);
+    border-bottom: 2px solid var(--primary-color);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+
+:root[data-theme^="spaceship"] .data-table tbody tr:hover {
+    background: rgba(var(--primary-rgb), 0.1);
+    box-shadow: inset 0 0 16px rgba(var(--primary-rgb), 0.2);
+}
+
+/* Channels day header with strong accent */
+:root[data-theme^="spaceship"] .channels-day {
+    background: linear-gradient(
+        135deg,
+        rgba(var(--primary-rgb), 0.4),
+        rgba(var(--accent-rgb), 0.3)
+    );
+    border: 1px solid var(--primary-color);
+    border-left: 4px solid var(--primary-color);
+    box-shadow:
+        0 0 16px rgba(var(--primary-rgb), 0.3),
+        inset 0 0 8px rgba(var(--primary-rgb), 0.2);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* Footer with HUD styling */
+:root[data-theme^="spaceship"] footer {
+    border-top: 2px solid var(--primary-color);
+    box-shadow:
+        0 0 16px rgba(var(--primary-rgb), 0.3),
+        0 -4px 24px rgba(0, 0, 0, 0.8);
+}
+
+/* Watch TV remote buttons */
+:root[data-theme^="spaceship"] .remote-btn {
+    box-shadow:
+        0 0 4px rgba(var(--primary-rgb), 0.4),
+        inset 0 0 4px rgba(var(--primary-rgb), 0.1);
+}
+
+:root[data-theme^="spaceship"] .remote-btn:hover {
+    box-shadow:
+        0 0 8px rgba(var(--primary-rgb), 0.6),
+        inset 0 0 8px rgba(var(--primary-rgb), 0.2);
+}
+
+:root[data-theme^="spaceship"] .remote-btn-ok {
+    border: 2px solid var(--primary-color);
+    box-shadow:
+        0 0 12px rgba(var(--primary-rgb), 0.8),
+        inset 0 0 8px rgba(var(--primary-rgb), 0.3);
+}
+
+/* Enhance burger menu for HUD look */
+:root[data-theme^="spaceship"] .nav-burger-menu {
+    border: 2px solid var(--primary-color);
+    box-shadow:
+        0 0 24px rgba(var(--primary-rgb), 0.6),
+        0 8px 48px rgba(0, 0, 0, 0.9);
+
+    /* Layer translucent surface over a solid base so the page grid doesn't show through */
+    background-color: var(--bg-color);
+    background-image: var(--surface-color);
+}
+
+/* EPG time display with tech font */
+:root[data-theme^="spaceship"] .epg-time time {
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: var(--primary-color);
+    text-shadow: 0 0 8px rgba(var(--primary-rgb), 0.6);
+}
+
+/* Add subtle animation to active navigation */
+:root[data-theme^="spaceship"] .nav-links a.active,
+:root[data-theme^="spaceship"] .nav-links a[aria-current="page"],
+:root[data-theme^="spaceship"] .nav-burger-menu a.active,
+:root[data-theme^="spaceship"] .nav-burger-menu a[aria-current="page"] {
+    animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes progress-scan {
+    0% {
+        filter: brightness(1);
+    }
+    50% {
+        filter: brightness(1.3);
+    }
+    100% {
+        filter: brightness(1);
+    }
+}
+
+@keyframes pulse-glow {
+    0%, 100% {
+        box-shadow:
+            0 0 8px rgba(var(--primary-rgb), 0.6),
+            0 0 16px rgba(var(--primary-rgb), 0.3),
+            inset 0 0 8px rgba(var(--primary-rgb), 0.2);
+    }
+    50% {
+        box-shadow:
+            0 0 12px rgba(var(--primary-rgb), 0.8),
+            0 0 24px rgba(var(--primary-rgb), 0.4),
+            inset 0 0 12px rgba(var(--primary-rgb), 0.3);
+    }
 }
