@@ -57,7 +57,7 @@ func TestContainers_TimersTimelineRenders(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = svdrp.Terminate(ctx) })
 
-	cfgPath := writeTempConfig(t, repoRoot, `server:
+	cfgPath := writeTempConfig(t, `server:
   host: "0.0.0.0"
   port: 8080
   read_timeout: 5s
@@ -198,7 +198,7 @@ func mustRepoRoot(t *testing.T) string {
 	return ""
 }
 
-func writeTempConfig(t *testing.T, repoRoot, content string) string {
+func writeTempConfig(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
 	p := filepath.Join(dir, "config.yaml")
