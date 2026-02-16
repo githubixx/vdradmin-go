@@ -1,0 +1,114 @@
+/* Solar System 1 Theme - vdradmin-go */
+
+:root[data-theme="solar-system-1"] {
+  /* Fonts: match spaceship-grey-dark */
+  --font-sans: 'Rajdhani', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Orbitron', 'Rajdhani', system-ui, sans-serif;
+
+  /* Gold + deep space palette */
+  --primary-color: #d4af37;
+  --primary-hover: #fff2b8;
+  --secondary-color: #8a6518;
+  --success-color: #d4af37;
+  --danger-color: #ef4444;
+  --warning-color: #f59e0b;
+
+  --bg-color: #070913;
+  --bg-image:
+    radial-gradient(1200px 900px at 50% 55%, rgba(212, 175, 55, 0.20), rgba(212, 175, 55, 0.07) 35%, rgba(7, 9, 19, 0) 70%),
+    radial-gradient(900px 700px at 50% 60%, rgba(242, 220, 138, 0.11), rgba(7, 9, 19, 0) 62%),
+    radial-gradient(1100px 900px at 50% 92%, rgba(7, 9, 19, 0), rgba(4, 5, 10, 0.92) 70%),
+    url('/static/img/themes/solar-system-1/ea479543-e6c8-4684-8f93-ee70ddcdb6fb.png');
+
+  /* Glass panels (used by header, cards, burger menu, etc.) */
+  --surface-color: linear-gradient(180deg, rgba(13, 16, 30, 0.84), rgba(10, 12, 22, 0.84));
+  --surface-hover: rgba(242, 220, 138, 0.06);
+
+  --text-color: rgba(243, 240, 228, 0.96);
+  --text-muted: rgba(189, 183, 166, 0.82);
+  --border-color: rgba(212, 175, 55, 0.22);
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.55), 0 18px 48px rgba(0, 0, 0, 0.58);
+  --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.55), 0 30px 90px rgba(0, 0, 0, 0.68);
+
+  --nav-active-bg: linear-gradient(180deg, rgba(212, 175, 55, 0.16), rgba(212, 175, 55, 0.06));
+  --nav-active-border: rgba(242, 220, 138, 0.38);
+  --nav-active-shadow: 0 14px 34px rgba(212, 175, 55, 0.12);
+
+  --menu-scrim-color: rgba(0, 0, 0, 0.58);
+  --menu-scrim-padding: 12px;
+
+  /* Slightly rectangular */
+  --radius: 0.35rem;
+  --spacing: 1rem;
+  color-scheme: dark;
+}
+
+/* Zoom/reposition the SVG layer (last background layer only) */
+:root[data-theme="solar-system-1"] body {
+  background-size: auto, auto, auto, cover;
+  background-position: center, center, center, center;
+}
+
+/* Make the burger/menu always readable (avoid full transparency over busy bg) */
+:root[data-theme="solar-system-1"] .nav-burger-menu {
+  overflow: hidden;
+  border-color: rgba(212, 175, 55, 0.38);
+  background-color: rgba(8, 10, 18, 0.94);
+  background-image: var(--surface-color);
+}
+
+/* Burger button: add a visible gold edge */
+:root[data-theme="solar-system-1"] .btn-menu {
+  border-color: rgba(242, 220, 138, 0.45);
+}
+
+/* Rectangular gold-bordered buttons (keep base layout, just refine look) */
+:root[data-theme="solar-system-1"] .btn {
+  border-radius: var(--radius);
+  border-color: rgba(212, 175, 55, 0.55);
+}
+
+/* Yellow/gold buttons should use black text for contrast */
+:root[data-theme="solar-system-1"] .btn-primary,
+:root[data-theme="solar-system-1"] .btn-success {
+  color: rgba(5, 2, 3, 0.96);
+}
+
+:root[data-theme="solar-system-1"] .btn:hover {
+  border-color: rgba(242, 220, 138, 0.85);
+}
+
+/* /channels date pill + /playing channel name headers reuse .channels-day */
+:root[data-theme="solar-system-1"] .channels-day {
+  color: rgba(5, 2, 3, 0.96);
+}
+
+/* Admin badge uses --primary-color background (gold): use black text */
+:root[data-theme="solar-system-1"] .badge {
+  color: rgba(5, 2, 3, 0.96);
+}
+
+/* Form controls */
+:root[data-theme="solar-system-1"] input[type='text'],
+:root[data-theme="solar-system-1"] input[type='search'],
+:root[data-theme="solar-system-1"] input[type='password'],
+:root[data-theme="solar-system-1"] input[type='number'],
+:root[data-theme="solar-system-1"] select,
+:root[data-theme="solar-system-1"] textarea {
+  border-radius: var(--radius);
+  border-color: rgba(212, 175, 55, 0.30);
+  background: rgba(10, 12, 22, 0.60);
+  color: var(--text-color);
+}
+
+:root[data-theme="solar-system-1"] input[type='text']:focus,
+:root[data-theme="solar-system-1"] input[type='search']:focus,
+:root[data-theme="solar-system-1"] input[type='password']:focus,
+:root[data-theme="solar-system-1"] input[type='number']:focus,
+:root[data-theme="solar-system-1"] select:focus,
+:root[data-theme="solar-system-1"] textarea:focus {
+  border-color: rgba(242, 220, 138, 0.80);
+  outline: 2px solid rgba(242, 220, 138, 0.35);
+  outline-offset: 1px;
+}

@@ -18,6 +18,10 @@ This code was mainly generated with Claude Code (initial conversion of `vdradmin
 
 ![Alt text](screenshots/vdradmin-go_watch_tv_01.png)
 
+## Gallery
+
+See [GALLERY.md](GALLERY.md) for theme screenshots.
+
 ## Goals
 
 - **Modern Architecture**: Hexagonal (ports & adapters) architecture for maintainability
