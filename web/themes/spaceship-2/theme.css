@@ -1,0 +1,514 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&display=swap');
+
+:root[data-theme="spaceship-2"] {
+    --font-sans: 'Share Tech Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --font-display: 'Orbitron', system-ui, sans-serif;
+
+    /* Sci-fi Palette */
+    --primary-color: #00f3ff;
+    --primary-hover: #00ff88;
+    --secondary-color: rgba(0, 243, 255, 0.1);
+    
+    --success-color: #00ff88;
+    --danger-color: #ff0044;
+    --warning-color: #ffaa00;
+
+    --bg-color: #050608;
+    --bg-image: 
+        radial-gradient(ellipse at 50% -20%, rgba(0, 243, 255, 0.15) 0%, transparent 60%),
+        url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMDMuOTIzIj4KICA8cGF0aCBkPSJNIDMwLDAgTCA2MCwxNy4zMiBMIDYwLDUxLjk2IEwgMzAsNjkuMjggTCAwLDUxLjk2IEwgMCwxNy4zMiBaIE0gMzAsMTAzLjkyIEwgNjAsODYuNiBMIDYwLDUxLjk2IE0gMCw4Ni42IEwgMzAsMTAzLjkyIiBmaWxsPSJub25lIiBzdHJva2U9InJnYmEoMCwyNDMsMjU1LDAuMDQpIiBzdHJva2Utd2lkdGg9IjEiLz4KICA8Y2lyY2xlIGN4PSIzMCIgY3k9IjM0LjY0IiByPSIxLjUiIGZpbGw9InJnYmEoMjU1LCAxNzAsIDAsIDAuMSkiLz4KPC9zdmc+');
+    
+    /* Text */
+    --text-color: #d0f0f5;
+    --text-muted: rgba(200, 240, 245, 0.5);
+
+    --border-color: rgba(0, 243, 255, 0.2);
+
+    /* Using real drop shadows since conventional box-shadows don't respect angled shapes */
+    --shadow: none; 
+    --shadow-lg: none;
+
+    --nav-active-bg: rgba(0, 243, 255, 0.15);
+    --nav-active-border: #00f3ff;
+    --nav-active-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
+
+    --radius: 0px; /* SVGs define the geometry now! */
+    --spacing: 1rem;
+
+    color-scheme: dark;
+}
+
+/* Set base font sizes for the mono-spaced display layout */
+:root[data-theme="spaceship-2"] {
+    font-size: 16px;
+    letter-spacing: 0.5px;
+}
+
+/* Typography */
+:root[data-theme="spaceship-2"] h1,
+:root[data-theme="spaceship-2"] h2,
+:root[data-theme="spaceship-2"] h3 {
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+:root[data-theme="spaceship-2"] .nav-brand h1 {
+    text-shadow: 0 0 5px var(--primary-color), 0 0 15px var(--primary-color);
+}
+
+/* The Magic! Completely replacing conventional rectangular borders with structural SVG border-images */
+:root[data-theme="spaceship-2"] .card,
+:root[data-theme="spaceship-2"] .epg-item,
+:root[data-theme="spaceship-2"] .recording-item,
+:root[data-theme="spaceship-2"] .timer-item {
+    border-style: solid;
+    border-width: 20px;
+    border-image-source: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdjYXJkIiB4MT0iMCIgeTE9IjAiIHgyPSIwIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9InJnYmEoMTAsIDE1LCAyNSwgMC45KSIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9InJnYmEoNSwgNywgMTIsIDAuOTUpIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cG9seWdvbiBwb2ludHM9IjIwLDIgODAsMiA5OCwyMCA5OCw4MCA4MCw5OCAyMCw5OCAyLDgwIDIsMjAiIGZpbGw9InVybCgjZ2NhcmQpIiBzdHJva2U9IiMwMGYzZmYiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWpvaW49Im1pdGVyIiBzdHJva2UtbWl0ZXJsaW1pdD0iNCIvPgo8L3N2Zz4=');
+    border-image-slice: 20 fill;
+    border-image-repeat: stretch;
+    background: transparent !important;
+    box-shadow: none !important;
+    filter: drop-shadow(0 8px 15px rgba(0,0,0,0.8));
+    padding: 0.5rem; /* Push content inward to compensate for the 20px structural border gap constraint */
+}
+
+:root[data-theme="spaceship-2"] .nav-burger-menu {
+    border-style: solid;
+    border-width: 20px;
+    border-image-source: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdjYXJkIiB4MT0iMCIgeTE9IjAiIHgyPSIwIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9InJnYmEoMTAsIDE1LCAyNSwgMC45KSIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9InJnYmEoNSwgNywgMTIsIDAuOTUpIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cG9seWdvbiBwb2ludHM9IjIwLDIgODAsMiA5OCwyMCA5OCw4MCA4MCw5OCAyMCw5OCAyLDgwIDIsMjAiIGZpbGw9InVybCgjZ2NhcmQpIiBzdHJva2U9IiMwMGYzZmYiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWpvaW49Im1pdGVyIiBzdHJva2UtbWl0ZXJsaW1pdD0iNCIvPgo8L3N2Zz4=');
+    border-image-slice: 20 fill;
+    border-image-repeat: stretch;
+    background: transparent !important;
+    box-shadow: none !important;
+    filter: drop-shadow(0 8px 15px rgba(0,0,0,0.8));
+    padding: 0.5rem; /* Push content inward to compensate for the 20px structural border gap constraint */
+}
+
+:root[data-theme="spaceship-2"] .card::before,
+:root[data-theme="spaceship-2"] .card::after,
+:root[data-theme="spaceship-2"] .epg-item::before,
+:root[data-theme="spaceship-2"] .epg-item::after,
+:root[data-theme="spaceship-2"] .timer-item::before,
+:root[data-theme="spaceship-2"] .timer-item::after,
+:root[data-theme="spaceship-2"] .recording-item::before,
+:root[data-theme="spaceship-2"] .recording-item::after {
+    content: none !important;
+}
+
+/* Override Headers to be angular flat strips */
+:root[data-theme="spaceship-2"] header {
+    background: rgba(5,7,12,0.9);
+    border-bottom: 2px solid var(--primary-color);
+    box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
+}
+/* ALIGN ADMIN BADGE AND BURGER MENU */
+
+:root[data-theme="spaceship-2"] .nav-burger-button {
+    height: 38px !important; 
+    min-height: 38px !important;
+    padding: 0 15px !important;
+}
+:root[data-theme="spaceship-2"] .nav-user .badge {
+    border-style: solid !important;
+    border-width: 18px !important;
+    border-image-source: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjAiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0icmdiYSgxNTAsIDAsIDMwLCAwLjE1KSIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9InJnYmEoMTUwLCAwLCAzMCwgMC42KSIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICA8L2RlZnM+CiAgPHBvbHlnb24gcG9pbnRzPSIxOCw0IDk2LDQgOTYsODIgODIsOTYgNCw5NiA0LDE4IiBmaWxsPSJ1cmwoI2cpIiBzdHJva2U9IiNmZjAwNDQiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWpvaW49Im1pdGVyIiBzdHJva2UtbWl0ZXJsaW1pdD0iNCIvPgogIDxsaW5lIHgxPSIxOCIgeTE9IjQiIHgyPSI0MCIgeTI9IjQiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0ic3F1YXJlIi8+CiAgPGxpbmUgeDE9IjgyIiB5MT0iOTYiIHgyPSI2MCIgeTI9Ijk2IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InNxdWFyZSIvPgo8L3N2Zz4=') !important;
+    border-image-slice: 18 fill !important;
+    border-image-repeat: stretch !important;
+    background: transparent !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    box-sizing: border-box !important;
+    padding: 0 15px !important;
+    color: #ffffff !important;
+    text-shadow: 0 0 5px var(--warning-color), 0 0 10px var(--warning-color);
+    font-size: 0.9rem;
+    letter-spacing: 2px;
+    display: inline-flex;
+    align-items: center;
+    box-shadow: none !important;
+}
+
+/* Keep burger trigger aligned with Admin badge and use matching framed borders */
+:root[data-theme="spaceship-2"] details.nav-burger > summary.nav-burger-button {
+    border-style: solid !important;
+    border-width: 18px !important;
+    border-image-source: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjAiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0icmdiYSgwLCA2MCwgOTAsIDAuMjApIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0icmdiYSgwLCA2MCwgOTAsIDAuNjUpIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cG9seWdvbiBwb2ludHM9IjE4LDQgOTYsNCA5Niw4MiA4Miw5NiA0LDk2IDQsMTgiIGZpbGw9InVybCgjZykiIHN0cm9rZT0iIzAwZjNmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lam9pbj0ibWl0ZXIiIHN0cm9rZS1taXRlcmxpbWl0PSI0Ii8+CiAgPGxpbmUgeDE9IjE4IiB5MT0iNCIgeDI9IjQwIiB5Mj0iNCIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJzcXVhcmUiLz4KICA8bGluZSB4MT0iODIiIHkxPSI5NiIgeDI9IjYwIiB5Mj0iOTYiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0ic3F1YXJlIi8+Cjwvc3ZnPg==') !important;
+    border-image-slice: 18 fill !important;
+    border-image-repeat: stretch !important;
+    background: transparent !important;
+    box-sizing: border-box !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    padding: 0 15px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: none !important;
+}
+
+
+/* SPACER FIXES */
+:root[data-theme="spaceship-2"] .timer-item,
+:root[data-theme="spaceship-2"] .epg-item,
+:root[data-theme="spaceship-2"] .recording-item {
+    margin-bottom: 0.5rem !important;
+}
+
+/* Preserve spaceship framing while making timer states visible without warning rectangles. */
+:root[data-theme="spaceship-2"] .timer-item.recording,
+:root[data-theme="spaceship-2"] .timer-item.collision,
+:root[data-theme="spaceship-2"] .timer-item.conflict {
+    outline: none !important;
+    box-shadow: none !important;
+    border-image-source: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdjYXJkIiB4MT0iMCIgeTE9IjAiIHgyPSIwIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9InJnYmEoMTAsIDE1LCAyNSwgMC45KSIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9InJnYmEoNSwgNywgMTIsIDAuOTUpIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cG9seWdvbiBwb2ludHM9IjIwLDIgODAsMiA5OCwyMCA5OCw4MCA4MCw5OCAyMCw5OCAyLDgwIDIsMjAiIGZpbGw9InVybCgjZ2NhcmQpIiBzdHJva2U9IiMwMGYzZmYiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWpvaW49Im1pdGVyIiBzdHJva2UtbWl0ZXJsaW1pdD0iNCIvPgo8L3N2Zz4=') !important;
+    filter: drop-shadow(0 8px 15px rgba(0,0,0,0.8)) !important;
+}
+
+:root[data-theme="spaceship-2"] .timer-item.recording {
+    opacity: 1 !important;
+    box-shadow: none !important;
+}
+
+:root[data-theme="spaceship-2"] .timer-item.collision {
+    box-shadow: none !important;
+}
+
+:root[data-theme="spaceship-2"] .timer-item.conflict {
+    box-shadow: none !important;
+}
+
+:root[data-theme="spaceship-2"] .timer-item.recording .timer-info,
+:root[data-theme="spaceship-2"] .timer-item.recording .timer-actions,
+:root[data-theme="spaceship-2"] .timer-item.collision .timer-info,
+:root[data-theme="spaceship-2"] .timer-item.collision .timer-actions,
+:root[data-theme="spaceship-2"] .timer-item.conflict .timer-info,
+:root[data-theme="spaceship-2"] .timer-item.conflict .timer-actions {
+    padding: 0.45rem 0.65rem;
+    min-height: 100%;
+}
+
+:root[data-theme="spaceship-2"] .timer-item.recording .timer-info,
+:root[data-theme="spaceship-2"] .timer-item.recording .timer-actions {
+    background: linear-gradient(135deg, rgba(0, 255, 136, 0.22) 0%, rgba(0, 243, 255, 0.14) 44%, rgba(0, 243, 255, 0.05) 100%) !important;
+}
+
+:root[data-theme="spaceship-2"] .timer-item.collision .timer-info,
+:root[data-theme="spaceship-2"] .timer-item.collision .timer-actions {
+    background: linear-gradient(135deg, rgba(255, 170, 0, 0.2) 0%, rgba(255, 170, 0, 0.12) 42%, rgba(255, 170, 0, 0.04) 100%) !important;
+}
+
+:root[data-theme="spaceship-2"] .timer-item.conflict .timer-info,
+:root[data-theme="spaceship-2"] .timer-item.conflict .timer-actions {
+    background: linear-gradient(135deg, rgba(255, 0, 68, 0.2) 0%, rgba(255, 0, 68, 0.12) 42%, rgba(255, 0, 68, 0.04) 100%) !important;
+}
+
+:root[data-theme="spaceship-2"] .timeline-track {
+    border: 1px solid rgba(0, 243, 255, 0.28) !important;
+    background: linear-gradient(180deg, rgba(5, 8, 14, 0.96), rgba(2, 4, 8, 0.98)) !important;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03) !important;
+}
+
+:root[data-theme="spaceship-2"] .timeline-block {
+    border: 1px solid rgba(0, 243, 255, 0.45) !important;
+    background: linear-gradient(180deg, rgba(0, 243, 255, 0.34), rgba(0, 243, 255, 0.18)) !important;
+    color: #e8fdff !important;
+    text-shadow: none !important;
+    box-shadow: 0 0 12px rgba(0, 243, 255, 0.2) !important;
+}
+
+:root[data-theme="spaceship-2"] .timeline-block.ok {
+    border-color: rgba(0, 255, 136, 0.72) !important;
+    background: linear-gradient(180deg, rgba(0, 255, 136, 0.42), rgba(0, 255, 136, 0.2)) !important;
+    color: #e7fff3 !important;
+    box-shadow: 0 0 12px rgba(0, 255, 136, 0.24) !important;
+}
+
+:root[data-theme="spaceship-2"] .timeline-block.collision {
+    border-color: rgba(255, 170, 0, 0.9) !important;
+    background: linear-gradient(180deg, rgba(255, 170, 0, 0.56), rgba(255, 170, 0, 0.24)) !important;
+    color: #fff6df !important;
+    box-shadow: 0 0 12px rgba(255, 170, 0, 0.28) !important;
+}
+
+:root[data-theme="spaceship-2"] .timeline-block.critical {
+    border-color: rgba(255, 0, 68, 0.92) !important;
+    background: linear-gradient(180deg, rgba(255, 0, 68, 0.62), rgba(255, 0, 68, 0.26)) !important;
+    color: #fff0f4 !important;
+    box-shadow: 0 0 14px rgba(255, 0, 68, 0.32) !important;
+}
+
+:root[data-theme="spaceship-2"] .epg-item {
+    column-gap: 2rem !important;
+}
+:root[data-theme="spaceship-2"] .page-now .epg-item {
+    grid-template-columns: auto minmax(0, 1fr) max-content !important;
+    align-items: start !important;
+}
+:root[data-theme="spaceship-2"] .page-now .epg-content,
+:root[data-theme="spaceship-2"] .page-now .epg-header,
+:root[data-theme="spaceship-2"] .page-now .epg-header h3 {
+    min-width: 0 !important;
+}
+:root[data-theme="spaceship-2"] .page-now .epg-actions {
+    display: flex !important;
+    justify-content: flex-end !important;
+    width: auto !important;
+    align-self: start !important;
+    justify-self: end !important;
+    position: relative !important;
+    z-index: 30 !important;
+}
+:root[data-theme="spaceship-2"] .epg-time time {
+    margin-right: 1.5rem;
+    display: inline-block;
+}
+
+/* REPLACE clip-path on inputs with actual SVG borders so the lines don't get chopped off */
+
+:root[data-theme="spaceship-2"] input, 
+:root[data-theme="spaceship-2"] select, 
+:root[data-theme="spaceship-2"] .custom-select-trigger,
+:root[data-theme="spaceship-2"] .badge,
+:root[data-theme="spaceship-2"] .channels-day {
+    clip-path: none !important;
+    border-style: solid !important;
+    border-width: 10px !important;
+    border-image-source: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cG9seWdvbiBwb2ludHM9IjEwLDIgOTgsMiA5OCw5MCA5MCw5OCAyLDk4IDIsMTAiIGZpbGw9InJnYmEoMCwgMjQzLCAyNTUsIDAuMDUpIiBzdHJva2U9IiMwMGYzZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVqb2luPSJtaXRlciIvPjwvc3ZnPg==') !important;
+    border-image-slice: 10 fill !important;
+    border-image-repeat: stretch !important;
+    background: transparent !important;
+    padding: 4px 10px !important;
+    min-height: auto !important; 
+}
+
+:root[data-theme="spaceship-2"] .badge {
+    padding: 0px 8px !important;
+}
+
+
+/* Specific spacing for Timers & Channels screen */
+:root[data-theme="spaceship-2"] .toolbar {
+    margin-bottom: 2rem !important;
+}
+:root[data-theme="spaceship-2"] .channels-selector {
+    margin-bottom: 2.5rem !important;
+}
+:root[data-theme="spaceship-2"] .channels-day {
+    margin-bottom: 1.5rem !important;
+}
+:root[data-theme="spaceship-2"] .timeline-header,
+:root[data-theme="spaceship-2"] .timer-list {
+    margin-top: 2rem !important;
+}
+:root[data-theme="spaceship-2"] .timeline-hours {
+    margin-top: 2rem !important;
+    margin-bottom: 1.5rem !important;
+}
+:root[data-theme="spaceship-2"] .btn,
+:root[data-theme="spaceship-2"] a.btn {
+    -moz-appearance: none !important;
+    appearance: none !important;
+    border-image: none !important;
+    border-image-source: none !important;
+    border-image-slice: initial !important;
+    border-image-width: initial !important;
+    border-image-repeat: initial !important;
+    display: inline-flex !important;
+    flex: 0 0 auto !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: auto !important;
+    width: auto !important;
+    min-height: 2rem !important;
+    padding: 0.3rem 0.9rem !important;
+    border-radius: 0 !important;
+    border: 1px solid #00cfe0 !important;
+    background: #18303c !important;
+    color: #f3fcff !important;
+    text-decoration: none !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+    background-image: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    filter: none !important;
+    text-shadow: none !important;
+    transform: none !important;
+    transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    cursor: pointer !important;
+    overflow: visible !important;
+}
+
+:root[data-theme="spaceship-2"] .btn:hover,
+:root[data-theme="spaceship-2"] a.btn:hover {
+    border-color: #8ef6ff !important;
+    background: #245066 !important;
+    color: #ffffff !important;
+    box-shadow: none !important;
+    filter: none !important;
+    text-shadow: none !important;
+    transform: none !important;
+}
+
+:root[data-theme="spaceship-2"] .btn:active,
+:root[data-theme="spaceship-2"] a.btn:active,
+:root[data-theme="spaceship-2"] .btn:focus,
+:root[data-theme="spaceship-2"] a.btn:focus,
+:root[data-theme="spaceship-2"] .btn:focus-visible,
+:root[data-theme="spaceship-2"] a.btn:focus-visible {
+    background: #245066 !important;
+    color: #ffffff !important;
+    box-shadow: none !important;
+    filter: none !important;
+    text-shadow: none !important;
+    transform: none !important;
+    outline: 1px solid #8ef6ff !important;
+    outline-offset: 1px !important;
+}
+
+:root[data-theme="spaceship-2"] .btn-primary {
+    border-color: #27f0ff !important;
+    background: #12627d !important;
+    color: #f3fcff !important;
+}
+
+:root[data-theme="spaceship-2"] .btn-primary:hover {
+    border-color: #8ef6ff !important;
+    background: #1980a6 !important;
+    color: #ffffff !important;
+}
+
+:root[data-theme="spaceship-2"] .btn-secondary {
+    border-color: #00cfe0 !important;
+    background: #21404f !important;
+    background-image: none !important;
+    color: #f3fcff !important;
+}
+
+:root[data-theme="spaceship-2"] .btn-secondary:hover {
+    border-color: #8ef6ff !important;
+    background: #2b566b !important;
+    color: #ffffff !important;
+}
+
+:root[data-theme="spaceship-2"] .btn-success {
+    border-color: #42e89f !important;
+    background: #174f39 !important;
+    background-image: none !important;
+    color: #f3fff7 !important;
+}
+
+:root[data-theme="spaceship-2"] .btn-success:hover {
+    border-color: #88ffc9 !important;
+    background: #1f684a !important;
+    color: #ffffff !important;
+}
+
+:root[data-theme="spaceship-2"] .btn-danger {
+    border-color: #ff5f85 !important;
+    background: #6b2034 !important;
+    color: #fff1f4 !important;
+}
+
+:root[data-theme="spaceship-2"] .btn-danger:hover {
+    border-color: #ff9cb4 !important;
+    background: #8a2944 !important;
+    color: #ffffff !important;
+}
+
+:root[data-theme="spaceship-2"] .btn[disabled],
+:root[data-theme="spaceship-2"] .btn:disabled,
+:root[data-theme="spaceship-2"] a.btn[aria-disabled="true"] {
+    opacity: 1 !important;
+    border-color: rgba(120, 162, 170, 0.55) !important;
+    background: #24333b !important;
+    color: rgba(214, 232, 236, 0.72) !important;
+    box-shadow: none !important;
+    filter: none !important;
+    transform: none !important;
+}
+
+:root[data-theme="spaceship-2"] .epg-actions,
+:root[data-theme="spaceship-2"] .recording-actions,
+:root[data-theme="spaceship-2"] .timer-actions,
+:root[data-theme="spaceship-2"] .channel-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    position: relative !important;
+    z-index: 30 !important;
+    justify-self: end !important;
+    align-self: start !important;
+}
+
+:root[data-theme="spaceship-2"] .epg-actions > .btn,
+:root[data-theme="spaceship-2"] .epg-actions > a.btn,
+:root[data-theme="spaceship-2"] .recording-actions > .btn,
+:root[data-theme="spaceship-2"] .recording-actions > a.btn,
+:root[data-theme="spaceship-2"] .timer-actions > .btn,
+:root[data-theme="spaceship-2"] .timer-actions > a.btn,
+:root[data-theme="spaceship-2"] .channel-actions > .btn,
+:root[data-theme="spaceship-2"] .channel-actions > a.btn,
+:root[data-theme="spaceship-2"] .epg-actions > form,
+:root[data-theme="spaceship-2"] .recording-actions > form,
+:root[data-theme="spaceship-2"] .timer-actions > form,
+:root[data-theme="spaceship-2"] .channel-actions > form {
+    flex: 0 0 auto !important;
+}
+
+/* Watch TV: theme-only panel separation so global themes stay unchanged */
+:root[data-theme="spaceship-2"] .watchtv-grid {
+    grid-template-columns: minmax(0, 1fr) 300px 300px !important;
+    column-gap: calc(var(--spacing) * 1.6) !important;
+    row-gap: var(--spacing) !important;
+    padding: calc(var(--spacing) * 0.35) !important;
+    border-radius: 0.5rem;
+    background: rgba(0, 0, 0, 0.24);
+}
+
+:root[data-theme="spaceship-2"] .watchtv-screen,
+:root[data-theme="spaceship-2"] .watchtv-remote,
+:root[data-theme="spaceship-2"] .watchtv-channels {
+    padding: 0 !important;
+}
+
+:root[data-theme="spaceship-2"] .watchtv-remote,
+:root[data-theme="spaceship-2"] .watchtv-channels {
+    margin-left: calc(var(--spacing) * 0.8) !important;
+}
+
+:root[data-theme="spaceship-2"] .watchtv-screen-inner,
+:root[data-theme="spaceship-2"] .remote-panel,
+:root[data-theme="spaceship-2"] .watchtv-channels-panel {
+    background: linear-gradient(180deg, rgba(8, 12, 20, 0.92), rgba(4, 8, 14, 0.96)) !important;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03), 0 0 0 1px rgba(0, 243, 255, 0.26) !important;
+}
+
+:root[data-theme="spaceship-2"] .timer-item,
+:root[data-theme="spaceship-2"] .recording-item {
+    grid-template-columns: minmax(0, 1fr) max-content !important;
+}
+
+:root[data-theme="spaceship-2"] .channel-item .epg-item,
+:root[data-theme="spaceship-2"] .playing-group .epg-item,
+:root[data-theme="spaceship-2"] .epg-list .epg-item {
+    grid-template-columns: auto minmax(0, 1fr) max-content !important;
+}
+
+:root[data-theme="spaceship-2"] .epg-content,
+:root[data-theme="spaceship-2"] .recording-info,
+:root[data-theme="spaceship-2"] .timer-info,
+:root[data-theme="spaceship-2"] .epg-header {
+    min-width: 0 !important;
+}
+
+:root[data-theme="spaceship-2"] .page-now .epg-actions {
+    margin-top: 0 !important;
+}
+
+
