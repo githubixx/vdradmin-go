@@ -1,0 +1,89 @@
+/* Custom Select Implementation */
+.custom-select-container {
+    position: relative;
+    display: inline-block;
+    min-width: max-content;
+}
+
+.custom-select-trigger {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* Match general nav form select rules */
+.nav-channel-form .custom-select-trigger {
+    appearance: none;
+    -webkit-appearance: none;
+    padding: 0.5rem 2.25rem 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    font-size: 0.875rem;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.02)), var(--surface-color);
+    color: var(--text-color);
+    box-shadow: var(--shadow);
+    min-width: 140px;
+}
+
+.nav-channel-form .custom-select-trigger:hover, 
+.nav-channel-form .custom-select-trigger.open {
+    border-color: var(--nav-active-border);
+}
+
+.custom-select-trigger::after {
+    content: '▾';
+    position: absolute;
+    right: 0.85rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.custom-select-dropdown {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    right: 0;
+    min-width: 100%;
+    z-index: 9999;
+    margin: 0;
+    padding: 0.25rem 0;
+    list-style: none;
+    background: var(--surface-color, var(--bg-color));
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    max-height: 50vh;
+    overflow-y: auto;
+    backdrop-filter: blur(15px);
+    display: none;
+}
+
+.custom-select-dropdown.open {
+    display: block;
+    animation: fadeIn 0.1s ease-out;
+}
+
+.custom-select-option {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: background 0.15s;
+    color: var(--text-color);
+}
+
+.custom-select-option:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.custom-select-option.selected {
+    background: var(--primary-color);
+    color: #fff; /* adjust for better contrast if needed */
+}
+
+/* Base override for default ::after to avoid double arrows */
+.nav-select::after {
+    display: none;
+}
+
