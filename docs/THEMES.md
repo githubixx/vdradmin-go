@@ -19,11 +19,18 @@ Theme IDs are the directory names (for example: `luxury-1`).
 Curated themes currently included:
 
 - `cartoon-1`
+- `fitness`
 - `glas-1`
 - `gold-1`
+- `golden-moon`
+- `lighting-1`
 - `luxury-1`
+- `mantle-1`
 - `metal-1`
+- `retro-arcade`
+- `solar-system-1`
 - `space-night-1`
+- `spaceship-2`
 
 Spaceship themes currently included:
 
@@ -148,6 +155,9 @@ ui:
 
 Restart vdradmin-go.
 
+If you only edit an existing theme's `theme.css`, a browser reload is usually enough because theme CSS is served with `Cache-Control: no-cache`.
+You still need to restart vdradmin-go when adding a new theme directory, renaming a theme, or changing `theme.yaml` metadata because theme discovery happens at startup.
+
 ## Theme Variables Reference
 
 ### Colors
@@ -199,7 +209,7 @@ Restart vdradmin-go.
 2. **Use CSS variables**: All layout uses CSS variables - only change colors
 3. **Test both modes**: Check your theme in different lighting conditions
 4. **Preserve contrast**: Ensure text remains readable
-5. **Restart required**: Adding/editing theme files requires a vdradmin-go restart
+5. **Restart selectively**: CSS edits to an existing theme usually only need a reload; adding a new theme or changing theme metadata requires a vdradmin-go restart
 
 ## Example: Creating a "Blue" Theme
 
@@ -245,9 +255,10 @@ Check that:
 
 ### Changes not showing
 
-1. Restart vdradmin-go
-2. Clear browser cache
-3. Check file permissions
+1. Reload the page first; theme CSS is served with `no-cache`
+2. If you added a new theme or changed `theme.yaml`, restart vdradmin-go
+3. Hard-refresh the browser (`Ctrl+F5`) if the old stylesheet still appears
+4. Check file permissions
 
 ## Advanced: Conditional Styles
 
@@ -274,12 +285,8 @@ You can add media queries or conditional styles within your theme.css:
 }
 ```
 
-## Future Enhancements
+## Notes
 
-Planned features:
-
-- Hot-reload without restart
-- Theme gallery/marketplace
-- Theme editor UI in configurations
-- More bundled themes
-- Per-user theme preferences
+- Theme CSS updates are picked up on reload because `/themes/<id>/theme.css` is served with `Cache-Control: no-cache`.
+- The Configurations page theme dropdown shows `System (auto)` plus all discovered themes, using the display name from each `theme.yaml` when available.
+- Theme discovery is dynamic across directories under `web/themes/`, but the available theme list is built at startup, so adding or renaming themes still requires a restart.
