@@ -1,0 +1,426 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap');
+
+/* Mantle 1 Theme - vdradmin-go */
+
+:root[data-theme="mantle-1"] {
+    --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+
+    --primary-color: #3aa07f;
+    --primary-hover: #52b594;
+    --secondary-color: #5a6675;
+    --success-color: #3aa07f;
+    --danger-color: #b6627b;
+    --warning-color: #cc9b63;
+
+    --bg-color: #0e0d10;
+    --bg-image:
+        radial-gradient(980px 540px at 0% 0%, rgba(95, 120, 34, 0.36) 0%, rgba(95, 120, 34, 0.00) 62%),
+        radial-gradient(1100px 620px at 44% 0%, rgba(18, 78, 88, 0.34) 0%, rgba(18, 78, 88, 0.00) 58%),
+        radial-gradient(880px 540px at 100% 0%, rgba(76, 46, 113, 0.36) 0%, rgba(76, 46, 113, 0.00) 64%),
+        linear-gradient(180deg, rgba(20, 20, 24, 0.98) 0%, rgba(14, 13, 16, 1) 32%, rgba(13, 13, 16, 1) 100%);
+
+    --surface-color: linear-gradient(180deg, rgba(31, 34, 39, 0.90), rgba(22, 24, 28, 0.95));
+    --panel-surface: linear-gradient(180deg, rgba(35, 37, 42, 0.90), rgba(22, 24, 29, 0.96));
+    --surface-hover: rgba(255, 255, 255, 0.045);
+
+    --text-color: rgba(241, 236, 232, 0.96);
+    --text-muted: rgba(190, 182, 175, 0.76);
+    --border-color: rgba(197, 188, 180, 0.14);
+    --panel-border: rgba(214, 205, 194, 0.11);
+
+    --shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 20px 44px rgba(0, 0, 0, 0.42);
+    --shadow-lg: 0 1px 0 rgba(255, 255, 255, 0.04), 0 28px 70px rgba(0, 0, 0, 0.52);
+    --panel-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.035),
+        0 18px 42px rgba(0, 0, 0, 0.42);
+    --panel-shadow-lg:
+        inset 0 1px 0 rgba(255, 255, 255, 0.04),
+        0 28px 72px rgba(0, 0, 0, 0.52);
+
+    --nav-active-bg: linear-gradient(180deg, rgba(123, 144, 162, 0.16), rgba(123, 144, 162, 0.08));
+    --nav-active-border: rgba(176, 188, 200, 0.18);
+    --nav-active-shadow: 0 14px 32px rgba(7, 13, 21, 0.38);
+
+    --menu-scrim-color: rgba(0, 0, 0, 0.48);
+    --menu-scrim-padding: 14px;
+
+    --radius: 1rem;
+    --spacing: 1rem;
+    color-scheme: dark;
+}
+
+:root[data-theme="mantle-1"] body {
+    min-height: 100vh;
+}
+
+:root[data-theme="mantle-1"] a {
+    color: #95afe6;
+}
+
+:root[data-theme="mantle-1"] a:hover {
+    color: #b2c5f0;
+}
+
+:root[data-theme="mantle-1"] header {
+    background:
+        linear-gradient(180deg, rgba(18, 18, 22, 0.88), rgba(18, 18, 22, 0.74)),
+        radial-gradient(140% 150% at 18% 0%, rgba(94, 116, 32, 0.14), rgba(0, 0, 0, 0.00) 46%),
+        radial-gradient(120% 140% at 82% 0%, rgba(77, 48, 111, 0.16), rgba(0, 0, 0, 0.00) 52%);
+    border-bottom-color: rgba(214, 205, 194, 0.12);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.34);
+    backdrop-filter: blur(18px);
+}
+
+:root[data-theme="mantle-1"] .nav-brand h1 {
+    font-family: var(--font-sans);
+    font-size: 1.05rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(241, 236, 232, 0.92);
+}
+
+:root[data-theme="mantle-1"] .nav-burger-menu {
+    position: absolute;
+    background-color: rgba(17, 18, 22, 0.98);
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015));
+    border-color: rgba(214, 205, 194, 0.12);
+    border-radius: 18px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.58);
+    overflow: hidden;
+}
+
+:root[data-theme="mantle-1"] .nav-burger-button.btn:hover,
+:root[data-theme="mantle-1"] .nav-burger-button.btn:active {
+    transform: none;
+}
+
+:root[data-theme="mantle-1"] .nav-burger-menu a,
+:root[data-theme="mantle-1"] .nav-links a {
+    color: rgba(241, 236, 232, 0.88);
+}
+
+:root[data-theme="mantle-1"] .nav-burger-menu a:hover,
+:root[data-theme="mantle-1"] .nav-links a:hover {
+    color: rgba(247, 243, 239, 0.96);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+:root[data-theme="mantle-1"] .nav-burger-menu a.active,
+:root[data-theme="mantle-1"] .nav-burger-menu a[aria-current="page"],
+:root[data-theme="mantle-1"] .nav-links a.active,
+:root[data-theme="mantle-1"] .nav-links a[aria-current="page"] {
+    background: linear-gradient(180deg, rgba(93, 108, 121, 0.20), rgba(93, 108, 121, 0.10));
+    border-color: rgba(188, 198, 208, 0.20);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 16px 36px rgba(0, 0, 0, 0.32);
+}
+
+:root[data-theme="mantle-1"] .badge,
+:root[data-theme="mantle-1"] .channels-day {
+    background: linear-gradient(180deg, rgba(82, 126, 94, 0.96), rgba(54, 98, 77, 0.98));
+    color: #eef6ef;
+    border: 1px solid rgba(171, 208, 183, 0.18);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 22px rgba(0, 0, 0, 0.22);
+}
+
+:root[data-theme="mantle-1"] .channels-day {
+    border-radius: 999px;
+    letter-spacing: 0.01em;
+}
+
+:root[data-theme="mantle-1"] .btn {
+    border-color: rgba(214, 205, 194, 0.12);
+    border-radius: 999px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 14px 28px rgba(0, 0, 0, 0.30);
+}
+
+:root[data-theme="mantle-1"] .btn-primary,
+:root[data-theme="mantle-1"] .btn-success {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04)),
+        linear-gradient(135deg, rgba(65, 150, 114, 0.94), rgba(34, 97, 93, 0.96));
+    border-color: rgba(147, 201, 180, 0.24);
+    color: #f5f9f7;
+}
+
+:root[data-theme="mantle-1"] .btn-primary:hover,
+:root[data-theme="mantle-1"] .btn-success:hover {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.20), rgba(255, 255, 255, 0.06)),
+        linear-gradient(135deg, rgba(82, 181, 148, 0.96), rgba(43, 119, 111, 0.98));
+}
+
+:root[data-theme="mantle-1"] .btn-secondary,
+:root[data-theme="mantle-1"] .btn-menu,
+:root[data-theme="mantle-1"] .btn-nav,
+:root[data-theme="mantle-1"] .toggle-chip {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+        rgba(42, 45, 52, 0.82);
+    border-color: rgba(214, 205, 194, 0.12);
+    color: rgba(241, 236, 232, 0.94);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 14px 28px rgba(0, 0, 0, 0.26);
+    backdrop-filter: blur(12px);
+}
+
+:root[data-theme="mantle-1"] .btn-secondary:hover,
+:root[data-theme="mantle-1"] .btn-menu:hover,
+:root[data-theme="mantle-1"] .btn-nav:hover,
+:root[data-theme="mantle-1"] .toggle-chip:hover {
+    border-color: rgba(186, 198, 213, 0.20);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.03)),
+        rgba(49, 52, 60, 0.90);
+}
+
+:root[data-theme="mantle-1"] .btn-danger {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04)),
+        linear-gradient(135deg, rgba(136, 61, 86, 0.94), rgba(96, 44, 70, 0.98));
+    border-color: rgba(201, 134, 156, 0.22);
+    color: #fff6f9;
+}
+
+:root[data-theme="mantle-1"] .btn-danger:hover {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.05)),
+        linear-gradient(135deg, rgba(164, 78, 108, 0.96), rgba(112, 51, 81, 1));
+}
+
+:root[data-theme="mantle-1"] .btn[disabled],
+:root[data-theme="mantle-1"] .btn:disabled,
+:root[data-theme="mantle-1"] a.btn[aria-disabled="true"] {
+    opacity: 0.72;
+    filter: saturate(0.82);
+}
+
+:root[data-theme="mantle-1"] .toolbar,
+:root[data-theme="mantle-1"] .recordings-search-box,
+:root[data-theme="mantle-1"] .card,
+:root[data-theme="mantle-1"] .epg-item,
+:root[data-theme="mantle-1"] .timer-item,
+:root[data-theme="mantle-1"] .recording-item,
+:root[data-theme="mantle-1"] footer {
+    background: var(--panel-surface, var(--surface-color));
+    border-color: var(--panel-border, var(--border-color));
+    box-shadow: var(--panel-shadow, var(--shadow));
+}
+
+:root[data-theme="mantle-1"] .card:hover,
+:root[data-theme="mantle-1"] .epg-item:hover,
+:root[data-theme="mantle-1"] .recording-item:hover {
+    box-shadow: var(--panel-shadow-lg, var(--shadow-lg));
+}
+
+:root[data-theme="mantle-1"] .timer-item {
+    border-left-color: var(--success-color);
+}
+
+:root[data-theme="mantle-1"] .timer-item.recording {
+    border-color: rgba(101, 175, 144, 0.26);
+    border-left-color: #58b694;
+    background:
+        linear-gradient(180deg, rgba(47, 66, 62, 0.96), rgba(24, 33, 32, 0.98));
+}
+
+:root[data-theme="mantle-1"] .timer-item.inactive {
+    border-left-color: rgba(140, 150, 162, 0.72);
+}
+
+:root[data-theme="mantle-1"] .timer-item.collision {
+    border-color: rgba(211, 165, 109, 0.72);
+    border-left-color: var(--warning-color);
+    background:
+        linear-gradient(180deg, rgba(79, 57, 35, 0.96), rgba(35, 25, 18, 0.98));
+}
+
+:root[data-theme="mantle-1"] .timer-item.conflict {
+    border-color: rgba(199, 116, 142, 0.72);
+    border-left-color: var(--danger-color);
+    background:
+        linear-gradient(180deg, rgba(76, 38, 52, 0.96), rgba(33, 18, 25, 0.98));
+}
+
+:root[data-theme="mantle-1"] .timeline-track {
+    background: linear-gradient(180deg, rgba(25, 27, 33, 0.96), rgba(16, 18, 23, 0.98));
+    border-color: rgba(214, 205, 194, 0.14);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 12px 24px rgba(0, 0, 0, 0.24);
+}
+
+:root[data-theme="mantle-1"] .timeline-block.ok {
+    background: linear-gradient(180deg, rgba(82, 157, 125, 0.9), rgba(48, 104, 88, 0.96));
+    border-color: rgba(156, 212, 189, 0.5);
+    color: #f2faf6;
+}
+
+:root[data-theme="mantle-1"] .timeline-block.collision {
+    background: linear-gradient(180deg, rgba(202, 145, 82, 0.92), rgba(133, 85, 37, 0.96));
+    border-color: rgba(235, 194, 142, 0.56);
+    color: #fff6ea;
+}
+
+:root[data-theme="mantle-1"] .timeline-block.critical {
+    background: linear-gradient(180deg, rgba(182, 88, 117, 0.92), rgba(110, 49, 73, 0.98));
+    border-color: rgba(228, 163, 185, 0.52);
+    color: #fff2f6;
+}
+
+:root[data-theme="mantle-1"] .card,
+:root[data-theme="mantle-1"] .toolbar,
+:root[data-theme="mantle-1"] .recordings-search-box,
+:root[data-theme="mantle-1"] .epg-item,
+:root[data-theme="mantle-1"] .timer-item,
+:root[data-theme="mantle-1"] .recording-item {
+    position: relative;
+}
+
+:root[data-theme="mantle-1"] .toolbar,
+:root[data-theme="mantle-1"] .recordings-search-box {
+    z-index: 20;
+}
+
+:root[data-theme="mantle-1"] .card,
+:root[data-theme="mantle-1"] .epg-item,
+:root[data-theme="mantle-1"] .timer-item,
+:root[data-theme="mantle-1"] .recording-item,
+:root[data-theme="mantle-1"] footer {
+    z-index: 0;
+}
+
+:root[data-theme="mantle-1"] .card,
+:root[data-theme="mantle-1"] .epg-item,
+:root[data-theme="mantle-1"] .timer-item,
+:root[data-theme="mantle-1"] .recording-item {
+    overflow: hidden;
+}
+
+:root[data-theme="mantle-1"] .card::before,
+:root[data-theme="mantle-1"] .toolbar::before,
+:root[data-theme="mantle-1"] .recordings-search-box::before,
+:root[data-theme="mantle-1"] .epg-item::before,
+:root[data-theme="mantle-1"] .timer-item::before,
+:root[data-theme="mantle-1"] .recording-item::before,
+:root[data-theme="mantle-1"] .nav-burger-menu::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.00) 26%),
+        radial-gradient(120% 120% at 0% 0%, rgba(146, 163, 179, 0.08), rgba(146, 163, 179, 0.00) 42%);
+    opacity: 0.9;
+}
+
+:root[data-theme="mantle-1"] main h1,
+:root[data-theme="mantle-1"] main h2,
+:root[data-theme="mantle-1"] .card h3,
+:root[data-theme="mantle-1"] .epg-header h3,
+:root[data-theme="mantle-1"] .epg-header h4,
+:root[data-theme="mantle-1"] .timer-info h3,
+:root[data-theme="mantle-1"] .recording-info h3,
+:root[data-theme="mantle-1"] .channels-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.08;
+}
+
+:root[data-theme="mantle-1"] .epg-header h3,
+:root[data-theme="mantle-1"] .epg-header h4,
+:root[data-theme="mantle-1"] .timer-info h3,
+:root[data-theme="mantle-1"] .recording-info h3,
+:root[data-theme="mantle-1"] .card h3 {
+    font-size: 1.45rem;
+}
+
+:root[data-theme="mantle-1"] .epg-time time {
+    font-weight: 500;
+    color: rgba(241, 236, 232, 0.92);
+}
+
+:root[data-theme="mantle-1"] .epg-duration,
+:root[data-theme="mantle-1"] .recording-subtitle,
+:root[data-theme="mantle-1"] .timer-meta,
+:root[data-theme="mantle-1"] .recording-meta,
+:root[data-theme="mantle-1"] .toggle-chips-label,
+:root[data-theme="mantle-1"] .sort-options label,
+:root[data-theme="mantle-1"] .empty-state,
+:root[data-theme="mantle-1"] footer {
+    color: var(--text-muted);
+}
+
+:root[data-theme="mantle-1"] .search-input,
+:root[data-theme="mantle-1"] .sort-options select,
+:root[data-theme="mantle-1"] .watchtv-select,
+:root[data-theme="mantle-1"] input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="file"]):not([type="image"]),
+:root[data-theme="mantle-1"] textarea,
+:root[data-theme="mantle-1"] .custom-select-trigger,
+:root[data-theme="mantle-1"] .custom-select-dropdown {
+    border-color: rgba(214, 205, 194, 0.12);
+    border-radius: 999px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015)),
+        rgba(25, 27, 32, 0.90);
+    color: var(--text-color);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025), inset 0 -10px 20px rgba(0, 0, 0, 0.18);
+}
+
+:root[data-theme="mantle-1"] textarea,
+:root[data-theme="mantle-1"] .custom-select-dropdown {
+    border-radius: calc(var(--radius) - 0.1rem);
+}
+
+:root[data-theme="mantle-1"] .search-input:focus,
+:root[data-theme="mantle-1"] .sort-options select:focus,
+:root[data-theme="mantle-1"] .watchtv-select:focus,
+:root[data-theme="mantle-1"] input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="file"]):not([type="image"]):focus,
+:root[data-theme="mantle-1"] textarea:focus,
+:root[data-theme="mantle-1"] .custom-select-trigger:focus {
+    border-color: rgba(149, 175, 230, 0.35);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.03),
+        0 0 0 3px rgba(68, 101, 153, 0.18);
+    outline: none;
+}
+
+:root[data-theme="mantle-1"] .recordings-search-box,
+:root[data-theme="mantle-1"] .toolbar {
+    backdrop-filter: blur(14px);
+}
+
+:root[data-theme="mantle-1"] .data-table th {
+    color: rgba(221, 212, 204, 0.76);
+}
+
+:root[data-theme="mantle-1"] .data-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+:root[data-theme="mantle-1"] .data-table tbody tr.is-selected {
+    background: rgba(92, 112, 128, 0.24);
+}
+
+:root[data-theme="mantle-1"] footer {
+    background:
+        linear-gradient(180deg, rgba(24, 25, 29, 0.96), rgba(18, 19, 23, 0.98));
+    border-top-color: rgba(214, 205, 194, 0.10);
+}
+
+@media (max-width: 768px) {
+    :root[data-theme="mantle-1"] .nav-brand h1 {
+        font-size: 0.92rem;
+        letter-spacing: 0.05em;
+    }
+
+    :root[data-theme="mantle-1"] .epg-header h3,
+    :root[data-theme="mantle-1"] .epg-header h4,
+    :root[data-theme="mantle-1"] .timer-info h3,
+    :root[data-theme="mantle-1"] .recording-info h3,
+    :root[data-theme="mantle-1"] .card h3 {
+        font-size: 1.28rem;
+    }
+}
