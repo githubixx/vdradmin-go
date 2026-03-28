@@ -1,0 +1,237 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
+/* Retro Arcade Theme - vdradmin-go */
+
+:root[data-theme="retro-arcade"] {
+    /* Typography: pixel display + readable retro monospace */
+    --font-display: 'Press Start 2P', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+    --font-sans: 'VT323', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+
+    /* Neon palette */
+    --primary-color: #19ff6a;
+    --primary-hover: #66ff99;
+    --secondary-color: rgba(255, 255, 255, 0.08);
+    --success-color: #19ff6a;
+    --danger-color: #ff3b7d;
+    --warning-color: #ffcc33;
+
+    /* Base */
+    --bg-color: #030308;
+    --bg-image:
+        radial-gradient(900px 550px at 50% 20%, rgba(25, 255, 106, 0.11), rgba(3, 3, 8, 0) 60%),
+        radial-gradient(750px 520px at 40% 72%, rgba(255, 59, 125, 0.06), rgba(3, 3, 8, 0) 62%),
+        radial-gradient(900px 900px at 50% 95%, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.86) 70%),
+        /* CRT scanlines */
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.020) 0px, rgba(255, 255, 255, 0.020) 3px, rgba(0, 0, 0, 0) 12px),
+        /* Subtle horizontal scanlines */
+        repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.00) 0px, rgba(0, 0, 0, 0.00) 2px, rgba(0, 0, 0, 0.14) 3px),
+        url('/static/img/themes/retro-arcade/noise.svg');
+
+    --surface-color: rgba(0, 0, 0, 0.85);
+    --panel-surface: linear-gradient(180deg, rgba(6, 6, 12, 0.88), rgba(0, 0, 0, 0.92));
+    --surface-hover: rgba(25, 255, 106, 0.08);
+
+    --text-color: rgba(245, 245, 255, 0.92);
+    --text-muted: rgba(245, 245, 255, 0.60);
+
+    --border-color: rgba(255, 255, 255, 0.14);
+
+    --shadow: 0 1px 0 rgba(255, 255, 255, 0.05), 0 14px 44px rgba(0, 0, 0, 0.72);
+    --shadow-lg: 0 1px 0 rgba(255, 255, 255, 0.06), 0 26px 84px rgba(0, 0, 0, 0.80);
+
+    --nav-active-bg: linear-gradient(180deg, rgba(25, 255, 106, 0.12), rgba(25, 255, 106, 0.05));
+    --nav-active-border: rgba(25, 255, 106, 0.40);
+    --nav-active-shadow: 0 0 0 1px rgba(25, 255, 106, 0.18), 0 0 22px rgba(25, 255, 106, 0.18);
+
+    --menu-scrim-color: rgba(0, 0, 0, 0.65);
+    --menu-scrim-padding: 12px;
+
+    /* Sharper look */
+    --radius: 0.35rem;
+    --spacing: 1rem;
+
+    color-scheme: dark;
+
+    /* Optional knobs consumed by base.css */
+    --panel-border: rgba(25, 255, 106, 0.14);
+    --panel-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+        0 14px 44px rgba(0, 0, 0, 0.72);
+}
+
+/* Header like a dark CRT frame */
+:root[data-theme="retro-arcade"] header {
+    background:
+        linear-gradient(180deg, rgba(6, 6, 10, 0.86), rgba(6, 6, 10, 0.70)),
+        radial-gradient(140% 120% at 20% 0%, rgba(25, 255, 106, 0.10), rgba(0, 0, 0, 0) 60%);
+    border-bottom-color: rgba(25, 255, 106, 0.14);
+}
+
+:root[data-theme="retro-arcade"] .nav-brand h1 {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    text-shadow: 0 0 14px rgba(25, 255, 106, 0.22);
+}
+
+/* Burger menu: darker panel for better readability */
+:root[data-theme="retro-arcade"] .nav-burger-menu {
+    background-color: rgba(0, 0, 0, 0.92);
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+    border-color: rgba(25, 255, 106, 0.22);
+}
+
+/* Lists / menu text: +1px for legibility */
+:root[data-theme="retro-arcade"] .nav-links a,
+:root[data-theme="retro-arcade"] .nav-burger-menu a,
+:root[data-theme="retro-arcade"] .epg-item,
+:root[data-theme="retro-arcade"] .timer-item,
+:root[data-theme="retro-arcade"] .recording-item {
+    font-size: calc(1rem + 1px);
+}
+
+/* Make cards/panels feel like arcade UI frames */
+:root[data-theme="retro-arcade"] .card,
+:root[data-theme="retro-arcade"] .epg-item,
+:root[data-theme="retro-arcade"] .recording-item,
+:root[data-theme="retro-arcade"] .nav-burger-menu {
+    border-color: rgba(25, 255, 106, 0.16);
+    box-shadow: var(--panel-shadow, var(--shadow)), 0 0 0 1px rgba(0, 0, 0, 0.55);
+}
+
+:root[data-theme="retro-arcade"] .timer-item {
+    border-color: rgba(25, 255, 106, 0.16);
+    border-left-color: var(--success-color);
+    box-shadow: var(--panel-shadow, var(--shadow)), 0 0 0 1px rgba(0, 0, 0, 0.55);
+}
+
+:root[data-theme="retro-arcade"] .timer-item.recording {
+    border-left-color: var(--danger-color);
+    background-color: var(--danger-color);
+}
+:root[data-theme="retro-arcade"] .timer-item.inactive {
+    border-left-color: var(--secondary-color);
+}
+:root[data-theme="retro-arcade"] .timer-item.collision {
+    border-color: var(--warning-color);
+    border-left-color: var(--warning-color);
+}
+:root[data-theme="retro-arcade"] .timer-item.conflict {
+    border-color: var(--danger-color);
+    border-left-color: var(--danger-color);
+}
+
+/* Buttons: sharp rectangles, neon borders, minimal rounding */
+:root[data-theme="retro-arcade"] .btn {
+    border-radius: 0px;
+    border-width: 2px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    box-shadow: none;
+}
+
+:root[data-theme="retro-arcade"] .btn-primary {
+    color: rgba(2, 2, 6, 0.95);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.06)),
+        var(--primary-color);
+    border-color: rgba(25, 255, 106, 0.70);
+    box-shadow: 0 0 0 1px rgba(25, 255, 106, 0.18), 0 0 22px rgba(25, 255, 106, 0.16);
+}
+
+:root[data-theme="retro-arcade"] .btn-primary:hover {
+    filter: brightness(1.03);
+    box-shadow: 0 0 0 1px rgba(25, 255, 106, 0.22), 0 0 28px rgba(25, 255, 106, 0.22);
+}
+
+:root[data-theme="retro-arcade"] .btn-secondary {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+        rgba(6, 6, 10, 0.60);
+    color: var(--text-color);
+    border-color: rgba(255, 255, 255, 0.16);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(10px);
+}
+
+:root[data-theme="retro-arcade"] .btn-secondary:hover {
+    border-color: rgba(25, 255, 106, 0.35);
+}
+
+:root[data-theme="retro-arcade"] .btn-danger {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04)),
+        rgba(255, 59, 125, 0.85);
+    border-color: rgba(255, 59, 125, 0.70);
+    box-shadow: 0 0 22px rgba(255, 59, 125, 0.12);
+}
+
+/* Navigation pills should match the square arcade buttons */
+:root[data-theme="retro-arcade"] .nav-links a,
+:root[data-theme="retro-arcade"] .btn-menu,
+:root[data-theme="retro-arcade"] .btn-nav {
+    border-radius: 0px;
+}
+
+/* Burger icon should pop neon-green */
+:root[data-theme="retro-arcade"] .burger-icon::before,
+:root[data-theme="retro-arcade"] .burger-icon::after {
+    background: rgba(25, 255, 106, 0.92);
+    box-shadow: 0 0 10px rgba(25, 255, 106, 0.22);
+}
+
+/* Day pill: use yellow/orange like arcade HUD accents */
+:root[data-theme="retro-arcade"] .channels-day {
+    background-color: rgba(255, 204, 51, 0.92);
+    color: rgba(2, 2, 6, 0.95);
+    border-radius: 0px;
+}
+:root[data-theme="retro-arcade"] {
+    font-size: 17px;
+}
+
+
+/* Amiga Starfield Animation */
+:root[data-theme="retro-arcade"] body {
+    isolation: isolate;
+}
+
+:root[data-theme="retro-arcade"] body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: 
+        url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIj48cmVjdCB4PSI4NSIgeT0iNyIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iI2ZmZmZmZiIgb3BhY2l0eT0iMC41MSIvPjxyZWN0IHg9IjEwNCIgeT0iOTUiIHdpZHRoPSIyIiBoZWlnaHQ9IjIiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuOTIiLz48cmVjdCB4PSIxNDgiIHk9IjE0NCIgd2lkdGg9IjIiIGhlaWdodD0iMiIgZmlsbD0iI2ZmZmZmZiIgb3BhY2l0eT0iMC45MSIvPjxyZWN0IHg9IjE2NCIgeT0iNTEiIHdpZHRoPSIyIiBoZWlnaHQ9IjIiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuODYiLz48cmVjdCB4PSIxNDAiIHk9IjE4OCIgd2lkdGg9IjIiIGhlaWdodD0iMiIgZmlsbD0iI2ZmZmZmZiIgb3BhY2l0eT0iMC4zNiIvPjxyZWN0IHg9IjE4OSIgeT0iMTA1IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjciLz48cmVjdCB4PSIxMzYiIHk9IjU1IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjQyIi8+PHJlY3QgeD0iNzciIHk9IjExOSIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iI2ZmZmZmZiIgb3BhY2l0eT0iMC40NyIvPjxyZWN0IHg9IjY3IiB5PSI3NCIgd2lkdGg9IjIiIGhlaWdodD0iMiIgZmlsbD0iI2ZmZmZmZiIgb3BhY2l0eT0iMC45MyIvPjxyZWN0IHg9IjgiIHk9IjgwIiB3aWR0aD0iMiIgaGVpZ2h0PSIyIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjQ3Ii8+PHJlY3QgeD0iMTUiIHk9IjE1MyIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iI2ZmZmZmZiIgb3BhY2l0eT0iMC40NSIvPjxyZWN0IHg9IjEzMyIgeT0iNjciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiNmZmZmZmYiIG9wYWNpdHk9IjAuNTgiLz48cmVjdCB4PSI2NyIgeT0iMTk3IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjZmZmZmZmIiBvcGFjaXR5PSIwLjY3Ii8+PHJlY3QgeD0iODgiIHk9IjEzNyIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iI2ZmZmZmZiIgb3BhY2l0eT0iMC4zMSIvPjxyZWN0IHg9IjI0IiB5PSI3NSIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iI2ZmZmZmZiIgb3BhY2l0eT0iMC41NCIvPjwvc3ZnPg=="),
+        url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48cmVjdCB4PSIyNjMiIHk9IjI0NyIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iI2U2ZmZlZSIgb3BhY2l0eT0iMC40Ii8+PHJlY3QgeD0iMzYiIHk9IjQ0IiB3aWR0aD0iMiIgaGVpZ2h0PSIyIiBmaWxsPSIjZTZmZmVlIiBvcGFjaXR5PSIwLjU0Ii8+PHJlY3QgeD0iODkiIHk9IjExNiIgd2lkdGg9IjIiIGhlaWdodD0iMiIgZmlsbD0iI2U2ZmZlZSIgb3BhY2l0eT0iMC4zMyIvPjxyZWN0IHg9IjEwNSIgeT0iMTY0IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjZTZmZmVlIiBvcGFjaXR5PSIwLjQzIi8+PHJlY3QgeD0iMTI5IiB5PSIxNzMiIHdpZHRoPSIyIiBoZWlnaHQ9IjIiIGZpbGw9IiNlNmZmZWUiIG9wYWNpdHk9IjAuNjUiLz48cmVjdCB4PSI2NyIgeT0iODciIHdpZHRoPSIyIiBoZWlnaHQ9IjIiIGZpbGw9IiNlNmZmZWUiIG9wYWNpdHk9IjAuMjgiLz48cmVjdCB4PSIyMzYiIHk9IjI5MSIgd2lkdGg9IjIiIGhlaWdodD0iMiIgZmlsbD0iI2U2ZmZlZSIgb3BhY2l0eT0iMC40OCIvPjxyZWN0IHg9IjE0OCIgeT0iMjIiIHdpZHRoPSIyIiBoZWlnaHQ9IjIiIGZpbGw9IiNlNmZmZWUiIG9wYWNpdHk9IjAuNTYiLz48cmVjdCB4PSI4NiIgeT0iNjQiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiNlNmZmZWUiIG9wYWNpdHk9IjAuNjMiLz48cmVjdCB4PSIyNzAiIHk9IjIwIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjZTZmZmVlIiBvcGFjaXR5PSIwLjM1Ii8+PHJlY3QgeD0iMjIwIiB5PSIxNzUiIHdpZHRoPSIyIiBoZWlnaHQ9IjIiIGZpbGw9IiNlNmZmZWUiIG9wYWNpdHk9IjAuNiIvPjxyZWN0IHg9IjYwIiB5PSI1OCIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iI2U2ZmZlZSIgb3BhY2l0eT0iMC4yOSIvPjxyZWN0IHg9IjEyNyIgeT0iMjIxIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjZTZmZmVlIiBvcGFjaXR5PSIwLjMxIi8+PHJlY3QgeD0iNDUiIHk9IjE3MyIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iI2U2ZmZlZSIgb3BhY2l0eT0iMC40NyIvPjxyZWN0IHg9IjEyIiB5PSIzMCIgd2lkdGg9IjIiIGhlaWdodD0iMiIgZmlsbD0iI2U2ZmZlZSIgb3BhY2l0eT0iMC40MSIvPjxyZWN0IHg9IjExNyIgeT0iMjc3IiB3aWR0aD0iMiIgaGVpZ2h0PSIyIiBmaWxsPSIjZTZmZmVlIiBvcGFjaXR5PSIwLjY2Ii8+PHJlY3QgeD0iMTgxIiB5PSIyMDIiIHdpZHRoPSIyIiBoZWlnaHQ9IjIiIGZpbGw9IiNlNmZmZWUiIG9wYWNpdHk9IjAuNDYiLz48cmVjdCB4PSI2IiB5PSIxMTYiIHdpZHRoPSIyIiBoZWlnaHQ9IjIiIGZpbGw9IiNlNmZmZWUiIG9wYWNpdHk9IjAuMjIiLz48cmVjdCB4PSIyMSIgeT0iNzgiIHdpZHRoPSIyIiBoZWlnaHQ9IjIiIGZpbGw9IiNlNmZmZWUiIG9wYWNpdHk9IjAuMzciLz48cmVjdCB4PSI1MiIgeT0iMjAyIiB3aWR0aD0iMiIgaGVpZ2h0PSIyIiBmaWxsPSIjZTZmZmVlIiBvcGFjaXR5PSIwLjMiLz48cmVjdCB4PSIyNjciIHk9IjEyMiIgd2lkdGg9IjIiIGhlaWdodD0iMiIgZmlsbD0iI2U2ZmZlZSIgb3BhY2l0eT0iMC4zOCIvPjxyZWN0IHg9IjMyIiB5PSI2MCIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iI2U2ZmZlZSIgb3BhY2l0eT0iMC40MSIvPjxyZWN0IHg9IjE5IiB5PSIzMiIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iI2U2ZmZlZSIgb3BhY2l0eT0iMC40NCIvPjxyZWN0IHg9IjIzIiB5PSIxNjAiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiNlNmZmZWUiIG9wYWNpdHk9IjAuMzkiLz48cmVjdCB4PSIyMTMiIHk9IjIwMiIgd2lkdGg9IjIiIGhlaWdodD0iMiIgZmlsbD0iI2U2ZmZlZSIgb3BhY2l0eT0iMC42MiIvPjwvc3ZnPg=="),
+        url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIj48cmVjdCB4PSIxMDIiIHk9IjE3NCIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzhjZjVhOCIgb3BhY2l0eT0iMC40Ii8+PHJlY3QgeD0iMTQ4IiB5PSIzMzUiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM4Y2Y1YTgiIG9wYWNpdHk9IjAuMyIvPjxyZWN0IHg9IjM0MyIgeT0iMjE5IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjOGNmNWE4IiBvcGFjaXR5PSIwLjM3Ii8+PHJlY3QgeD0iMjM5IiB5PSIzOTQiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM4Y2Y1YTgiIG9wYWNpdHk9IjAuMjEiLz48cmVjdCB4PSIyMSIgeT0iMzgiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM4Y2Y1YTgiIG9wYWNpdHk9IjAuNDgiLz48cmVjdCB4PSIxODIiIHk9IjI4OCIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzhjZjVhOCIgb3BhY2l0eT0iMC40Ii8+PHJlY3QgeD0iMzgzIiB5PSIyODMiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM4Y2Y1YTgiIG9wYWNpdHk9IjAuNDUiLz48cmVjdCB4PSIyMDQiIHk9IjE4OCIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzhjZjVhOCIgb3BhY2l0eT0iMC4yOSIvPjxyZWN0IHg9IjYxIiB5PSI5OCIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzhjZjVhOCIgb3BhY2l0eT0iMC40MiIvPjxyZWN0IHg9IjEyMSIgeT0iMzQ3IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjOGNmNWE4IiBvcGFjaXR5PSIwLjM1Ii8+PHJlY3QgeD0iMjcwIiB5PSIxMiIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzhjZjVhOCIgb3BhY2l0eT0iMC4yOSIvPjxyZWN0IHg9IjM2NyIgeT0iMjI3IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjOGNmNWE4IiBvcGFjaXR5PSIwLjI5Ii8+PHJlY3QgeD0iMTg5IiB5PSIxMyIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzhjZjVhOCIgb3BhY2l0eT0iMC40MiIvPjxyZWN0IHg9IjE3OCIgeT0iMjM4IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjOGNmNWE4IiBvcGFjaXR5PSIwLjMyIi8+PHJlY3QgeD0iOTMiIHk9IjM2NCIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzhjZjVhOCIgb3BhY2l0eT0iMC4zOCIvPjxyZWN0IHg9IjE4IiB5PSIxNzgiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM4Y2Y1YTgiIG9wYWNpdHk9IjAuMzIiLz48cmVjdCB4PSI2NyIgeT0iMzE2IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjOGNmNWE4IiBvcGFjaXR5PSIwLjM2Ii8+PHJlY3QgeD0iMzU5IiB5PSI1NCIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzhjZjVhOCIgb3BhY2l0eT0iMC40NSIvPjxyZWN0IHg9IjM5MSIgeT0iMTM0IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjOGNmNWE4IiBvcGFjaXR5PSIwLjUiLz48cmVjdCB4PSIxMTIiIHk9IjMwMCIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzhjZjVhOCIgb3BhY2l0eT0iMC4yOSIvPjxyZWN0IHg9IjMzMSIgeT0iMjkwIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjOGNmNWE4IiBvcGFjaXR5PSIwLjQiLz48cmVjdCB4PSI2MyIgeT0iMjAiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM4Y2Y1YTgiIG9wYWNpdHk9IjAuMTUiLz48cmVjdCB4PSIxMDQiIHk9IjMyNyIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzhjZjVhOCIgb3BhY2l0eT0iMC4yMiIvPjxyZWN0IHg9IjM1NyIgeT0iMTE1IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjOGNmNWE4IiBvcGFjaXR5PSIwLjQ0Ii8+PHJlY3QgeD0iNTYiIHk9IjM4NCIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzhjZjVhOCIgb3BhY2l0eT0iMC4yOCIvPjxyZWN0IHg9IjI5OSIgeT0iMzUiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM4Y2Y1YTgiIG9wYWNpdHk9IjAuNDgiLz48cmVjdCB4PSIyMTYiIHk9IjM0NiIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzhjZjVhOCIgb3BhY2l0eT0iMC4yMyIvPjxyZWN0IHg9IjE5NiIgeT0iMjcxIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjOGNmNWE4IiBvcGFjaXR5PSIwLjE3Ii8+PHJlY3QgeD0iMTc5IiB5PSIxNTMiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM4Y2Y1YTgiIG9wYWNpdHk9IjAuMiIvPjxyZWN0IHg9IjEwMSIgeT0iMTgzIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjOGNmNWE4IiBvcGFjaXR5PSIwLjIzIi8+PHJlY3QgeD0iMjgiIHk9IjM3NyIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzhjZjVhOCIgb3BhY2l0eT0iMC40MSIvPjxyZWN0IHg9IjI2MiIgeT0iMjM5IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjOGNmNWE4IiBvcGFjaXR5PSIwLjI4Ii8+PHJlY3QgeD0iMjkiIHk9IjYwIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjOGNmNWE4IiBvcGFjaXR5PSIwLjQiLz48cmVjdCB4PSIyNjEiIHk9IjI5IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjOGNmNWE4IiBvcGFjaXR5PSIwLjE5Ii8+PHJlY3QgeD0iMTc2IiB5PSIyMDMiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM4Y2Y1YTgiIG9wYWNpdHk9IjAuNDIiLz48cmVjdCB4PSIzNyIgeT0iOCIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzhjZjVhOCIgb3BhY2l0eT0iMC40Ii8+PHJlY3QgeD0iMTcwIiB5PSIyMjciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM4Y2Y1YTgiIG9wYWNpdHk9IjAuMyIvPjxyZWN0IHg9IjExNSIgeT0iNzAiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM4Y2Y1YTgiIG9wYWNpdHk9IjAuMzgiLz48cmVjdCB4PSIxOTgiIHk9IjMxNyIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzhjZjVhOCIgb3BhY2l0eT0iMC4yMSIvPjxyZWN0IHg9IjI0NSIgeT0iMTgiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM4Y2Y1YTgiIG9wYWNpdHk9IjAuNDQiLz48L3N2Zz4="),
+        url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MDAiIGhlaWdodD0iNjAwIj48cmVjdCB4PSI1MzIiIHk9IjgyIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjI0Ii8+PHJlY3QgeD0iNDI4IiB5PSIzMjgiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMjIiLz48cmVjdCB4PSIyNjMiIHk9IjIwMSIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4yNyIvPjxyZWN0IHg9IjU2NyIgeT0iNjkiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMjkiLz48cmVjdCB4PSI3OCIgeT0iMzk0IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjIiLz48cmVjdCB4PSIxNiIgeT0iMjAxIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjIxIi8+PHJlY3QgeD0iNTA2IiB5PSIzNiIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4xMiIvPjxyZWN0IHg9IjQ4OSIgeT0iNTMyIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjE0Ii8+PHJlY3QgeD0iMzU5IiB5PSIzNTciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMjIiLz48cmVjdCB4PSI1MiIgeT0iNTE5IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjI5Ii8+PHJlY3QgeD0iMTQyIiB5PSIyNzciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMjMiLz48cmVjdCB4PSIzMiIgeT0iMjU0IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjE5Ii8+PHJlY3QgeD0iNTMwIiB5PSIxMzEiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMyIvPjxyZWN0IHg9IjYwIiB5PSIzNzUiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMjUiLz48cmVjdCB4PSI3NSIgeT0iMTIyIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjEyIi8+PHJlY3QgeD0iNTA0IiB5PSIzNzUiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMjIiLz48cmVjdCB4PSIxNTQiIHk9IjQ1MiIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4xOCIvPjxyZWN0IHg9IjE0NiIgeT0iNTE3IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjE1Ii8+PHJlY3QgeD0iMjc2IiB5PSIyMjAiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMTYiLz48cmVjdCB4PSI1MzciIHk9IjU1NiIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4xNiIvPjxyZWN0IHg9IjU1NCIgeT0iNTYxIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjE2Ii8+PHJlY3QgeD0iNDIzIiB5PSI1MzciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMjIiLz48cmVjdCB4PSIzMjkiIHk9IjE2NiIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4xMiIvPjxyZWN0IHg9IjE2OSIgeT0iMzg2IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjE5Ii8+PHJlY3QgeD0iNTA4IiB5PSIxIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjI5Ii8+PHJlY3QgeD0iMTE5IiB5PSIxMDMiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMiIvPjxyZWN0IHg9IjQ0NyIgeT0iMjM3IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjExIi8+PHJlY3QgeD0iOCIgeT0iMTUwIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjMiLz48cmVjdCB4PSIyODgiIHk9IjM4NyIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4yNCIvPjxyZWN0IHg9IjE4MyIgeT0iMzcyIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjIzIi8+PHJlY3QgeD0iMjAwIiB5PSIyMDciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMjYiLz48cmVjdCB4PSI4OCIgeT0iMzIzIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjI2Ii8+PHJlY3QgeD0iNTcyIiB5PSIzMzYiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMjEiLz48cmVjdCB4PSIxMjkiIHk9IjE1OCIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4yNyIvPjxyZWN0IHg9IjUxNCIgeT0iNDUyIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjE1Ii8+PHJlY3QgeD0iOTMiIHk9IjM2MSIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4yNCIvPjxyZWN0IHg9IjEzMCIgeT0iNTI1IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjI2Ii8+PHJlY3QgeD0iNDg3IiB5PSIzODIiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMTkiLz48cmVjdCB4PSIxODYiIHk9Ijg3IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjExIi8+PHJlY3QgeD0iNDM4IiB5PSI2MCIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4xIi8+PHJlY3QgeD0iNDE4IiB5PSI5OSIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4yOSIvPjxyZWN0IHg9IjQ0MSIgeT0iNzEiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMTMiLz48cmVjdCB4PSIyNzQiIHk9IjQxMiIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4xNyIvPjxyZWN0IHg9IjI2NiIgeT0iNDMwIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjE4Ii8+PHJlY3QgeD0iNzciIHk9IjMyNSIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4yMiIvPjxyZWN0IHg9IjQ2NSIgeT0iNTc1IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjIzIi8+PHJlY3QgeD0iMzYyIiB5PSIyOTgiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMTkiLz48cmVjdCB4PSIxNjQiIHk9IjUzNiIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4yMyIvPjxyZWN0IHg9IjE5OSIgeT0iMzM1IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjE0Ii8+PHJlY3QgeD0iMjk1IiB5PSI0NSIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4yOSIvPjxyZWN0IHg9IjI2OSIgeT0iMzI4IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjIiLz48cmVjdCB4PSIyMjkiIHk9IjE5OSIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4wOSIvPjxyZWN0IHg9IjQwOSIgeT0iMjY2IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjI3Ii8+PHJlY3QgeD0iMzUyIiB5PSI1OTkiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMjciLz48cmVjdCB4PSIyNTQiIHk9IjU4MiIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4yOCIvPjxyZWN0IHg9IjQzOSIgeT0iMTY2IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjEyIi8+PHJlY3QgeD0iMSIgeT0iNTA5IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjExIi8+PHJlY3QgeD0iNDU0IiB5PSI2IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjI0Ii8+PHJlY3QgeD0iNTU0IiB5PSIxOTciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMTgiLz48cmVjdCB4PSIxMTEiIHk9IjU1OCIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4wOSIvPjxyZWN0IHg9IjU1NiIgeT0iNDUiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMjYiLz48cmVjdCB4PSI0NzciIHk9IjI5MSIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4xNyIvPjxyZWN0IHg9IjI5NCIgeT0iNTUxIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjE0Ii8+PHJlY3QgeD0iMTI1IiB5PSI4MyIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4xNiIvPjxyZWN0IHg9IjUzNyIgeT0iNTE3IiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjIxIi8+PHJlY3QgeD0iNTUxIiB5PSI0MTEiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMSIvPjxyZWN0IHg9IjIxNiIgeT0iNTAwIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjNTk5OTZkIiBvcGFjaXR5PSIwLjIiLz48cmVjdCB4PSI0NTAiIHk9IjU4NyIgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iIzU5OTk2ZCIgb3BhY2l0eT0iMC4yNCIvPjxyZWN0IHg9IjE3OCIgeT0iNjciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMSIvPjxyZWN0IHg9IjU1NyIgeT0iNjkiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiM1OTk5NmQiIG9wYWNpdHk9IjAuMjciLz48L3N2Zz4=");
+    background-size: 200px 200px, 300px 300px, 400px 400px, 600px 600px;
+    background-position: 0 0, 0 0, 0 0, 0 0;
+    animation: retro-starfield 60s linear infinite;
+    will-change: background-position;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}
+
+@keyframes retro-starfield {
+    100% {
+        /* 
+           common multiple layout: 
+           L1 (size 200): moves -2400px (12 cycles) 
+           L2 (size 300): moves -1200px (4 cycles)
+           L3 (size 400): moves -800px  (2 cycles)
+           L4 (size 600): moves -600px  (1 cycle)
+        */
+        background-position: -2400px 0, -1200px 0, -800px 0, -600px 0;
+    }
+}
+
+/* OPTIMIZATION: Disable expensive backdrop-filters over the animated starfield */
+:root[data-theme="retro-arcade"] header,
+:root[data-theme="retro-arcade"] .nav-burger-menu,
+:root[data-theme="retro-arcade"] .card,
+:root[data-theme="retro-arcade"] .custom-select-dropdown,
+:root[data-theme="retro-arcade"] .btn-secondary {
+    backdrop-filter: none !important;
+}
