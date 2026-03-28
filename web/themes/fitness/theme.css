@@ -1,0 +1,158 @@
+/* Fitness Theme - vdradmin-go */
+
+:root[data-theme="fitness"] {
+    --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+    /* Accent (orange) */
+    --primary-color: #f08a4b;
+    --primary-hover: #ff9c62;
+    --secondary-color: rgba(255, 255, 255, 0.10);
+    --success-color: #22c55e;
+    --danger-color: #ef4444;
+    --warning-color: #f59e0b;
+
+    /* Base */
+    --bg-color: #0b0c0f;
+    --bg-image:
+        radial-gradient(1100px 700px at 35% 30%, rgba(240, 138, 75, 0.12), rgba(11, 12, 15, 0) 60%),
+        radial-gradient(900px 700px at 70% 35%, rgba(255, 255, 255, 0.06), rgba(11, 12, 15, 0) 62%),
+        radial-gradient(900px 900px at 50% 95%, rgba(11, 12, 15, 0), rgba(0, 0, 0, 0.78) 70%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
+        url('/static/img/themes/fitness/noise.svg');
+
+    /* Surfaces (glossier glass) */
+    --surface-color: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.10) 0%,
+        rgba(255, 255, 255, 0.045) 55%,
+        rgba(255, 255, 255, 0.025) 100%
+    );
+    --surface-hover: rgba(255, 255, 255, 0.055);
+
+    --text-color: rgba(245, 245, 245, 0.92);
+    --text-muted: rgba(245, 245, 245, 0.56);
+    --border-color: rgba(255, 255, 255, 0.12);
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.52), 0 18px 52px rgba(0, 0, 0, 0.60);
+    --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.58), 0 34px 90px rgba(0, 0, 0, 0.76);
+
+    --nav-active-bg: linear-gradient(180deg, rgba(240, 138, 75, 0.16), rgba(240, 138, 75, 0.08));
+    --nav-active-border: rgba(240, 138, 75, 0.28);
+    --nav-active-shadow: 0 14px 34px rgba(240, 138, 75, 0.12);
+
+    --menu-scrim-color: rgba(0, 0, 0, 0.55);
+    /* Prevent overflow-induced scrollbars/layout shift when opening burger menu */
+    --menu-scrim-padding: 0px;
+
+    /* Bigger radii like the screenshot cards */
+    --radius: 1.25rem;
+    --spacing: 1rem;
+    color-scheme: dark;
+
+    /* Component-specific knobs used by base.css */
+    --panel-surface:
+        radial-gradient(140% 120% at 18% 10%, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 60%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.032));
+    --panel-border: rgba(255, 255, 255, 0.12);
+    --panel-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 1px 2px rgba(0, 0, 0, 0.58),
+        0 26px 84px rgba(0, 0, 0, 0.54);
+    --panel-shadow-lg:
+        inset 0 1px 0 rgba(255, 255, 255, 0.14),
+        0 2px 6px rgba(0, 0, 0, 0.62),
+        0 38px 130px rgba(0, 0, 0, 0.64);
+}
+
+/* Make header feel like a frosted dark bar */
+:root[data-theme="fitness"] header {
+    background: linear-gradient(180deg, rgba(12, 13, 16, 0.78), rgba(12, 13, 16, 0.58));
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Guard against any scrollbar-induced layout shift when the menu opens */
+:root[data-theme="fitness"] html {
+    /* Fallback for browsers that don't support scrollbar-gutter */
+    overflow-y: scroll;
+}
+
+:root[data-theme="fitness"] body {
+    overflow-x: hidden;
+    scrollbar-gutter: stable;
+}
+
+/* Avoid the burger button "jump" caused by base .btn hover/active transforms */
+:root[data-theme="fitness"] .nav-burger-button.btn:hover,
+:root[data-theme="fitness"] .nav-burger-button.btn:active {
+    transform: none;
+}
+
+/* Add a soft specular highlight overlay to panels/cards for extra gloss */
+:root[data-theme="fitness"] .card,
+:root[data-theme="fitness"] .epg-item,
+:root[data-theme="fitness"] .timer-item,
+:root[data-theme="fitness"] .recording-item {
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(12px);
+}
+
+:root[data-theme="fitness"] .card::before,
+:root[data-theme="fitness"] .epg-item::before,
+:root[data-theme="fitness"] .timer-item::before,
+:root[data-theme="fitness"] .recording-item::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(120% 80% at 25% 0%, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 60%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.00) 52%);
+    mix-blend-mode: screen;
+    opacity: 0.62;
+}
+
+/* Brand/title style closer to the screenshot (slightly wider tracking) */
+:root[data-theme="fitness"] .nav-brand h1 {
+    letter-spacing: 0.02em;
+}
+
+/* Burger menu: more opaque, less glassy */
+:root[data-theme="fitness"] .nav-burger-menu {
+    background-color: rgba(12, 13, 16, 0.94);
+    background-image: var(--surface-color);
+    border-color: rgba(255, 255, 255, 0.10);
+}
+
+/* Primary buttons as orange pills */
+:root[data-theme="fitness"] .btn-primary {
+    color: rgba(10, 10, 12, 0.92);
+    border-color: rgba(255, 255, 255, 0.16);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.55), 0 14px 34px rgba(240, 138, 75, 0.16);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.10) 55%),
+        var(--primary-color);
+}
+
+:root[data-theme="fitness"] .btn-primary:hover {
+    filter: brightness(1.03);
+}
+
+/* Softer secondary pills */
+:root[data-theme="fitness"] .btn-secondary {
+    border-color: rgba(255, 255, 255, 0.10);
+}
+
+/* Slightly glossier secondary buttons */
+:root[data-theme="fitness"] .btn-secondary {
+    background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.06)),
+        var(--surface-color);
+}
+
+/* Day pill (used in /channels and /playing headings) should read like an orange label */
+:root[data-theme="fitness"] .channels-day {
+    background-color: rgba(240, 138, 75, 0.92);
+    color: rgba(10, 10, 12, 0.92);
+}
