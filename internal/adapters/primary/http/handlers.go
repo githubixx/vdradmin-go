@@ -251,7 +251,9 @@ func (h *Handler) ServeTheme(w http.ResponseWriter, r *http.Request) {
 
 	// Set content type
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
-	w.Header().Set("Cache-Control", "public, max-age=3600")
+	// Theme CSS is small and may be edited while the server is running.
+	// Avoid long-lived client caching so changes show up on reload.
+	w.Header().Set("Cache-Control", "no-cache")
 
 	// Serve file
 	http.ServeFile(w, r, themeCSSPath)
@@ -3017,7 +3019,7 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 		dvbCards = h.cfg.VDR.DVBCards
 	}
 
-	collisionIDs, criticalIDs := timerOverlapStates(timers, dvbCards, collisionWindowFrom, collisionWindowTo, func(t domain.Timer) string {
+	collisionIDs, criticalIDs := timerOverlapStatesAt(timers, dvbCards, collisionWindowFrom, collisionWindowTo, localNow, func(t domain.Timer) string {
 		return transponderKeyForTimer(t, channels)
 	})
 	for i := range views {
@@ -3302,6 +3304,10 @@ type timerOccurrence struct {
 }
 
 func timerOverlapStates(timers []domain.Timer, dvbCards int, from, to time.Time, transponderKey func(domain.Timer) string) (collisionIDs, criticalIDs map[int]bool) {
+	return timerOverlapStatesAt(timers, dvbCards, from, to, time.Now(), transponderKey)
+}
+
+func timerOverlapStatesAt(timers []domain.Timer, dvbCards int, from, to, now time.Time, transponderKey func(domain.Timer) string) (collisionIDs, criticalIDs map[int]bool) {
 	if dvbCards < 1 {
 		dvbCards = 1
 	}
@@ -3310,7 +3316,7 @@ func timerOverlapStates(timers []domain.Timer, dvbCards int, from, to time.Time,
 
 	occs := make([]timerOccurrence, 0, len(timers))
 	for _, t := range timers {
-		if !t.Active {
+		if !t.Active && !timerIsCurrentlyRecording(t, now) {
 			continue
 		}
 		key := transponderKey(t)
@@ -3376,6 +3382,13 @@ func timerOverlapStates(timers []domain.Timer, dvbCards int, from, to time.Time,
 	}
 
 	return collisionIDs, criticalIDs
+}
+
+func timerIsCurrentlyRecording(t domain.Timer, now time.Time) bool {
+	if now.IsZero() || t.Start.IsZero() || t.Stop.IsZero() {
+		return false
+	}
+	return (t.Start.Before(now) || t.Start.Equal(now)) && t.Stop.After(now)
 }
 
 func timerOccurrences(t domain.Timer, from, to time.Time) []timerOccurrence {
