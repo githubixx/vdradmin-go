@@ -112,3 +112,50 @@
   outline: 2px solid rgba(242, 220, 138, 0.35);
   outline-offset: 1px;
 }
+
+/* Timer overlap states */
+:root[data-theme="solar-system-1"] .timer-item {
+  border-color: rgba(212, 175, 55, 0.26);
+  border-left-color: var(--success-color);
+}
+
+:root[data-theme="solar-system-1"] .timer-item.recording {
+  border-left-color: var(--primary-color);
+  background: linear-gradient(180deg, rgba(43, 34, 12, 0.94), rgba(20, 18, 8, 0.98));
+}
+
+:root[data-theme="solar-system-1"] .timer-item.collision {
+  border-color: rgba(245, 158, 11, 0.7);
+  border-left-color: var(--warning-color);
+  background: linear-gradient(180deg, rgba(88, 58, 16, 0.95), rgba(38, 24, 8, 0.98));
+}
+
+:root[data-theme="solar-system-1"] .timer-item.conflict {
+  border-color: rgba(239, 68, 68, 0.7);
+  border-left-color: var(--danger-color);
+  background: linear-gradient(180deg, rgba(88, 24, 28, 0.95), rgba(34, 10, 12, 0.98));
+}
+
+:root[data-theme="solar-system-1"] .timeline-track {
+  background: linear-gradient(180deg, rgba(14, 16, 28, 0.94), rgba(9, 11, 20, 0.98));
+  border-color: rgba(212, 175, 55, 0.35);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28), inset 0 0 0 1px rgba(255, 248, 225, 0.04);
+}
+
+:root[data-theme="solar-system-1"] .timeline-block.ok {
+  background: linear-gradient(180deg, rgba(183, 145, 52, 0.92), rgba(121, 88, 24, 0.96));
+  border-color: rgba(255, 233, 157, 0.82);
+  color: rgba(15, 11, 5, 0.96);
+}
+
+:root[data-theme="solar-system-1"] .timeline-block.collision {
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.92), rgba(146, 86, 12, 0.96));
+  border-color: rgba(255, 210, 124, 0.9);
+  color: rgba(28, 14, 2, 0.96);
+}
+
+:root[data-theme="solar-system-1"] .timeline-block.critical {
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.92), rgba(128, 30, 36, 0.96));
+  border-color: rgba(255, 178, 178, 0.84);
+  color: rgba(35, 8, 10, 0.96);
+}
