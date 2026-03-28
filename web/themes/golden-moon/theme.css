@@ -1,0 +1,212 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+
+/* Golden Moon Theme - vdradmin-go */
+
+:root[data-theme="golden-moon"] {
+    --font-sans: 'Lora', Georgia, 'Times New Roman', Times, serif;
+    --font-display: 'Cinzel', 'Trajan Pro', serif;
+
+    /* Gold palette matching the image */
+    --primary-color: #d4af37;
+    --primary-hover: #f1cd55;
+    --secondary-color: #1a2033;
+    --success-color: #2b7042;
+    --danger-color: #8b1c1c;
+    --warning-color: #cc9b22;
+
+    /* Base dark navy matching the moon aesthetic background */
+    --bg-color: #0b0e14;
+    --bg-image: url('/static/img/themes/golden-moon/bg.svg'),
+        radial-gradient(ellipse at top center, #192033 0%, #0b0e14 100%);
+
+    /* Translucent dark glass for panels */
+    --surface-color: rgba(15, 20, 30, 0.65);
+    --surface-hover: rgba(25, 33, 48, 0.45);
+
+    --text-color: #fdf6df;
+    --text-muted: #c4b58e;
+
+    --border-color: rgba(212, 175, 55, 0.3);
+
+    --shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.7);
+
+    --nav-active-bg: rgba(212, 175, 55, 0.15);
+    --nav-active-border: rgba(212, 175, 55, 0.5);
+    --nav-active-shadow: 0 0 15px rgba(212, 175, 55, 0.2);
+
+    --menu-scrim-color: rgba(0, 0, 0, 0.75);
+    --menu-scrim-padding: 0px; /* layout shift prevention */
+
+    --radius: 12px;
+    --spacing: 1rem;
+
+    color-scheme: dark;
+
+    /* Panel refinements */
+    --panel-border: rgba(212, 175, 55, 0.25);
+    --panel-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+/* Header slightly glassy, separated by fine gold line */
+:root[data-theme="golden-moon"] header {
+    background: linear-gradient(180deg, rgba(8, 11, 16, 0.9), rgba(11, 15, 22, 0.8));
+    border-bottom: 2px solid;
+    border-image: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.8), transparent) 1;
+    backdrop-filter: blur(10px);
+}
+
+/* Brand heading in beautiful gold */
+:root[data-theme="golden-moon"] .nav-brand h1 {
+    font-size: 1.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: linear-gradient(180deg, #fff1a0, #d4af37, #aa7c11);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 8px rgba(212, 175, 55, 0.3));
+}
+
+/* Smooth fonts */
+:root[data-theme="golden-moon"] body {
+    overflow-x: hidden;
+    scrollbar-gutter: stable;
+    /* Extra spacing for elegant feel */
+    line-height: 1.6;
+}
+
+/* Glass cards with elegant golden borders */
+/* Glass cards with elegant golden borders */
+:root[data-theme="golden-moon"] .card,
+:root[data-theme="golden-moon"] .epg-item,
+:root[data-theme="golden-moon"] .recording-item,
+:root[data-theme="golden-moon"] .nav-burger-menu {
+    border: 1px solid var(--panel-border);
+    backdrop-filter: blur(0px);
+    background: var(--surface-color);
+}
+
+:root[data-theme="golden-moon"] .timer-item {
+    border: 1px solid var(--panel-border);
+    border-left: 4px solid var(--success-color);
+    backdrop-filter: blur(0px);
+    background: var(--surface-color);
+}
+:root[data-theme="golden-moon"] .timer-item.recording {
+    border-left-color: var(--danger-color);
+    background-color: var(--danger-color);
+}
+:root[data-theme="golden-moon"] .timer-item.inactive {
+    border-left-color: var(--secondary-color);
+}
+:root[data-theme="golden-moon"] .timer-item.collision {
+    border-color: var(--warning-color);
+    border-left-color: var(--warning-color);
+}
+:root[data-theme="golden-moon"] .timer-item.conflict {
+    border-color: var(--danger-color);
+    border-left-color: var(--danger-color);
+}
+
+/* Burger menu specific fixes */
+:root[data-theme="golden-moon"] .nav-burger-menu {
+    background: rgba(8, 11, 16, 0.95);
+    border: 1px solid rgba(212, 175, 55, 0.4);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+}
+:root[data-theme="golden-moon"] .nav-burger-button.btn:hover,
+:root[data-theme="golden-moon"] .nav-burger-button.btn:active {
+    transform: none;
+}
+:root[data-theme="golden-moon"] .burger-icon::before,
+:root[data-theme="golden-moon"] .burger-icon::after {
+    background: #d4af37;
+}
+
+/* ========================================================
+   Beautiful Responsive CSS buttons
+   ======================================================== */
+
+:root[data-theme="golden-moon"] .btn {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-size: 100% 100%;
+    color: #fff;
+    font-family: var(--font-display);
+    font-weight: 600;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+    letter-spacing: 0.05em;
+    padding: 0.4rem 1.25rem;
+    transition: transform 0.2s, filter 0.2s;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    background-clip: padding-box, border-box;
+    background-origin: padding-box, border-box;
+    white-space: nowrap;
+    min-width: max-content;
+}
+
+:root[data-theme="golden-moon"] .btn:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.15);
+    box-shadow: 0 6px 14px rgba(0,0,0,0.5);
+}
+
+:root[data-theme="golden-moon"] .btn:active {
+    transform: translateY(1px);
+    filter: brightness(0.9);
+}
+
+/* Primary Button */
+:root[data-theme="golden-moon"] .btn-primary {
+    background-image: 
+        linear-gradient(180deg, #fff1a0 0%, #d4af37 20%, #aa7c11 50%, #d4af37 80%, #fff1a0 100%),
+        linear-gradient(180deg, #ffe28a, #ffe28a);
+    color: #1a1100;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+}
+
+/* Secondary Button (e.g. Scheduled/Disable) */
+:root[data-theme="golden-moon"] .btn-secondary,
+:root[data-theme="golden-moon"] .btn:not(.btn-primary):not(.btn-danger):not(.btn-success) {
+    background-image: 
+        linear-gradient(180deg, #1c2438, #0b0e14),
+        linear-gradient(90deg, #fff1a0, #aa7c11, #d4af37);
+    color: #fdf6df;
+}
+
+/* Danger Button (e.g. Delete) */
+:root[data-theme="golden-moon"] .btn-danger {
+    background-image: 
+        linear-gradient(180deg, #8b1c1c, #4a0f0f),
+        linear-gradient(90deg, #fff1a0, #aa7c11, #d4af37);
+    color: #ffcccc;
+}
+
+/* Success Button */
+:root[data-theme="golden-moon"] .btn-success {
+    background-image: 
+        linear-gradient(180deg, #144a24, #0a2e15),
+        linear-gradient(90deg, #fff1a0, #aa7c11, #d4af37);
+    color: #ccffcc;
+}
+
+:root[data-theme="golden-moon"] .btn-sm {
+    padding: 0.35rem 1rem !important;
+    font-size: 0.85rem;
+}
+
+:root[data-theme="golden-moon"] .nav-links a {
+    border-radius: 30px;
+}
+
+:root[data-theme="golden-moon"] .channels-day {
+    background-image: linear-gradient(180deg, #fff1a0 0%, #d4af37 20%, #aa7c11 50%, #d4af37 80%, #fff1a0 100%);
+    background-color: transparent;
+    color: #1a1100;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.4);
+    font-family: var(--font-display);
+    font-weight: 600;
+    border: none;
+    border-radius: 999px;
+}
