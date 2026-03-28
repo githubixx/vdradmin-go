@@ -7,7 +7,7 @@
     --font-display: 'Press Start 2P', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
     --font-sans: 'VT323', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
 
-    /* Neon palette (close to screenshot) */
+    /* Neon palette */
     --primary-color: #19ff6a;
     --primary-hover: #66ff99;
     --secondary-color: rgba(255, 255, 255, 0.08);
@@ -89,7 +89,6 @@
     font-size: calc(1rem + 1px);
 }
 
-/* Make cards/panels feel like arcade UI frames */
 /* Make cards/panels feel like arcade UI frames */
 :root[data-theme="retro-arcade"] .card,
 :root[data-theme="retro-arcade"] .epg-item,
