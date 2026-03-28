@@ -5,9 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VDRAdmin-go - EPG Search</title>
-    <link rel="stylesheet" href="/static/css/base.css?v=20260212-2">
-    {{if and .ThemeMode (ne .ThemeMode "system")}}<link rel="stylesheet" href="/themes/{{.ThemeMode}}/theme.css">{{end}}
-    <script src="/static/js/theme.js?v=20260212" defer></script>
+    <link rel="stylesheet" href="/static/css/base.css?v=20260212-AE">
+    {{if and .ThemeMode (ne .ThemeMode "system")}}<link rel="stylesheet" href="/themes/{{.ThemeMode}}/theme.css?v=20260212-AE">{{end}}
+    <script src="/static/js/theme.js?v=20260212-AE" defer></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
 <body>
@@ -31,16 +31,17 @@
         </div>
         {{end}}
 
-        <div class="toolbar" style="display: flex; justify-content: space-between; align-items: center;">
-            <h3>EPG Search</h3>
-            <div class="sort-options" style="justify-content: flex-end; width: 100%;">
-                {{if eq .Role "admin"}}
-                <a class="btn btn-primary" href="/epgsearch/new">New Search</a>
-                {{end}}
-            </div>
-        </div>
-
         <form method="post" action="/epgsearch/execute">
+            <div class="toolbar" style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem;">
+                <h3>EPG Search</h3>
+                <div class="sort-options" style="justify-content: flex-end; width: 100%; gap: 0.5rem; display: flex; flex-wrap: wrap;">
+                    {{if eq .Role "admin"}}
+                    <a class="btn btn-primary" href="/epgsearch/new">New Search</a>
+                    {{end}}
+                    <button type="submit" class="btn btn-primary">Execute</button>
+                </div>
+            </div>
+
             <div class="toolbar">
                 <table class="data-table">
                     <thead>

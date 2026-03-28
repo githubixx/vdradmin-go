@@ -578,7 +578,7 @@ details.nav-burger:not([open]) .nav-burger-menu {
 }
 
 .nav-channel-label {
-    font-size: 0.875rem;
+    font-size: 1rem;
     color: var(--text-muted);
 }
 
@@ -589,7 +589,7 @@ details.nav-burger:not([open]) .nav-burger-menu {
     padding: 0.5rem 2.25rem 0.5rem 0.75rem;
     border: 1px solid var(--border-color);
     border-radius: 999px;
-    font-size: 0.875rem;
+    font-size: 1rem;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.02)), var(--surface-color);
     color: var(--text-color);
     box-shadow: var(--shadow);
@@ -907,9 +907,24 @@ main {
 
     .watchtv-grid {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) 260px 300px;
-        gap: var(--spacing);
+        grid-template-columns: minmax(0, 1fr) 300px 300px;
         align-items: stretch;
+        gap: var(--spacing);
+    }
+
+    .watchtv-screen {
+        min-width: 0;
+    }
+
+    .watchtv-remote,
+    .watchtv-channels {
+        align-items: stretch;
+    }
+
+    .watchtv-screen,
+    .watchtv-remote,
+    .watchtv-channels {
+        box-sizing: border-box;
     }
 
     /* Keep screen/remote/channels same height on wide layouts */
@@ -929,11 +944,16 @@ main {
         .watchtv-grid {
             grid-template-columns: 1fr;
         }
+
+        .watchtv-screen,
+        .watchtv-remote,
+        .watchtv-channels {
+            min-width: 0;
+        }
     }
 
     .watchtv-screen-inner {
-        width: 960px;
-        max-width: 100%;
+        width: 100%;
         margin: 0 auto;
         padding: calc(var(--spacing) * 0.75);
         border-radius: var(--radius);
@@ -1001,7 +1021,7 @@ main {
 
     .watchtv-now {
         width: 100%;
-        margin-top: var(--spacing);
+        margin-top: calc(var(--spacing) * 1.35);
     }
 
     .watchtv-now-description {
@@ -1048,12 +1068,18 @@ main {
     .remote-panel {
         display: flex;
         flex-direction: column;
+        width: 100%;
+        box-sizing: border-box;
+        padding: calc(var(--spacing) * 1.25) calc(var(--spacing) * 1.45) calc(var(--spacing) * 1.6);
     }
 
     .remote-row {
         display: flex;
         gap: 0.5rem;
         margin-bottom: 0.5rem;
+        width: calc(100% - 2.6rem);
+        margin-left: auto;
+        margin-right: auto;
     }
 
     .remote-row-right {
@@ -1063,7 +1089,10 @@ main {
     .remote-grid {
         display: grid;
         gap: 0.45rem;
-        margin-bottom: 0.6rem;
+        margin-bottom: 0.65rem;
+        width: calc(100% - 2.6rem);
+        margin-left: auto;
+        margin-right: auto;
     }
 
     .remote-grid-nums {
@@ -1088,7 +1117,7 @@ main {
 
     .remote-grid-volume {
         grid-template-columns: repeat(3, 1fr);
-        margin-bottom: 0;
+        margin-bottom: 1rem;
     }
 
     .remote-btn {
@@ -1185,6 +1214,43 @@ main {
     line-clamp: unset;
     -webkit-line-clamp: unset;
     overflow: visible;
+}
+
+.event-popup .epg-item {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "time actions"
+        "content content";
+    align-items: start;
+}
+
+.event-popup .epg-time {
+    grid-area: time;
+    padding-top: 0;
+}
+
+.event-popup .epg-content {
+    grid-area: content;
+    min-width: 0;
+}
+
+.event-popup .epg-header {
+    display: block;
+}
+
+.event-popup .epg-header h3,
+.event-popup .epg-header h4 {
+    overflow-wrap: anywhere;
+}
+
+.event-popup .epg-channel {
+    display: block;
+    margin-top: 0.35rem;
+}
+
+.event-popup .epg-actions {
+    grid-area: actions;
+    justify-content: flex-end;
 }
 
 .epg-actions {
@@ -2180,4 +2246,159 @@ footer a:hover {
             0 0 24px rgba(var(--primary-rgb), 0.4),
             inset 0 0 12px rgba(var(--primary-rgb), 0.3);
     }
+}
+/* Custom Select Implementation */
+.custom-select-container {
+    position: relative;
+    display: inline-block;
+    min-width: max-content;
+}
+
+.custom-select-trigger {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* Match general nav form select rules */
+.nav-channel-form .custom-select-trigger {
+    appearance: none;
+    -webkit-appearance: none;
+    padding: 0.5rem 2.25rem 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    font-size: 1rem;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.02)), var(--surface-color);
+    color: var(--text-color);
+    box-shadow: var(--shadow);
+    min-width: 140px;
+}
+
+.nav-channel-form .custom-select-trigger:hover, 
+.nav-channel-form .custom-select-trigger.open {
+    border-color: var(--nav-active-border);
+}
+
+.custom-select-trigger::after {
+    content: '▾';
+    position: absolute;
+    right: 0.85rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.custom-select-dropdown {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    right: 0;
+    min-width: 100%;
+    z-index: 9999;
+    margin: 0;
+    padding: 0.25rem 0;
+    list-style: none;
+    background: var(--surface-color, var(--bg-color));
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    max-height: 50vh;
+    overflow-y: auto;
+    backdrop-filter: blur(15px);
+    display: none;
+}
+
+.custom-select-dropdown.open {
+    display: block;
+    animation: fadeIn 0.1s ease-out;
+}
+
+.custom-select-option {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background 0.15s;
+    color: var(--text-color);
+}
+
+.custom-select-option:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.custom-select-option.selected {
+    background: var(--primary-color);
+    color: #fff; /* adjust for better contrast if needed */
+}
+
+/* Base override for default ::after to avoid double arrows */
+.nav-select::after {
+    display: none;
+}
+
+
+/* Generic fallback for custom select when not in nav */
+form:not(.nav-channel-form) .custom-select-trigger {
+    width: 100%;
+    padding: 0.5rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: 1rem;
+    background: var(--surface-color);
+    color: var(--text-color);
+}
+.config-grid .custom-select-trigger {
+    width: 100%;
+    padding: 0.5rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: 1rem;
+    background: var(--surface-color);
+    color: var(--text-color);
+}
+.sort-options .custom-select-trigger {
+    padding: 0.5rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: 1rem;
+    background: var(--surface-color);
+    color: var(--text-color);
+    min-width: 150px;
+}
+.custom-select-trigger {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.custom-select-option {
+    white-space: nowrap;
+}
+/* Make container a grid stack to use phantom sizing */
+.custom-select-container {
+    position: relative;
+    display: inline-grid;
+    grid-template-areas: "select";
+    align-items: center;
+    vertical-align: middle;
+}
+.custom-select-trigger, .custom-select-phantom {
+    grid-area: select;
+}
+.custom-select-phantom {
+    visibility: hidden;
+    pointer-events: none;
+    white-space: nowrap;
+    overflow: hidden;
+    /* padding, border and font-size need to match trigger constraints for perfect sizing */
+    padding: 0.5rem 2.25rem 0.5rem 0.75rem; 
+    border: 1px solid transparent; /* or 2px, depending on general form overrrides */
+}
+/* Ensure options inside dropdown list avoid wrapping if desired */
+.custom-select-option {
+    white-space: nowrap;
+}
+.custom-select-trigger {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }

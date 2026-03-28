@@ -5,9 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VDRAdmin-go - What’s on now</title>
-    <link rel="stylesheet" href="/static/css/base.css?v=20260212-2">
-    {{if and .ThemeMode (ne .ThemeMode "system")}}<link rel="stylesheet" href="/themes/{{.ThemeMode}}/theme.css">{{end}}
-    <script src="/static/js/theme.js?v=20260212" defer></script>
+    <link rel="stylesheet" href="/static/css/base.css?v=20260212-AE">
+    {{if and .ThemeMode (ne .ThemeMode "system")}}<link rel="stylesheet" href="/themes/{{.ThemeMode}}/theme.css?v=20260212-AE">{{end}}
+    <script src="/static/js/theme.js?v=20260212-AE" defer></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
 <body class="page-now">
@@ -64,11 +64,11 @@
                     <p class="epg-subtitle">{{.Subtitle}}</p>
                     {{end}}
                 </div>
+                {{if gt .EventID 0}}
                 <div class="epg-actions">
-                    {{if gt .EventID 0}}
                     <a class="btn btn-sm btn-secondary" href="/event?channel={{.ChannelID}}&id={{.EventID}}" onclick="window.open(this.href,'vdradmin_moreinfo','width=560,height=420,scrollbars=yes,resizable=yes'); return false;">Information</a>
-                    {{end}}
                 </div>
+                {{end}}
             </div>
             {{else}}
             <p class="empty-state">No EPG data available</p>
