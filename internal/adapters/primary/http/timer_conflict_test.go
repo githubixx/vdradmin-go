@@ -87,3 +87,40 @@ func TestTimerOverlapStates_TwoCards_TwoTransponders_IsYellowNotRed(t *testing.T
 		t.Fatalf("expected both timers collision (yellow) with overlap, got %v", collision)
 	}
 }
+
+func TestTimerOverlapStates_CurrentlyRecordingInactiveTimer_IsStillMarkedOverlap(t *testing.T) {
+	day := time.Date(2026, 3, 25, 0, 0, 0, 0, time.Local)
+	from := day
+	to := day.Add(8 * 24 * time.Hour)
+	now := day.Add(23*time.Hour + 30*time.Minute)
+
+	// Inactive one-time timer that is currently still recording across midnight.
+	recording := domain.Timer{
+		ID:        47,
+		Active:    false,
+		ChannelID: "S19.2E-1-100-10",
+		Start:     day.Add(22*time.Hour + 27*time.Minute),
+		Stop:      day.Add(24*time.Hour + 5*time.Minute),
+	}
+
+	// Midnight recurring timer that overlaps the recording by 5 minutes.
+	weekly := domain.Timer{
+		ID:           1,
+		Active:       true,
+		ChannelID:    "S19.2E-1-200-20",
+		DaySpec:      "---TF--",
+		StartMinutes: 0,
+		StopMinutes:  60,
+	}
+
+	collision, critical := timerOverlapStatesAt([]domain.Timer{recording, weekly}, 2, from, to, now, func(t domain.Timer) string {
+		return transponderKeyFromChannelID(t.ChannelID)
+	})
+
+	if critical[47] || critical[1] {
+		t.Fatalf("expected no critical timers with 2 cards, got %v", critical)
+	}
+	if !collision[47] || !collision[1] {
+		t.Fatalf("expected inactive recording timer and midnight recurring timer to both be collision, got %v", collision)
+	}
+}

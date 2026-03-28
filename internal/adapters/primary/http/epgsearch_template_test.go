@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/githubixx/vdradmin-go/internal/infrastructure/config"
@@ -108,6 +109,45 @@ func TestTemplate_EPGSearchEdit_ShowsRunButtonOnEdit(t *testing.T) {
 	html := buf.String()
 	mustContain(t, html, "action=\"/epgsearch/edit\"")
 	mustContain(t, html, "<button type=\"submit\" name=\"action\" value=\"run\" class=\"btn btn-secondary\">Run</button>")
+}
+
+func TestTemplate_EPGSearchIndex_ShowsExecuteButtonTopAndBottom(t *testing.T) {
+	tmpl := template.Must(template.ParseFiles(
+		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
+		filepath.Join(repoRoot(t), "web", "templates", "epgsearch.html"),
+	))
+
+	data := map[string]any{
+		"User":         "admin",
+		"Role":         "admin",
+		"Year":         2026,
+		"Path":         "/epgsearch",
+		"ThemeDefault": "light",
+		"ThemeMode":    "light",
+		"Searches":     []any{},
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "epgsearch.html", data); err != nil {
+		t.Fatalf("execute template: %v", err)
+	}
+
+	html := buf.String()
+	mustContain(t, html, "<a class=\"btn btn-primary\" href=\"/epgsearch/new\">New Search</a>")
+	if strings.Count(html, ">Execute</button>") != 2 {
+		t.Fatalf("expected Execute button to appear twice, got %d", strings.Count(html, ">Execute</button>"))
+	}
+	newIdx := strings.Index(html, ">New Search</a>")
+	firstExecuteIdx := strings.Index(html, ">Execute</button>")
+	if newIdx == -1 || firstExecuteIdx == -1 {
+		t.Fatalf("expected New Search and top Execute controls to be present")
+	}
+	if !(newIdx < firstExecuteIdx) {
+		t.Fatalf("expected top Execute button to appear to the right of New Search in markup order")
+	}
+	if strings.LastIndex(html, ">Execute</button>") == firstExecuteIdx {
+		t.Fatalf("expected a second Execute button at the bottom of the page")
+	}
 }
 
 func repoRoot(t *testing.T) string {
