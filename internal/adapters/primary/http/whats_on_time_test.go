@@ -101,3 +101,55 @@ func TestWhatsOnNow_InvalidTimeShowsErrorAndFallsBack(t *testing.T) {
 		t.Fatalf("expected invalid time error")
 	}
 }
+
+func TestWhatsOnNow_RendersInformationLinkWhenEventIDPresent(t *testing.T) {
+	loc := time.Local
+	now := time.Now().In(loc)
+	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+
+	ch := domain.Channel{ID: "C-1-2-3", Number: 1, Name: "3sat HD"}
+	m := ports.NewMockVDRClient().WithChannels([]domain.Channel{ch})
+	m.WithEPGEvents([]domain.EPGEvent{{
+		EventID:       1234,
+		ChannelID:     ch.ID,
+		ChannelNumber: ch.Number,
+		ChannelName:   ch.Name,
+		Title:         "Show A",
+		Start:         day.Add(18 * time.Hour),
+		Stop:          day.Add(19 * time.Hour),
+	}})
+
+	epgService := services.NewEPGService(m, 0)
+
+	parsed := template.Must(template.ParseFiles(
+		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
+		filepath.Join(repoRoot(t), "web", "templates", "index.html"),
+	))
+
+	h := NewHandler(
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		parsed,
+		epgService,
+		nil,
+		nil,
+		nil,
+	)
+	h.SetUIThemeDefault("light")
+	h.SetTemplates(map[string]*template.Template{"index.html": parsed})
+
+	req := httptest.NewRequest(http.MethodGet, "/now?h=18&at=18:30", nil)
+	rw := httptest.NewRecorder()
+	h.WhatsOnNow(rw, req)
+
+	if rw.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rw.Code)
+	}
+
+	body := rw.Body.String()
+	if !strings.Contains(body, "Information") {
+		t.Fatalf("expected Information link to be rendered")
+	}
+	if !strings.Contains(body, "/event?channel=C-1-2-3&id=1234") {
+		t.Fatalf("expected event link href to be rendered")
+	}
+}

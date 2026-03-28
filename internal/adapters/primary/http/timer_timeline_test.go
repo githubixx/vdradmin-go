@@ -304,6 +304,63 @@ func TestTimerList_DoesNotIncludeMidnightEndDay(t *testing.T) {
 	}
 }
 
+func TestTimerList_CurrentlyRecordingTimer_ShowsRecordingStatusInsteadOfToggle(t *testing.T) {
+	loc := time.Local
+	day := time.Date(2026, 3, 25, 0, 0, 0, 0, loc)
+	fixedNow := day.Add(23 * time.Hour)
+
+	ch := domain.Channel{ID: "S19.2E-1-100-10", Number: 1, Name: "3sat HD"}
+	recording := domain.Timer{ID: 47, Active: false, ChannelID: ch.ID, Title: "Flammenmaedchen", Start: day.Add(22*time.Hour + 27*time.Minute), Stop: day.Add(24*time.Hour + 5*time.Minute)}
+
+	mock := &timersTimelineVDRMock{
+		channels: []domain.Channel{ch},
+		timers:   []domain.Timer{recording},
+	}
+
+	epqService := services.NewEPGService(mock, 0)
+	timerService := services.NewTimerService(mock)
+
+	parsed := template.Must(template.ParseFiles(
+		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
+		filepath.Join(repoRoot(t), "web", "templates", "timers.html"),
+	))
+
+	h := NewHandler(
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		parsed,
+		epqService,
+		timerService,
+		nil,
+		nil,
+	)
+	h.nowFunc = func() time.Time { return fixedNow }
+	h.SetUIThemeDefault("light")
+	h.SetTemplates(map[string]*template.Template{"timers.html": parsed})
+	h.SetConfig(&config.Config{VDR: config.VDRConfig{DVBCards: 2}}, "")
+
+	req := httptest.NewRequest(http.MethodGet, "/timers?day="+day.Format("2006-01-02"), nil)
+	ctx := context.WithValue(req.Context(), "user", "admin")
+	ctx = context.WithValue(ctx, "role", "admin")
+	req = req.WithContext(ctx)
+
+	rw := httptest.NewRecorder()
+	h.TimerList(rw, req)
+	if rw.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rw.Code)
+	}
+
+	body := rw.Body.String()
+	if !strings.Contains(body, "disabled>Recording</button>") {
+		t.Fatalf("expected currently recording timer to render disabled Recording status, body=%s", body)
+	}
+	if strings.Contains(body, "/timers/toggle?id=47") {
+		t.Fatalf("did not expect toggle action for currently recording timer")
+	}
+	if !strings.Contains(body, "hx-delete=\"/timers?id=47\"") {
+		t.Fatalf("expected Delete action to remain available for currently recording timer")
+	}
+}
+
 func TestTimerList_RecurringTimerDaysCappedToNextWeek_OneTimeBeyondWeekStillIncluded(t *testing.T) {
 	loc := time.Local
 	now := time.Now().In(loc)
