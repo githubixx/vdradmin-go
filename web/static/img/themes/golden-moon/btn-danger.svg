@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="red-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#8b1c1c" />
+      <stop offset="100%" stop-color="#4a0f0f" />
+    </linearGradient>
+    <linearGradient id="rim-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff1a0" />
+      <stop offset="50%" stop-color="#aa7c11" />
+      <stop offset="100%" stop-color="#d4af37" />
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="196" height="56" rx="28" fill="url(#red-grad)" />
+  <rect x="2" y="2" width="196" height="56" rx="28" fill="none" stroke="url(#rim-grad)" stroke-width="3" />
+</svg>
