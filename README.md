@@ -276,8 +276,10 @@ vdradmin-go includes a modular theme system for easy customization:
 - **System** (default): Automatically follows OS/browser dark/light mode preference
 - **Light**: Always use light theme
 - **Dark**: Always use dark theme
-- **Spaceship (orange)**: Futuristic spaceship HUD interface with glowing orange accents and angular design
-- **Spaceship variants**: `spaceship-cyan-(light|dark)`, `spaceship-grey-(light|dark)`, `spaceship-blue-(light|dark)`, `spaceship-green-(light|dark)`, `spaceship-yellow-(light|dark)`, `spaceship-red-(light|dark)`, `spaceship-purple-(light|dark)`, `spaceship-magenta-(light|dark)`, `spaceship-mono-(light|dark)`
+- **Curated bundled themes**: `cartoon-1`, `fitness`, `glas-1`, `gold-1`, `golden-moon`, `lighting-1`, `luxury-1`, `mantle-1`, `metal-1`, `retro-arcade`, `solar-system-1`, `space-night-1`, `spaceship-2`
+- **Spaceship variants**: `spaceship-blue-(dark|light)`, `spaceship-cyan-(dark|light)`, `spaceship-green-(dark|light)`, `spaceship-grey-(dark|light)`, `spaceship-magenta-(dark|light)`, `spaceship-mono-(dark|light)`, `spaceship-orange-(dark|light)`, `spaceship-purple-(dark|light)`, `spaceship-red-(dark|light)`, `spaceship-yellow-(dark|light)`
+
+Themes are discovered from subdirectories under `web/themes/` that contain a `theme.yaml` file. The Configurations page shows `System (auto)` plus all discovered themes, using the display name from `theme.yaml` when available.
 
 ### Custom themes
 
@@ -294,7 +296,9 @@ nano web/themes/mytheme/theme.css
 nano web/themes/mytheme/theme.yaml
 ```
 
-Custom themes appear automatically in **Configurations** → **Theme** dropdown after restart.
+Custom themes are discovered automatically at startup and appear in **Configurations** → **Theme** after restart.
+If you only edit an existing theme's `theme.css`, a browser reload is usually enough because theme CSS is served with `Cache-Control: no-cache`.
+If you add a new theme directory, rename a theme, or change `theme.yaml`, restart vdradmin-go so the available theme list is rebuilt.
 
 For complete documentation on creating custom themes, including:
 
