@@ -198,6 +198,7 @@
 }
 
 :root[data-theme="mantle-1"] .toolbar,
+:root[data-theme="mantle-1"] .config-panel,
 :root[data-theme="mantle-1"] .recordings-search-box,
 :root[data-theme="mantle-1"] .card,
 :root[data-theme="mantle-1"] .epg-item,
@@ -269,6 +270,7 @@
 }
 
 :root[data-theme="mantle-1"] .card,
+:root[data-theme="mantle-1"] .config-panel,
 :root[data-theme="mantle-1"] .toolbar,
 :root[data-theme="mantle-1"] .recordings-search-box,
 :root[data-theme="mantle-1"] .epg-item,
@@ -297,8 +299,11 @@
     overflow: hidden;
 }
 
+:root[data-theme="mantle-1"] .toolbar {
+    overflow: visible;
+}
+
 :root[data-theme="mantle-1"] .card::before,
-:root[data-theme="mantle-1"] .toolbar::before,
 :root[data-theme="mantle-1"] .recordings-search-box::before,
 :root[data-theme="mantle-1"] .epg-item::before,
 :root[data-theme="mantle-1"] .timer-item::before,
@@ -318,6 +323,7 @@
 :root[data-theme="mantle-1"] main h1,
 :root[data-theme="mantle-1"] main h2,
 :root[data-theme="mantle-1"] .card h3,
+:root[data-theme="mantle-1"] .config-panel h3,
 :root[data-theme="mantle-1"] .epg-header h3,
 :root[data-theme="mantle-1"] .epg-header h4,
 :root[data-theme="mantle-1"] .timer-info h3,
@@ -333,7 +339,8 @@
 :root[data-theme="mantle-1"] .epg-header h4,
 :root[data-theme="mantle-1"] .timer-info h3,
 :root[data-theme="mantle-1"] .recording-info h3,
-:root[data-theme="mantle-1"] .card h3 {
+:root[data-theme="mantle-1"] .card h3,
+:root[data-theme="mantle-1"] .config-panel h3 {
     font-size: 1.45rem;
 }
 
