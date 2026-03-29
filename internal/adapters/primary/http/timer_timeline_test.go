@@ -62,6 +62,10 @@ func (m *timersTimelineVDRMock) SetCurrentChannel(ctx context.Context, channelID
 }
 func (m *timersTimelineVDRMock) SendKey(ctx context.Context, key string) error { return nil }
 
+func addCalendarDays(t time.Time, days int) time.Time {
+	return t.AddDate(0, 0, days)
+}
+
 func TestTimerList_RendersTimeline(t *testing.T) {
 	loc := time.Local
 	now := time.Now().In(loc)
@@ -134,8 +138,8 @@ func TestTimerList_TimelineDaysOnlyContainTimerDays_AndDoNotShiftWithSelection(t
 	loc := time.Local
 	now := time.Now().In(loc)
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
-	day1 := todayStart.Add(24 * time.Hour)
-	day2 := todayStart.Add(12 * 24 * time.Hour)
+	day1 := addCalendarDays(todayStart, 1)
+	day2 := addCalendarDays(todayStart, 12)
 
 	ch1 := domain.Channel{ID: "S19.2E-1-100-10", Number: 1, Name: "SWR BW HD"}
 	ch2 := domain.Channel{ID: "S19.2E-1-200-20", Number: 2, Name: "ZDF HD"}
@@ -202,7 +206,7 @@ func TestTimerList_TimelineDaysOnlyContainTimerDays_AndDoNotShiftWithSelection(t
 func TestTimerList_SnapsSelectedDayToNearestAvailableTimerDay(t *testing.T) {
 	loc := time.Local
 	now := time.Now().In(loc)
-	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).Add(2 * 24 * time.Hour)
+	day := addCalendarDays(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc), 2)
 
 	ch := domain.Channel{ID: "S19.2E-1-100-10", Number: 1, Name: "SWR BW HD"}
 	t1 := domain.Timer{ID: 1, Active: true, ChannelID: ch.ID, Title: "Show A", Start: day.Add(1 * time.Hour), Stop: day.Add(2 * time.Hour)}
@@ -368,20 +372,20 @@ func TestTimerList_RecurringTimerDaysCappedToNextWeek_OneTimeBeyondWeekStillIncl
 
 	// Compute a Monday that will definitely be beyond the next-week horizon.
 	daysUntilMon := (int(time.Monday) - int(todayStart.Weekday()) + 7) % 7
-	firstMon := todayStart.Add(time.Duration(daysUntilMon) * 24 * time.Hour)
-	thirdMon := firstMon.Add(14 * 24 * time.Hour)
+	firstMon := addCalendarDays(todayStart, daysUntilMon)
+	thirdMon := addCalendarDays(firstMon, 14)
 
 	// Ensure farDay doesn't collide with the "third Monday" date.
-	farDay := todayStart.Add(14 * 24 * time.Hour)
+	farDay := addCalendarDays(todayStart, 14)
 	if farDay.Equal(thirdMon) {
-		farDay = farDay.Add(24 * time.Hour)
+		farDay = addCalendarDays(farDay, 1)
 	}
 
 	beyondWeekRecurringDay := thirdMon
 	if beyondWeekRecurringDay.Equal(farDay) {
-		beyondWeekRecurringDay = firstMon.Add(21 * 24 * time.Hour)
+		beyondWeekRecurringDay = addCalendarDays(firstMon, 21)
 		if beyondWeekRecurringDay.Equal(farDay) {
-			beyondWeekRecurringDay = firstMon.Add(28 * 24 * time.Hour)
+			beyondWeekRecurringDay = addCalendarDays(firstMon, 28)
 		}
 	}
 
@@ -453,11 +457,11 @@ func TestTimerList_RecurringThuFriMidnight_ShowsBothUpcomingOccurrencesInList(t 
 	// Find the next Thursday and Friday (including today if it matches).
 	daysUntilThu := (int(time.Thursday) - int(realTodayStart.Weekday()) + 7) % 7
 	daysUntilFri := (int(time.Friday) - int(realTodayStart.Weekday()) + 7) % 7
-	thu := realTodayStart.Add(time.Duration(daysUntilThu) * 24 * time.Hour)
-	fri := realTodayStart.Add(time.Duration(daysUntilFri) * 24 * time.Hour)
+	thu := addCalendarDays(realTodayStart, daysUntilThu)
+	fri := addCalendarDays(realTodayStart, daysUntilFri)
 	// Ensure Friday is after Thursday in the normal Thu/Fri pair.
 	if !fri.After(thu) {
-		fri = fri.Add(7 * 24 * time.Hour)
+		fri = addCalendarDays(fri, 7)
 	}
 
 	// Pin the handler's notion of "now" to a stable time inside the Thursday occurrence
@@ -517,5 +521,36 @@ func TestTimerList_RecurringThuFriMidnight_ShowsBothUpcomingOccurrencesInList(t 
 	}
 	if !strings.Contains(body, expFri) {
 		t.Fatalf("expected Friday occurrence %q to be present", expFri)
+	}
+}
+
+func TestTimerOccurrences_RecurringMidnightAcrossDST_PreservesLocalMidnight(t *testing.T) {
+	loc := time.Local
+	from := time.Date(2026, 3, 28, 0, 0, 0, 0, loc)
+	to := time.Date(2026, 4, 3, 0, 0, 0, 0, loc)
+
+	timer := domain.Timer{
+		ID:           1,
+		Active:       true,
+		ChannelID:    "S19.2E-1-100-10",
+		Title:        "DST Timer",
+		DaySpec:      "M------",
+		StartMinutes: 0,
+		StopMinutes:  60,
+	}
+
+	occs := timerOccurrences(timer, from, to)
+	if len(occs) != 1 {
+		t.Fatalf("expected 1 occurrence, got %d (%+v)", len(occs), occs)
+	}
+
+	wantStart := time.Date(2026, 3, 30, 0, 0, 0, 0, loc)
+	wantStop := time.Date(2026, 3, 30, 1, 0, 0, 0, loc)
+
+	if !occs[0].Start.Equal(wantStart) {
+		t.Fatalf("expected start %s, got %s", wantStart.Format(time.RFC3339), occs[0].Start.Format(time.RFC3339))
+	}
+	if !occs[0].Stop.Equal(wantStop) {
+		t.Fatalf("expected stop %s, got %s", wantStop.Format(time.RFC3339), occs[0].Stop.Format(time.RFC3339))
 	}
 }
