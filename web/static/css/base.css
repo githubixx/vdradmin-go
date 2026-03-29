@@ -1652,6 +1652,21 @@ main {
     box-shadow: var(--shadow);
 }
 
+.config-panel {
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: var(--spacing);
+    margin-bottom: var(--spacing);
+    box-shadow: var(--shadow);
+}
+
+.toolbar:focus-within,
+.recordings-search-box:focus-within {
+    position: relative;
+    z-index: 40;
+}
+
 /* Data Table (used for EPG Search list) */
 .data-table {
     width: 100%;

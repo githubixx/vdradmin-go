@@ -5,12 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VDRAdmin-go - Configurations</title>
-    <link rel="stylesheet" href="/static/css/base.css?v=20260212-Z">
-    {{if and .ThemeMode (ne .ThemeMode "system")}}<link rel="stylesheet" href="/themes/{{.ThemeMode}}/theme.css?v=20260212-Z">{{end}}
+    <link rel="stylesheet" href="/static/css/base.css?v=20260328-C">
+    {{if and .ThemeMode (ne .ThemeMode "system")}}<link rel="stylesheet" href="/themes/{{.ThemeMode}}/theme.css?v=20260328-C">{{end}}
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="/static/js/theme.js?v=20260212-Z" defer></script>
 </head>
-<body>
+<body class="page-configurations">
     {{template "nav_header" .}}
 
     <main class="container">
@@ -38,7 +38,7 @@
                 </p>
             </div>
 
-            <div class="toolbar">
+            <div class="config-panel">
                 <h3>Server</h3>
                 <div class="config-grid">
                     <label for="server_host">Host</label>
@@ -67,7 +67,7 @@
                 </div>
             </div>
 
-            <div class="toolbar">
+            <div class="config-panel">
                 <h3>General Settings</h3>
                 <div class="config-grid">
                     <label for="ui_theme">Default theme</label>
@@ -93,7 +93,7 @@
                 </div>
             </div>
 
-            <div class="toolbar">
+            <div class="config-panel">
                 <h3>VDR</h3>
                 <div class="config-grid">
                     <label for="vdr_dvb_cards">Number of DVB cards</label>
@@ -166,7 +166,7 @@
                 </div>
             </div>
 
-            <div class="toolbar">
+            <div class="config-panel">
                 <h3>Authentication</h3>
                 <div class="config-grid">
                     <label for="auth_enabled">Enabled</label>
@@ -193,7 +193,7 @@
                 </div>
             </div>
 
-            <div class="toolbar">
+            <div class="config-panel">
                 <h3>Archive</h3>
                 <div class="config-grid">
                     <label for="archive_base_dir">Base dir</label>
@@ -259,7 +259,7 @@
                 </div>
             </div>
 
-            <div class="toolbar">
+            <div class="config-panel">
                 <h3>Cache</h3>
                 <div class="config-grid">
                     <label for="cache_epg_expiry">EPG expiry</label>
@@ -270,7 +270,7 @@
                 </div>
             </div>
 
-            <div class="toolbar">
+            <div class="config-panel">
                 <h3>Timer Defaults</h3>
                 <div class="config-grid">
                     <label for="timer_default_priority">Priority</label>
