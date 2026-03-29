@@ -56,6 +56,10 @@ func (h *Handler) now() time.Time {
 	return time.Now()
 }
 
+func addCalendarDaysHTTP(t time.Time, days int) time.Time {
+	return t.AddDate(0, 0, days)
+}
+
 // NewHandler creates a new HTTP handler
 func NewHandler(
 	logger *slog.Logger,
@@ -2931,7 +2935,7 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 
 	// Keep collision/critical computation stable (do not shift based on UI day selection).
 	collisionWindowFrom := todayStart
-	collisionWindowTo := collisionWindowFrom.Add(8 * 24 * time.Hour) // cover at least one full week for recurring timers
+	collisionWindowTo := addCalendarDaysHTTP(collisionWindowFrom, 8) // cover at least one full week for recurring timers
 
 	// Parse selected day (may be empty/invalid or outside the available days).
 	selectedDay := strings.TrimSpace(r.URL.Query().Get("day"))
@@ -2941,14 +2945,14 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 			selectedDayStart = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
 		}
 	}
-	selectedDayEnd := selectedDayStart.Add(24 * time.Hour)
+	selectedDayEnd := addCalendarDaysHTTP(selectedDayStart, 1)
 
 	// Build day dropdown options from active timer occurrences, but never include days
 	// in the past ("already gone"). Keep the horizon stable so it doesn't jump.
 	optionsFrom := todayStart
-	optionsTo := todayStart.Add(180 * 24 * time.Hour)
+	optionsTo := addCalendarDaysHTTP(todayStart, 180)
 	if selectedDayStart.After(optionsTo) {
-		optionsTo = selectedDayStart.Add(30 * 24 * time.Hour)
+		optionsTo = addCalendarDaysHTTP(selectedDayStart, 30)
 	}
 
 	timers, err := h.timerService.GetAllTimers(r.Context())
@@ -2999,7 +3003,7 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 		var nextOcc []string
 		if t.Active && isWeekdayMaskHTTP(t.DaySpec) {
 			occFrom := todayStart
-			occTo := todayStart.Add(8 * 24 * time.Hour)
+			occTo := addCalendarDaysHTTP(todayStart, 8)
 			for _, occ := range timerOccurrences(t, occFrom, occTo) {
 				// Keep occurrences that haven't fully ended yet.
 				if !occ.Stop.After(localNow) {
@@ -3075,7 +3079,7 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 
 	// Build timeline day options from active timer occurrences in the stable horizon.
 	daysByValue := map[string]time.Time{}
-	recurringHorizonTo := todayStart.Add(8 * 24 * time.Hour)
+	recurringHorizonTo := addCalendarDaysHTTP(todayStart, 8)
 	for _, t := range timers {
 		if !t.Active {
 			continue
@@ -3104,7 +3108,7 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 			for !d.After(endDay) {
 				v := d.Format("2006-01-02")
 				daysByValue[v] = d
-				d = d.Add(24 * time.Hour)
+				d = addCalendarDaysHTTP(d, 1)
 			}
 		}
 	}
@@ -3135,7 +3139,7 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			selectedDayStart = chosen
-			selectedDayEnd = selectedDayStart.Add(24 * time.Hour)
+			selectedDayEnd = addCalendarDaysHTTP(selectedDayStart, 1)
 		}
 	}
 
@@ -3166,8 +3170,8 @@ func (h *Handler) TimerList(w http.ResponseWriter, r *http.Request) {
 	if len(availableDays) > 0 {
 		// Only generate occurrences around the selected day; this keeps rendering fast
 		// while still handling timers that cross midnight.
-		blockWindowFrom := selectedDayStart.Add(-24 * time.Hour)
-		blockWindowTo := selectedDayEnd.Add(24 * time.Hour)
+		blockWindowFrom := addCalendarDaysHTTP(selectedDayStart, -1)
+		blockWindowTo := addCalendarDaysHTTP(selectedDayEnd, 1)
 		for _, t := range timers {
 			if !t.Active {
 				continue
@@ -3422,7 +3426,7 @@ func timerOccurrences(t domain.Timer, from, to time.Time) []timerOccurrence {
 	endDay := time.Date(to.In(loc).Year(), to.In(loc).Month(), to.In(loc).Day(), 0, 0, 0, 0, loc)
 
 	var out []timerOccurrence
-	for d := startDay; d.Before(endDay); d = d.Add(24 * time.Hour) {
+	for d := startDay; d.Before(endDay); d = addCalendarDaysHTTP(d, 1) {
 		if !weekdayMaskAllowsHTTP(daySpec, d.Weekday()) {
 			continue
 		}
