@@ -63,6 +63,20 @@
                         {{end}}
                     </select>
 
+                    <label for="ffmpeg_profile">FFmpeg profile</label>
+                    <div class="ffmpeg-profile-control">
+                        <select id="ffmpeg_profile" name="ffmpeg_profile">
+                            {{if .FFMpegProfiles}}
+                                {{range .FFMpegProfiles}}
+                                    <option value="{{.Name}}" data-comment="{{.Comment}}" {{if eq $.SelectedFFMpegProfile .Name}}selected{{end}}>{{.Name}}</option>
+                                {{end}}
+                            {{else}}
+                                <option value="">No profile configured</option>
+                            {{end}}
+                        </select>
+                        <p id="ffmpeg-profile-comment" class="empty-state" style="display:none; padding: 0.5rem 0 0; text-align: left; white-space: pre-line;"></p>
+                    </div>
+
                     <label for="format">Output format</label>
                     <select id="format" name="format">
                         <option value="mkv" {{if or (not $.Format) (eq $.Format "mkv")}}selected{{end}}>MKV</option>
@@ -113,6 +127,8 @@
     <script>
         (() => {
             const profileEl = document.getElementById('profile');
+            const ffmpegProfileEl = document.getElementById('ffmpeg_profile');
+            const ffmpegProfileCommentEl = document.getElementById('ffmpeg-profile-comment');
             const titleEl = document.getElementById('title');
             const episodeEl = document.getElementById('episode');
             const formatEl = document.getElementById('format');
@@ -129,6 +145,14 @@
 
             function get(id) {
                 return document.getElementById(id);
+            }
+
+            function updateFFMpegProfileComment() {
+                if (!ffmpegProfileEl || !ffmpegProfileCommentEl) return;
+                const selected = ffmpegProfileEl.options[ffmpegProfileEl.selectedIndex];
+                const comment = selected ? String(selected.dataset.comment || '').trim() : '';
+                ffmpegProfileCommentEl.textContent = comment;
+                ffmpegProfileCommentEl.style.display = comment ? 'block' : 'none';
             }
 
             for (const id of previewFieldIds) {
@@ -319,6 +343,7 @@
                 }
                 refreshPreviewSuggestions();
             });
+            if (ffmpegProfileEl) ffmpegProfileEl.addEventListener('change', updateFFMpegProfileComment);
             if (titleEl) titleEl.addEventListener('input', debounceRefresh);
             if (episodeEl) episodeEl.addEventListener('input', debounceRefresh);
 
@@ -347,6 +372,7 @@
             if (videoEl) videoEl.addEventListener('input', debounceRefresh);
 
             // On load, ensure output warning matches the current effective video path.
+            updateFFMpegProfileComment();
             refreshPreviewSuggestions();
         })();
     </script>

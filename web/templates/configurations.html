@@ -204,17 +204,19 @@
                         </p>
                     </div>
 
-                    <label for="archive_ffmpeg_args">ffmpeg args</label>
+                    <label>FFmpeg profiles</label>
                     <div>
-                        <textarea id="archive_ffmpeg_args" name="archive_ffmpeg_args" rows="3" placeholder="-vaapi_device /dev/dri/renderD128 ...">{{if .Config}}{{.Config.Archive.FFMpegArgs}}{{end}}</textarea>
+                        <div class="sort-options profile-management-actions" style="width: 100%; margin-bottom: 0.5rem;">
+                            <a class="btn btn-secondary" href="/configurations/ffmpeg-profiles">Manage ffmpeg profiles</a>
+                        </div>
                         <p class="empty-state" style="padding: 0.5rem 0 0 0; text-align: left;">
-                            Extra arguments passed to <code>ffmpeg</code> when archiving. Do not include <code>-i</code> or output path.
+                            Choose a default profile for archive jobs, or select another profile per recording.
                         </p>
                     </div>
 
                     <label>Destination profiles</label>
                     <div>
-                        <div class="sort-options" style="justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;">
+                        <div class="sort-options profile-management-actions" style="width: 100%; margin-bottom: 0.5rem;">
                             <a class="btn btn-secondary" href="/configurations/archive-profiles">Manage profiles</a>
                         </div>
                         {{if .ArchiveProfilesDerived}}
@@ -223,13 +225,6 @@
                             </p>
                         {{end}}
                         {{if .ArchiveProfiles}}
-                            <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-                                <select id="archive_profile_select" name="profile_id">
-                                    {{range .ArchiveProfiles}}
-                                        <option value="{{.ID}}" {{if eq .ID $.ArchiveProfileSelectedID}}selected{{end}}>{{.Name}} ({{.ID}})</option>
-                                    {{end}}
-                                </select>
-                            </div>
                             <div style="margin-top: 0.75rem;">
                                 <table class="data-table" id="archive_profiles_table">
                                     <thead>
@@ -242,7 +237,7 @@
                                     </thead>
                                     <tbody>
                                         {{range .ArchiveProfiles}}
-                                            <tr data-profile-id="{{.ID}}" {{if eq .ID $.ArchiveProfileSelectedID}}class="is-selected"{{end}}>
+                                            <tr data-profile-id="{{.ID}}">
                                                 <td style="white-space: nowrap;">{{.ID}}</td>
                                                 <td>{{.Name}}</td>
                                                 <td style="white-space: nowrap;">{{.Kind}}</td>

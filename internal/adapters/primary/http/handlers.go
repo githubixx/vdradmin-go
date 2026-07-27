@@ -1103,6 +1103,39 @@ func (h *Handler) defaultProfileIDForKind(profiles []archive.ArchiveProfile, k a
 	return ""
 }
 
+func (h *Handler) ffmpegProfilesFromConfig(cfg *config.Config) []config.FFMpegProfileConfig {
+	if cfg == nil {
+		return nil
+	}
+	return append([]config.FFMpegProfileConfig(nil), cfg.Archive.FFMpegProfiles...)
+}
+
+func (h *Handler) defaultFFMpegProfile(profiles []config.FFMpegProfileConfig) (config.FFMpegProfileConfig, bool) {
+	for _, profile := range profiles {
+		if profile.Default {
+			return profile, true
+		}
+	}
+	return config.FFMpegProfileConfig{}, false
+}
+
+func (h *Handler) selectedFFMpegProfile(cfg *config.Config, name string) (config.FFMpegProfileConfig, string, bool) {
+	profiles := h.ffmpegProfilesFromConfig(cfg)
+	name = strings.TrimSpace(name)
+	if name != "" {
+		for _, profile := range profiles {
+			if profile.Name == name {
+				return profile, profile.Name, true
+			}
+		}
+	}
+	profile, ok := h.defaultFFMpegProfile(profiles)
+	if !ok {
+		return config.FFMpegProfileConfig{}, "", false
+	}
+	return profile, profile.Name, true
+}
+
 // ConfigurationsApply applies configuration changes without persisting them.
 func (h *Handler) ConfigurationsApply(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -1328,6 +1361,120 @@ func (h *Handler) ConfigurationsArchiveProfilesSave(w http.ResponseWriter, r *ht
 	http.Redirect(w, r, "/configurations?msg="+url.QueryEscape("Saved archive profiles."), http.StatusSeeOther)
 }
 
+// ConfigurationsFFMpegProfiles shows the ffmpeg profile management page.
+func (h *Handler) ConfigurationsFFMpegProfiles(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.cfg == nil {
+		http.Error(w, "Configuration not available", http.StatusInternalServerError)
+		return
+	}
+	h.renderTemplate(w, r, "ffmpeg_profiles.html", h.ffmpegProfilePageData(h.ffmpegProfilesFromConfig(h.cfg), nil, ""))
+}
+
+// ConfigurationsFFMpegProfilesSave persists ffmpeg profiles.
+func (h *Handler) ConfigurationsFFMpegProfilesSave(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.cfg == nil {
+		http.Error(w, "Configuration not available", http.StatusInternalServerError)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(h.configPath) == "" {
+		http.Error(w, "No config path configured; cannot save.", http.StatusInternalServerError)
+		return
+	}
+
+	updated := *h.cfg
+	indices, nextIndex := cleanFFMpegProfileIndices(r.PostForm["ffmpeg_profile_indices"])
+	profiles := make([]config.FFMpegProfileConfig, 0, len(indices))
+	views := make([]map[string]any, 0, len(indices))
+	for _, index := range indices {
+		name := strings.TrimSpace(r.PostFormValue("ffmpeg_profile_name_" + index))
+		comment := strings.TrimSpace(r.PostFormValue("ffmpeg_profile_comment_" + index))
+		args := strings.TrimSpace(r.PostFormValue("ffmpeg_profile_args_" + index))
+		isDefault := r.PostFormValue("ffmpeg_profile_default_"+index) == "on"
+		deleted := r.PostFormValue("ffmpeg_profile_delete_"+index) == "on"
+		views = append(views, map[string]any{
+			"Index":   index,
+			"Name":    name,
+			"Comment": comment,
+			"Args":    args,
+			"Default": isDefault,
+			"Delete":  deleted,
+		})
+		if deleted || (name == "" && comment == "" && args == "" && !isDefault) {
+			continue
+		}
+		profiles = append(profiles, config.FFMpegProfileConfig{Name: name, Comment: comment, Args: args, Default: isDefault})
+	}
+	updated.Archive.FFMpegProfiles = profiles
+
+	if err := updated.Validate(); err != nil {
+		h.renderTemplate(w, r, "ffmpeg_profiles.html", ffmpegProfilePageDataFromViews(views, nextIndex, err.Error()))
+		return
+	}
+	if err := updated.Save(h.configPath); err != nil {
+		h.renderTemplate(w, r, "ffmpeg_profiles.html", ffmpegProfilePageDataFromViews(views, nextIndex, err.Error()))
+		return
+	}
+	if err := h.applyRuntimeConfig(&updated); err != nil {
+		h.renderTemplate(w, r, "ffmpeg_profiles.html", ffmpegProfilePageDataFromViews(views, nextIndex, err.Error()))
+		return
+	}
+
+	http.Redirect(w, r, "/configurations?msg="+url.QueryEscape("Saved ffmpeg profiles."), http.StatusSeeOther)
+}
+
+func (h *Handler) ffmpegProfilePageData(profiles []config.FFMpegProfileConfig, deleted map[string]bool, pageError string) map[string]any {
+	views := make([]map[string]any, 0, len(profiles))
+	for index, profile := range profiles {
+		indexText := strconv.Itoa(index)
+		views = append(views, map[string]any{
+			"Index":   indexText,
+			"Name":    profile.Name,
+			"Comment": profile.Comment,
+			"Args":    profile.Args,
+			"Default": profile.Default,
+			"Delete":  deleted != nil && deleted[indexText],
+		})
+	}
+	return ffmpegProfilePageDataFromViews(views, len(views), pageError)
+}
+
+func ffmpegProfilePageDataFromViews(views []map[string]any, nextIndex int, pageError string) map[string]any {
+	data := map[string]any{
+		"Profiles":  views,
+		"NextIndex": nextIndex,
+	}
+	if pageError != "" {
+		data["Error"] = pageError
+	}
+	return data
+}
+
+func cleanFFMpegProfileIndices(indices []string) ([]string, int) {
+	cleaned := make([]string, 0, len(indices))
+	nextIndex := 0
+	for _, index := range indices {
+		if index = strings.TrimSpace(index); index != "" {
+			cleaned = append(cleaned, index)
+			if value, err := strconv.Atoi(index); err == nil && value >= nextIndex {
+				nextIndex = value + 1
+			}
+		}
+	}
+	return cleaned, nextIndex
+}
+
 func serverRestartRequired(oldCfg config.ServerConfig, newCfg config.ServerConfig) bool {
 	if oldCfg.Host != newCfg.Host || oldCfg.Port != newCfg.Port {
 		return true
@@ -1446,7 +1593,6 @@ func (h *Handler) buildConfigFromForm(form url.Values) (*config.Config, error) {
 
 	// Archive
 	updated.Archive.BaseDir = strings.TrimSpace(form.Get("archive_base_dir"))
-	updated.Archive.FFMpegArgs = strings.TrimSpace(form.Get("archive_ffmpeg_args"))
 
 	// Cache
 	if v := strings.TrimSpace(form.Get("cache_epg_expiry")); v != "" {
@@ -4423,6 +4569,8 @@ func (h *Handler) RecordingArchivePrepare(w http.ResponseWriter, r *http.Request
 	if selectedID == "" {
 		selectedID = h.defaultProfileIDForKind(profiles, parsed.Kind)
 	}
+	ffmpegProfiles := h.ffmpegProfilesFromConfig(h.cfg)
+	_, selectedFFMpegProfile, _ := h.selectedFFMpegProfile(h.cfg, r.URL.Query().Get("ffmpeg_profile"))
 
 	const profileNoneID = "none"
 	var preview archive.Preview
@@ -4441,15 +4589,17 @@ func (h *Handler) RecordingArchivePrepare(w http.ResponseWriter, r *http.Request
 	}
 
 	data := map[string]any{
-		"RecordingID":       recID,
-		"RecordingDir":      recDir,
-		"DetectedKind":      string(parsed.Kind),
-		"Title":             title,
-		"Episode":           episode,
-		"Profiles":          profiles,
-		"SelectedProfileID": selectedID,
-		"Format":            format,
-		"ArchiveWarning":    warn,
+		"RecordingID":           recID,
+		"RecordingDir":          recDir,
+		"DetectedKind":          string(parsed.Kind),
+		"Title":                 title,
+		"Episode":               episode,
+		"Profiles":              profiles,
+		"SelectedProfileID":     selectedID,
+		"FFMpegProfiles":        ffmpegProfiles,
+		"SelectedFFMpegProfile": selectedFFMpegProfile,
+		"Format":                format,
+		"ArchiveWarning":        warn,
 	}
 	if perr != nil {
 		data["Error"] = perr.Error()
@@ -4517,6 +4667,7 @@ func (h *Handler) RecordingArchiveStart(w http.ResponseWriter, r *http.Request) 
 	title := strings.TrimSpace(r.FormValue("title"))
 	episode := strings.TrimSpace(r.FormValue("episode"))
 	profileID := strings.TrimSpace(r.FormValue("profile"))
+	ffmpegProfileName := strings.TrimSpace(r.FormValue("ffmpeg_profile"))
 	format := strings.ToLower(strings.TrimSpace(r.FormValue("format")))
 	if format != "mp4" {
 		format = "mkv"
@@ -4572,7 +4723,12 @@ func (h *Handler) RecordingArchiveStart(w http.ResponseWriter, r *http.Request) 
 	})
 	const profileNoneID = "none"
 
-	ffArgs := archive.SplitArgs(h.cfg.Archive.FFMpegArgs)
+	ffmpegProfiles := h.ffmpegProfilesFromConfig(h.cfg)
+	selectedFFMpeg, selectedFFMpegProfile, hasFFMpegProfile := h.selectedFFMpegProfile(h.cfg, ffmpegProfileName)
+	var ffArgs []string
+	if hasFFMpegProfile {
+		ffArgs = archive.SplitArgs(selectedFFMpeg.Args)
+	}
 	var plan archive.Plan
 	var planErr error
 
@@ -4592,15 +4748,17 @@ func (h *Handler) RecordingArchiveStart(w http.ResponseWriter, r *http.Request) 
 	}
 	if planErr != nil {
 		h.renderTemplate(w, r, "recording_archive.html", map[string]any{
-			"Error":             planErr.Error(),
-			"RecordingID":       recID,
-			"RecordingDir":      recDir,
-			"DetectedKind":      string(parsed.Kind),
-			"Title":             title,
-			"Episode":           episode,
-			"Profiles":          profiles,
-			"SelectedProfileID": profileID,
-			"Format":            format,
+			"Error":                 planErr.Error(),
+			"RecordingID":           recID,
+			"RecordingDir":          recDir,
+			"DetectedKind":          string(parsed.Kind),
+			"Title":                 title,
+			"Episode":               episode,
+			"Profiles":              profiles,
+			"SelectedProfileID":     profileID,
+			"FFMpegProfiles":        ffmpegProfiles,
+			"SelectedFFMpegProfile": selectedFFMpegProfile,
+			"Format":                format,
 			"Preview": &archive.Preview{
 				TargetDir:   oTargetDir,
 				VideoPath:   oVideoPath,
@@ -4631,17 +4789,19 @@ func (h *Handler) RecordingArchiveStart(w http.ResponseWriter, r *http.Request) 
 	if plan.Preview.VideoPath != "" {
 		if _, err := os.Stat(plan.Preview.VideoPath); err == nil {
 			h.renderTemplate(w, r, "recording_archive.html", map[string]any{
-				"Error":             fmt.Sprintf("Output already exists: %s", plan.Preview.VideoPath),
-				"RecordingID":       recID,
-				"RecordingDir":      recDir,
-				"DetectedKind":      string(parsed.Kind),
-				"Title":             title,
-				"Episode":           episode,
-				"Profiles":          profiles,
-				"SelectedProfileID": profileID,
-				"Preview":           plan.Preview,
-				"OutputExists":      true,
-				"OutputExistsPath":  plan.Preview.VideoPath,
+				"Error":                 fmt.Sprintf("Output already exists: %s", plan.Preview.VideoPath),
+				"RecordingID":           recID,
+				"RecordingDir":          recDir,
+				"DetectedKind":          string(parsed.Kind),
+				"Title":                 title,
+				"Episode":               episode,
+				"Profiles":              profiles,
+				"SelectedProfileID":     profileID,
+				"FFMpegProfiles":        ffmpegProfiles,
+				"SelectedFFMpegProfile": selectedFFMpegProfile,
+				"Preview":               plan.Preview,
+				"OutputExists":          true,
+				"OutputExistsPath":      plan.Preview.VideoPath,
 			})
 			return
 		}

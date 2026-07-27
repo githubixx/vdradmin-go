@@ -96,6 +96,8 @@ func SetupRoutes(handler *Handler, authCfg *config.AuthConfig, logger *slog.Logg
 	// Config management sub-pages (admin-only)
 	mux.Handle("GET /configurations/archive-profiles", chain(handler.ConfigurationsArchiveProfiles, adminMiddleware...))
 	mux.Handle("POST /configurations/archive-profiles/save", chain(handler.ConfigurationsArchiveProfilesSave, adminMiddleware...))
+	mux.Handle("GET /configurations/ffmpeg-profiles", chain(handler.ConfigurationsFFMpegProfiles, adminMiddleware...))
+	mux.Handle("POST /configurations/ffmpeg-profiles/save", chain(handler.ConfigurationsFFMpegProfilesSave, adminMiddleware...))
 	mux.Handle("GET /playing", chain(handler.PlayingToday, commonMiddleware...))
 	mux.Handle("GET /watch", chain(handler.WatchTV, commonMiddleware...))
 	mux.Handle("POST /watch/key", chain(handler.WatchTVKey, commonMiddleware...))

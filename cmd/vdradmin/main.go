@@ -90,7 +90,7 @@ func main() {
 
 	// Load templates - each page gets its own template set
 	templates := make(map[string]*template.Template)
-	pages := []string{"index.html", "epg.html", "playing.html", "watch.html", "timers.html", "timer_edit.html", "recordings.html", "recording_archive.html", "recording_archive_jobs.html", "recording_archive_job.html", "recording_archive_job_status.html", "archive_profiles.html", "search.html", "search_results.html", "epgsearch.html", "epgsearch_edit.html", "epgsearch_results.html", "event.html", "channels.html", "configurations.html"}
+	pages := []string{"index.html", "epg.html", "playing.html", "watch.html", "timers.html", "timer_edit.html", "recordings.html", "recording_archive.html", "recording_archive_jobs.html", "recording_archive_job.html", "recording_archive_job_status.html", "archive_profiles.html", "ffmpeg_profiles.html", "search.html", "search_results.html", "epgsearch.html", "epgsearch_edit.html", "epgsearch_results.html", "event.html", "channels.html", "configurations.html"}
 
 	for _, page := range pages {
 		tmpl := template.Must(template.ParseFiles("web/templates/_nav.html", "web/templates/"+page))
