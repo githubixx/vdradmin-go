@@ -45,7 +45,7 @@
                 <div class="timeline-channel">{{.ChannelName}}</div>
                 <div class="timeline-track">
                     {{range .Blocks}}
-                    <div class="timeline-block {{.Class}}" style="left: {{printf "%.4f" .LeftPct}}%; width: {{printf "%.4f" .WidthPct}}%;" title="{{.StartLabel}}-{{.StopLabel}} {{.Title}}">
+                    <div class="timeline-block {{.Class}}" data-left-pct="{{printf "%.4f" .LeftPct}}" data-width-pct="{{printf "%.4f" .WidthPct}}" title="{{.StartLabel}}-{{.StopLabel}} {{.Title}}">
                         <span class="timeline-block-text">{{.Title}}</span>
                     </div>
                     {{end}}
@@ -107,6 +107,15 @@
             <p>&copy; {{.Year}} vdradmin-go | <a href="https://github.com/githubixx/vdradmin-go">GitHub</a></p>
         </div>
     </footer>
+    <script>
+        document.querySelectorAll('.timeline-block[data-left-pct][data-width-pct]').forEach((block) => {
+            const leftPct = Number.parseFloat(block.dataset.leftPct || '');
+            const widthPct = Number.parseFloat(block.dataset.widthPct || '');
+            if (!Number.isFinite(leftPct) || !Number.isFinite(widthPct)) return;
+            block.style.left = `${leftPct}%`;
+            block.style.width = `${widthPct}%`;
+        });
+    </script>
 </body>
 </html>
 {{end}}

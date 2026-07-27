@@ -13,7 +13,7 @@
 <body>
     {{template "nav_header" .}}
 
-    <main class="container">
+    <main id="archive-job-page" class="container" data-job-id="{{.JobID}}" data-output-ready="{{if .OutputVideoReady}}true{{else}}false{{end}}" data-log-count="{{.Job.LogCount}}" data-polling="{{if or (eq .Job.Status "queued") (eq .Job.Status "running")}}true{{else}}false{{end}}">
         <div class="toolbar">
             <div style="display:flex; justify-content: space-between; align-items: center; gap: 1rem; width: 100%;">
                 <h3 style="margin: 0;">Archive Job</h3>
@@ -45,7 +45,7 @@
                 <label>Progress</label>
                 <div>
                     <div class="progress">
-                        <div id="progress-bar" class="progress-bar" style="width: {{if .Job.Progress.KnownDuration}}{{printf "%.1f" .Job.Progress.Percent}}{{else}}{{if or (eq .Job.Status "queued") (eq .Job.Status "running")}}0{{else}}100{{end}}{{end}}%;"></div>
+                        <div id="progress-bar" class="progress-bar" data-initial-width="{{if .Job.Progress.KnownDuration}}{{printf "%.1f" .Job.Progress.Percent}}{{else}}{{if or (eq .Job.Status "queued") (eq .Job.Status "running")}}0{{else}}100{{end}}{{end}}"></div>
                         <div id="progress-indeterminate" class="progress-indeterminate" {{if or .Job.Progress.KnownDuration (and (ne .Job.Status "queued") (ne .Job.Status "running"))}}hidden{{end}}></div>
                     </div>
                     <div id="progress-meta" class="empty-state" style="padding: 0.5rem 0 0 0; text-align: left;">
@@ -98,7 +98,7 @@
                 <div class="archive-target-item">
                     <div class="archive-target-label">Output video</div>
                     <div id="output-video" class="log-panel archive-target-frame" data-output-url="{{.OutputVideoURL}}" style="overflow-wrap: anywhere;">{{.Job.Preview.VideoPath}}</div>
-                    <div id="output-video-actions" style="margin-top: 0.6rem; display: {{if .OutputVideoReady}}flex{{else}}none{{end}}; gap: 0.5rem; flex-wrap: wrap;">
+                    <div id="output-video-actions" style="margin-top: 0.6rem; display: flex; gap: 0.5rem; flex-wrap: wrap;" {{if not .OutputVideoReady}}hidden{{end}}>
                         <button id="output-video-copy" type="button" class="btn btn-sm btn-secondary">Copy URL</button>
                         <a id="output-video-vlc" class="btn btn-sm btn-secondary" href="#" rel="nofollow">Open in VLC</a>
                     </div>
@@ -111,7 +111,7 @@
             <p class="empty-state" style="padding: 0 0 0.5rem 0; text-align: left;">
                 Shown after the job finishes (copied from the original recording info).
             </p>
-            <div id="job-info-copy-error" class="empty-state" style="padding: 0 0 0.5rem 0; text-align: left; {{if .InfoCopyError}}display:block;{{else}}display:none;{{end}}">{{.InfoCopyError}}</div>
+            <div id="job-info-copy-error" class="empty-state" style="padding: 0 0 0.5rem 0; text-align: left;" {{if not .InfoCopyError}}hidden{{end}}>{{.InfoCopyError}}</div>
             <pre id="job-info-copy" class="log-panel">{{if .InfoCopyText}}{{.InfoCopyText}}{{else}}{{if or (eq .Job.Status "queued") (eq .Job.Status "running")}}(available after completion){{else}}—{{end}}{{end}}</pre>
         </div>
     </main>
@@ -124,7 +124,9 @@
 
     <script>
         (() => {
-            const jobID = {{printf "%q" .JobID}};
+            const pageEl = document.getElementById('archive-job-page');
+            if (!pageEl) return;
+            const jobID = pageEl.dataset.jobId || '';
             const stateEl = document.getElementById('job-state');
             const errEl = document.getElementById('job-error');
             const barEl = document.getElementById('progress-bar');
@@ -140,10 +142,17 @@
             const outVideoCopyEl = document.getElementById('output-video-copy');
             const outVideoVlcEl = document.getElementById('output-video-vlc');
 
-            const outputReadyInitial = {{if .OutputVideoReady}}true{{else}}false{{end}};
+            const outputReadyInitial = pageEl.dataset.outputReady === 'true';
 
-            let next = {{.Job.LogCount}};
-            let polling = {{if or (eq .Job.Status "queued") (eq .Job.Status "running")}}true{{else}}false{{end}};
+            let next = Number.parseInt(pageEl.dataset.logCount || '0', 10);
+            let polling = pageEl.dataset.polling === 'true';
+
+            if (barEl) {
+                const initialWidth = Number.parseFloat(barEl.dataset.initialWidth || '');
+                if (Number.isFinite(initialWidth)) {
+                    barEl.style.width = initialWidth.toFixed(1) + '%';
+                }
+            }
 
             // If this is an already-finished job (opened via Jobs → Open), ensure the
             // indeterminate animation is off immediately even if we don't poll.
@@ -169,7 +178,7 @@
                 const abs = absoluteURL(href);
                 if (!abs) return;
 
-                outVideoActionsEl.style.display = 'flex';
+                outVideoActionsEl.hidden = false;
 
                 // Best-effort: these only work if the user has a protocol handler installed.
                 // Use an encoded payload so the nested http(s) URL survives Firefox/KDE round-trips.
@@ -311,7 +320,7 @@
                             if (typeof data.output_url === 'string' && data.output_url) {
                                 outVideoWrapEl.setAttribute('data-output-url', data.output_url);
                             }
-                            outVideoActionsEl.style.display = 'flex';
+                            outVideoActionsEl.hidden = false;
                             updateOutputActions();
                         }
 
@@ -321,10 +330,10 @@
                         }
                         if (infoCopyErrEl) {
                             if (typeof data.info_copy_error === 'string' && data.info_copy_error.length > 0) {
-                                infoCopyErrEl.style.display = 'block';
+                                infoCopyErrEl.hidden = false;
                                 infoCopyErrEl.textContent = data.info_copy_error;
                             } else {
-                                infoCopyErrEl.style.display = 'none';
+                                infoCopyErrEl.hidden = true;
                                 infoCopyErrEl.textContent = '';
                             }
                         }

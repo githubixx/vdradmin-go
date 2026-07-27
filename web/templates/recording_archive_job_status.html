@@ -14,7 +14,7 @@
             <label>Progress</label>
             <div>
                 {{if .Job.Progress.KnownDuration}}
-                    <div class="progress"><div class="progress-bar" style="width: {{printf "%.1f" .Job.Progress.Percent}}%;"></div></div>
+                    <div class="progress"><div class="progress-bar" data-progress-width="{{printf "%.1f" .Job.Progress.Percent}}"></div></div>
                     <div class="empty-state" style="padding: 0.5rem 0 0 0; text-align: left;">
                         {{printf "%.1f" .Job.Progress.Percent}}% • out_time_ms={{.Job.Progress.OutTimeMS}} • speed={{.Job.Progress.Speed}}
                     </div>
@@ -47,4 +47,12 @@
         <pre class="log-panel">{{.Job.LogTail}}</pre>
     </div>
 </div>
+<script>
+    document.querySelectorAll('#job-status .progress-bar[data-progress-width]').forEach((bar) => {
+        const width = Number.parseFloat(bar.dataset.progressWidth || '');
+        if (Number.isFinite(width)) {
+            bar.style.width = `${width.toFixed(1)}%`;
+        }
+    });
+</script>
 {{end}}
