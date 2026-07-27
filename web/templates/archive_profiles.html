@@ -43,7 +43,7 @@
             </div>
 
             <div class="toolbar">
-                <div id="profiles">
+                <div id="profiles" data-next-index="{{.NextIndex}}">
                     {{range .Profiles}}
                     <div class="toolbar" style="margin: 0 0 1rem 0;" data-profile-row data-index="{{.Index}}">
                         <input type="hidden" name="profile_indices" value="{{.Index}}">
@@ -67,7 +67,7 @@
                             <div>
                                 <input class="profile-delete-flag" name="profile_delete_{{.Index}}" type="hidden" value="{{if .Delete}}on{{end}}">
                                 <button type="button" class="btn btn-sm {{if .Delete}}btn-secondary{{else}}btn-danger{{end}}" data-action="toggle-delete">{{if .Delete}}Undo{{else}}Delete{{end}}</button>
-                                <div class="empty-state" data-delete-note style="padding: 0.25rem 0 0 0; text-align: left; {{if not .Delete}}display:none;{{end}}">
+                                <div class="empty-state" data-delete-note style="padding: 0.25rem 0 0 0; text-align: left;" {{if not .Delete}}hidden{{end}}>
                                     Marked for deletion (removed on save)
                                 </div>
                             </div>
@@ -108,7 +108,7 @@
                 <div>
                     <input class="profile-delete-flag" name="profile_delete___IDX__" type="hidden" value="">
                     <button type="button" class="btn btn-sm btn-danger" data-action="toggle-delete">Delete</button>
-                    <div class="empty-state" data-delete-note style="padding: 0.25rem 0 0 0; text-align: left; display:none;">
+                    <div class="empty-state" data-delete-note style="padding: 0.25rem 0 0 0; text-align: left;" hidden>
                         Marked for deletion (removed on save)
                     </div>
                 </div>
@@ -121,9 +121,10 @@
             const btn = document.getElementById('add-profile');
             const profiles = document.getElementById('profiles');
             const tpl = document.getElementById('profile-row-template');
-            let next = {{.NextIndex}};
 
             if (!btn || !profiles || !tpl) return;
+            let next = Number.parseInt(profiles.dataset.nextIndex || '0', 10);
+            if (!Number.isFinite(next)) next = 0;
 
             function setRowDeleted(row, deleted) {
                 if (!row) return;
@@ -131,7 +132,7 @@
                 const note = row.querySelector('[data-delete-note]');
                 const toggle = row.querySelector('button[data-action="toggle-delete"]');
                 if (flag) flag.value = deleted ? 'on' : '';
-                if (note) note.style.display = deleted ? 'block' : 'none';
+                if (note) note.hidden = !deleted;
                 if (toggle) {
                     toggle.textContent = deleted ? 'Undo' : 'Delete';
                     toggle.classList.toggle('btn-danger', !deleted);

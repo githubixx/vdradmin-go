@@ -60,7 +60,7 @@
                     <option value="range" {{if eq .Search.UseChannel "range"}}selected{{end}}>Channel range</option>
                 </select>
 
-                <div id="channel_single_rows" style="{{if eq .Search.UseChannel "single"}}display: contents;{{else}}display: none;{{end}}">
+                <div id="channel_single_rows" style="display: contents;" {{if ne .Search.UseChannel "single"}}hidden{{end}}>
                     <label for="channel_id">Channel</label>
                     <select id="channel_id" name="channel_id">
                         <option value="">-- Select --</option>
@@ -70,7 +70,7 @@
                     </select>
                 </div>
 
-                <div id="channel_range_rows" style="{{if eq .Search.UseChannel "range"}}display: contents;{{else}}display: none;{{end}}">
+                <div id="channel_range_rows" style="display: contents;" {{if ne .Search.UseChannel "range"}}hidden{{end}}>
                     <label for="channel_from">From</label>
                     <select id="channel_from" name="channel_from">
                         <option value="">-- Select --</option>
@@ -145,8 +145,8 @@
 
                 function update() {
                     const v = (useChannel && useChannel.value) ? useChannel.value : 'no';
-                    if (single) single.style.display = (v === 'single') ? 'contents' : 'none';
-                    if (range) range.style.display = (v === 'range') ? 'contents' : 'none';
+                    if (single) single.hidden = v !== 'single';
+                    if (range) range.hidden = v !== 'range';
                 }
 
                 if (useChannel) {
