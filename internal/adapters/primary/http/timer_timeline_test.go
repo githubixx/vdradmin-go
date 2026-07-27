@@ -132,6 +132,9 @@ func TestTimerList_RendersTimeline(t *testing.T) {
 	if !strings.Contains(body, "timeline-block ok") {
 		t.Fatalf("expected ok (green) block")
 	}
+	if !strings.Contains(body, "data-left-pct=") || !strings.Contains(body, "data-width-pct=") {
+		t.Fatalf("expected timeline block position data attributes")
+	}
 }
 
 func TestTimerList_TimelineDaysOnlyContainTimerDays_AndDoNotShiftWithSelection(t *testing.T) {

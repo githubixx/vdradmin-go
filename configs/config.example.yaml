@@ -104,10 +104,14 @@ archive:
       kind: series
       base_dir: /vdr/series
 
-  # Extra arguments passed to ffmpeg when archiving.
-  # Do NOT include input (-i) or output file path.
-  ffmpeg_args: >-
-    -vaapi_device /dev/dri/renderD128
-    -vf format=nv12,hwupload
-    -map 0:0 -c:v hevc_vaapi -rc_mode CQP -global_quality 23 -profile:v main
-    -map 0:a -c:a copy
+  # Reusable argument profiles passed to ffmpeg when archiving.
+  # Do NOT include input (-i) or output file path. Exactly one profile is default.
+  ffmpeg_profiles:
+    - name: VAAPI HEVC
+      comment: Hardware-accelerated HEVC encoding with copied audio.
+      default: true
+      args: >-
+        -vaapi_device /dev/dri/renderD128
+        -vf format=nv12,hwupload
+        -map 0:0 -c:v hevc_vaapi -rc_mode CQP -global_quality 23 -profile:v main
+        -map 0:a -c:a copy

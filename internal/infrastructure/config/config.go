@@ -30,6 +30,14 @@ type ArchiveProfileConfig struct {
 	BaseDir string `yaml:"base_dir"` // absolute destination directory
 }
 
+// FFMpegProfileConfig defines a reusable ffmpeg argument profile for archive jobs.
+type FFMpegProfileConfig struct {
+	Name    string `yaml:"name"`
+	Comment string `yaml:"comment"`
+	Args    string `yaml:"args"`
+	Default bool   `yaml:"default"`
+}
+
 // ArchiveConfig contains settings for archiving/re-encoding recordings.
 type ArchiveConfig struct {
 	// BaseDir is the root directory where archived recordings should be stored.
@@ -40,11 +48,11 @@ type ArchiveConfig struct {
 	// - movies (movies) -> <base_dir>/movies
 	// - series (series) -> <base_dir>/series
 	Profiles []ArchiveProfileConfig `yaml:"profiles"`
-	// FFMpegArgs are extra arguments passed to ffmpeg when archiving.
-	// They should NOT include input (-i) or output path; these are provided by vdradmin-go.
-	// Example (VAAPI HEVC + copy audio):
-	//   -vaapi_device /dev/dri/renderD128 -vf format=nv12,hwupload -map 0:0 -c:v hevc_vaapi -rc_mode CQP -global_quality 23 -profile:v main -map 0:a -c:a copy
-	FFMpegArgs string `yaml:"ffmpeg_args"`
+	// FFMpegProfiles are reusable argument sets passed to ffmpeg when archiving.
+	// Their args should NOT include input (-i) or output path; these are provided by vdradmin-go.
+	FFMpegProfiles []FFMpegProfileConfig `yaml:"ffmpeg_profiles"`
+	// FFMpegArgs is retained only to migrate existing configuration files.
+	FFMpegArgs string `yaml:"ffmpeg_args,omitempty"`
 }
 
 // EPGConfig contains settings and saved searches related to EPG.
@@ -222,9 +230,8 @@ func Load(path string) (*Config, error) {
 			Searches: []EPGSearch{},
 		},
 		Archive: ArchiveConfig{
-			BaseDir:    "",
-			Profiles:   nil,
-			FFMpegArgs: "-vaapi_device /dev/dri/renderD128 -vf format=nv12,hwupload -map 0:0 -c:v hevc_vaapi -rc_mode CQP -global_quality 23 -profile:v main -map 0:a -c:a copy",
+			BaseDir:  "",
+			Profiles: nil,
 		},
 		UI: UIConfig{
 			Theme:     "system",
@@ -232,19 +239,26 @@ func Load(path string) (*Config, error) {
 		},
 	}
 
-	// If config file exists, load it
+	configExists := false
+	// If config file exists, load it.
 	if path != "" {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return cfg, nil // Use defaults if file doesn't exist
+				// Use defaults if the file does not exist.
+				configExists = false
+			} else {
+				return nil, fmt.Errorf("failed to read config file: %w", err)
 			}
-			return nil, fmt.Errorf("failed to read config file: %w", err)
+		} else {
+			if err := yaml.Unmarshal(data, cfg); err != nil {
+				return nil, fmt.Errorf("failed to parse config file: %w", err)
+			}
+			configExists = true
 		}
-
-		if err := yaml.Unmarshal(data, cfg); err != nil {
-			return nil, fmt.Errorf("failed to parse config file: %w", err)
-		}
+	}
+	if !configExists && len(cfg.Archive.FFMpegProfiles) == 0 && strings.TrimSpace(cfg.Archive.FFMpegArgs) == "" {
+		cfg.Archive.FFMpegProfiles = defaultFFMpegProfiles()
 	}
 
 	// Validate configuration
@@ -375,6 +389,15 @@ func (c *Config) Validate() error {
 	// Archive
 	c.Archive.BaseDir = strings.TrimSpace(c.Archive.BaseDir)
 	c.Archive.FFMpegArgs = strings.TrimSpace(c.Archive.FFMpegArgs)
+	if len(c.Archive.FFMpegProfiles) == 0 && c.Archive.FFMpegArgs != "" {
+		c.Archive.FFMpegProfiles = []FFMpegProfileConfig{{
+			Name:    "Default",
+			Args:    c.Archive.FFMpegArgs,
+			Default: true,
+		}}
+	}
+	// New profile configuration takes precedence if both formats are present.
+	c.Archive.FFMpegArgs = ""
 	if c.Archive.BaseDir != "" {
 		if !filepath.IsAbs(c.Archive.BaseDir) {
 			return fmt.Errorf("invalid archive.base_dir: %q (must be an absolute path)", c.Archive.BaseDir)
@@ -412,9 +435,38 @@ func (c *Config) Validate() error {
 		}
 		p.BaseDir = filepath.Clean(p.BaseDir)
 	}
-	// Allow empty ffmpeg args; execution layer may still add required flags.
+	seenFFMpegProfile := make(map[string]struct{}, len(c.Archive.FFMpegProfiles))
+	defaultFFMpegProfiles := 0
+	for i := range c.Archive.FFMpegProfiles {
+		p := &c.Archive.FFMpegProfiles[i]
+		p.Name = strings.TrimSpace(p.Name)
+		p.Comment = strings.TrimSpace(p.Comment)
+		p.Args = strings.TrimSpace(p.Args)
+		if p.Name == "" {
+			return fmt.Errorf("invalid archive.ffmpeg_profiles[%d].name: required", i)
+		}
+		nameKey := strings.ToLower(p.Name)
+		if _, ok := seenFFMpegProfile[nameKey]; ok {
+			return fmt.Errorf("duplicate archive.ffmpeg_profiles[%d].name: %q", i, p.Name)
+		}
+		seenFFMpegProfile[nameKey] = struct{}{}
+		if p.Default {
+			defaultFFMpegProfiles++
+		}
+	}
+	if len(c.Archive.FFMpegProfiles) > 0 && defaultFFMpegProfiles != 1 {
+		return fmt.Errorf("invalid archive.ffmpeg_profiles: exactly one default profile is required")
+	}
 
 	return nil
+}
+
+func defaultFFMpegProfiles() []FFMpegProfileConfig {
+	return []FFMpegProfileConfig{{
+		Name:    "Default",
+		Args:    "-vaapi_device /dev/dri/renderD128 -vf format=nv12,hwupload -map 0:0 -c:v hevc_vaapi -rc_mode CQP -global_quality 23 -profile:v main -map 0:a -c:a copy",
+		Default: true,
+	}}
 }
 
 // Save saves the configuration to a YAML file

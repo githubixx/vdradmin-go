@@ -321,7 +321,7 @@ Configuration:
 
 - `archive.base_dir`: absolute output directory root
 - `archive.profiles`: optional list of destination profiles (movie/series) so you can add more archive directories or customize defaults
-- `archive.ffmpeg_args`: additional ffmpeg output args (defaults are hardware-accel friendly for AMD GPUs but can be changed)
+- `archive.ffmpeg_profiles`: named ffmpeg argument profiles; exactly one is the default, and another can be selected for an individual archive job
 
 Safety defaults:
 

@@ -1,0 +1,181 @@
+{{define "ffmpeg_profiles.html"}}
+<!DOCTYPE html>
+<html lang="en" {{if ne .ThemeMode "system"}}data-theme="{{.ThemeMode}}"{{end}} data-theme-default="{{.ThemeDefault}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VDRAdmin-go - FFmpeg Profiles</title>
+    <link rel="stylesheet" href="/static/css/base.css?v=20260212-Z">
+    {{if and .ThemeMode (ne .ThemeMode "system")}}<link rel="stylesheet" href="/themes/{{.ThemeMode}}/theme.css?v=20260212-Z">{{end}}
+    <script src="/static/js/theme.js?v=20260212-Z" defer></script>
+</head>
+<body>
+    {{template "nav_header" .}}
+
+    <main class="container">
+        <div class="toolbar">
+            <div style="display:flex; justify-content: space-between; align-items: center; gap: 1rem; width: 100%;">
+                <h3 style="margin: 0;">FFmpeg profiles</h3>
+                <a class="btn btn-sm btn-secondary" href="/configurations">Back</a>
+            </div>
+        </div>
+
+        {{if .Error}}
+        <div class="toolbar">
+            <p><strong>Error:</strong> {{.Error}}</p>
+        </div>
+        {{end}}
+
+        <form method="post" action="/configurations/ffmpeg-profiles/save" id="ffmpeg-profiles-form">
+            <div class="toolbar">
+                <div class="sort-options" style="justify-content: flex-end; width: 100%;">
+                    <button type="button" class="btn btn-secondary" id="add-ffmpeg-profile">Add profile</button>
+                    <button type="submit" class="btn btn-primary">Save profiles</button>
+                </div>
+                <p class="empty-state" style="padding: 0.75rem 0 0 0; text-align: left;">
+                    Do not include <code>-i</code> or an output path. Exactly one profile must be the default.
+                </p>
+            </div>
+
+            <div class="toolbar">
+                <div id="ffmpeg-profiles" data-next-index="{{.NextIndex}}">
+                    {{range .Profiles}}
+                    <div class="toolbar" style="margin: 0 0 1rem 0;" data-profile-row data-index="{{.Index}}">
+                        <input type="hidden" name="ffmpeg_profile_indices" value="{{.Index}}">
+                        <div class="config-grid">
+                            <label>Name</label>
+                            <input name="ffmpeg_profile_name_{{.Index}}" type="text" value="{{.Name}}" placeholder="VAAPI HEVC">
+
+                            <label>Comment</label>
+                            <textarea name="ffmpeg_profile_comment_{{.Index}}" rows="2" placeholder="Optional description shown when archiving">{{.Comment}}</textarea>
+
+                            <label>ffmpeg args</label>
+                            <textarea name="ffmpeg_profile_args_{{.Index}}" rows="3" placeholder="-vaapi_device /dev/dri/renderD128 ...">{{.Args}}</textarea>
+
+                            <label>Default</label>
+                            <div>
+                                <input class="profile-default" name="ffmpeg_profile_default_{{.Index}}" type="checkbox" {{if .Default}}checked{{end}}>
+                            </div>
+
+                            <label>Delete</label>
+                            <div>
+                                <input class="profile-delete-flag" name="ffmpeg_profile_delete_{{.Index}}" type="hidden" value="{{if .Delete}}on{{end}}">
+                                <button type="button" class="btn btn-sm {{if .Delete}}btn-secondary{{else}}btn-danger{{end}}" data-action="toggle-delete">{{if .Delete}}Undo{{else}}Delete{{end}}</button>
+                                <div class="empty-state" data-delete-note style="padding: 0.25rem 0 0 0; text-align: left;" {{if not .Delete}}hidden{{end}}>
+                                    Marked for deletion (removed on save)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+        </form>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; {{.Year}} vdradmin-go | <a href="https://github.com/githubixx/vdradmin-go">GitHub</a></p>
+        </div>
+    </footer>
+
+    <template id="ffmpeg-profile-row-template">
+        <div class="toolbar" style="margin: 0 0 1rem 0;" data-profile-row data-index="__IDX__">
+            <input type="hidden" name="ffmpeg_profile_indices" value="__IDX__">
+            <div class="config-grid">
+                <label>Name</label>
+                <input name="ffmpeg_profile_name___IDX__" type="text" value="" placeholder="VAAPI HEVC">
+
+                <label>Comment</label>
+                <textarea name="ffmpeg_profile_comment___IDX__" rows="2" placeholder="Optional description shown when archiving"></textarea>
+
+                <label>ffmpeg args</label>
+                <textarea name="ffmpeg_profile_args___IDX__" rows="3" placeholder="-vaapi_device /dev/dri/renderD128 ..."></textarea>
+
+                <label>Default</label>
+                <div>
+                    <input class="profile-default" name="ffmpeg_profile_default___IDX__" type="checkbox">
+                </div>
+
+                <label>Delete</label>
+                <div>
+                    <input class="profile-delete-flag" name="ffmpeg_profile_delete___IDX__" type="hidden" value="">
+                    <button type="button" class="btn btn-sm btn-danger" data-action="toggle-delete">Delete</button>
+                    <div class="empty-state" data-delete-note style="padding: 0.25rem 0 0 0; text-align: left; display:none;">
+                        Marked for deletion (removed on save)
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        (() => {
+            const addButton = document.getElementById('add-ffmpeg-profile');
+            const profiles = document.getElementById('ffmpeg-profiles');
+            const template = document.getElementById('ffmpeg-profile-row-template');
+
+            if (!addButton || !profiles || !template) return;
+            let nextIndex = Number.parseInt(profiles.dataset.nextIndex || '0', 10);
+
+            function setRowDeleted(row, deleted) {
+                const flag = row.querySelector('.profile-delete-flag');
+                const note = row.querySelector('[data-delete-note]');
+                const toggle = row.querySelector('button[data-action="toggle-delete"]');
+                if (flag) flag.value = deleted ? 'on' : '';
+                if (note) note.hidden = !deleted;
+                if (toggle) {
+                    toggle.textContent = deleted ? 'Undo' : 'Delete';
+                    toggle.classList.toggle('btn-danger', !deleted);
+                    toggle.classList.toggle('btn-secondary', deleted);
+                }
+                row.querySelectorAll('input, textarea').forEach((control) => {
+                    if (control.type !== 'hidden') control.disabled = deleted;
+                });
+                row.style.opacity = deleted ? '0.65' : '';
+            }
+
+            function selectOnlyDefault(selected) {
+                profiles.querySelectorAll('.profile-default').forEach((control) => {
+                    if (control !== selected) control.checked = false;
+                });
+            }
+
+            profiles.querySelectorAll('[data-profile-row]').forEach((row) => {
+                const flag = row.querySelector('.profile-delete-flag');
+                setRowDeleted(row, !!(flag && flag.value === 'on'));
+            });
+
+            profiles.addEventListener('change', (event) => {
+                const target = event.target;
+                if (target && target.classList.contains('profile-default') && target.checked) {
+                    selectOnlyDefault(target);
+                }
+            });
+
+            profiles.addEventListener('click', (event) => {
+                const target = event.target;
+                const toggle = target && target.closest ? target.closest('button[data-action="toggle-delete"]') : null;
+                if (!toggle) return;
+                const row = toggle.closest('[data-profile-row]');
+                const flag = row && row.querySelector('.profile-delete-flag');
+                setRowDeleted(row, !(flag && flag.value === 'on'));
+            });
+
+            addButton.addEventListener('click', () => {
+                const wrapper = document.createElement('div');
+                wrapper.innerHTML = template.innerHTML.replaceAll('__IDX__', String(nextIndex));
+                const row = wrapper.firstElementChild;
+                if (!row) return;
+                const hasDefault = Array.from(profiles.querySelectorAll('.profile-default')).some((control) => control.checked && !control.disabled);
+                const defaultControl = row.querySelector('.profile-default');
+                if (defaultControl && !hasDefault) defaultControl.checked = true;
+                profiles.appendChild(row);
+                setRowDeleted(row, false);
+                nextIndex++;
+            });
+        })();
+    </script>
+</body>
+</html>
+{{end}}
