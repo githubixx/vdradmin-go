@@ -8,10 +8,10 @@ before:
     - go test ./...
 
 builds:
-  - id: vdradmin
+  - id: vdradmin-go
     dir: .
-    main: ./cmd/vdradmin
-    binary: vdradmin
+    main: ./cmd/vdradmin-go
+    binary: vdradmin-go
     env:
       - CGO_ENABLED=0
     goos:
