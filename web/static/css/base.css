@@ -1697,6 +1697,11 @@ main {
 
 .data-table td.actions {
     white-space: nowrap;
+    vertical-align: middle;
+}
+
+.data-table td.actions .btn {
+    vertical-align: middle;
 }
 
 .data-table tr:last-child td {

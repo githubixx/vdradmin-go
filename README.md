@@ -276,7 +276,7 @@ vdradmin-go includes a modular theme system for easy customization:
 - **System** (default): Automatically follows OS/browser dark/light mode preference
 - **Light**: Always use light theme
 - **Dark**: Always use dark theme
-- **Curated bundled themes**: `cartoon-1`, `fitness`, `glas-1`, `gold-1`, `golden-moon`, `lighting-1`, `luxury-1`, `mantle-1`, `metal-1`, `retro-arcade`, `solar-system-1`, `space-night-1`, `spaceship-2`
+- **Curated bundled themes**: `aurora-glass-1`, `cartoon-1`, `fitness`, `glas-1`, `gold-1`, `golden-moon`, `lighting-1`, `luxury-1`, `mantle-1`, `metal-1`, `retro-arcade`, `solar-system-1`, `space-night-1`, `spaceship-2`
 - **Spaceship variants**: `spaceship-blue-(dark|light)`, `spaceship-cyan-(dark|light)`, `spaceship-green-(dark|light)`, `spaceship-grey-(dark|light)`, `spaceship-magenta-(dark|light)`, `spaceship-mono-(dark|light)`, `spaceship-orange-(dark|light)`, `spaceship-purple-(dark|light)`, `spaceship-red-(dark|light)`, `spaceship-yellow-(dark|light)`
 
 Themes are discovered from subdirectories under `web/themes/` that contain a `theme.yaml` file. The Configurations page shows `System (auto)` plus all discovered themes, using the display name from `theme.yaml` when available.

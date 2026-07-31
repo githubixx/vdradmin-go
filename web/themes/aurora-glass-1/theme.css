@@ -1,0 +1,234 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap');
+
+/* Aurora Glass 1 Theme - vdradmin-go */
+
+:root[data-theme="aurora-glass-1"] {
+    --font-sans: 'Manrope', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Sora', 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+    --primary-color: #8b5cf6;
+    --primary-hover: #b794f6;
+    --secondary-color: #7dd3fc;
+    --success-color: #34d399;
+    --danger-color: #fb7185;
+    --warning-color: #fbbf24;
+
+    --bg-color: #050a20;
+    --bg-image:
+        image-set(
+            url('/static/img/themes/aurora-glass-1/aurora-desktop.avif') type('image/avif'),
+            url('/static/img/themes/aurora-glass-1/aurora-desktop.webp') type('image/webp')
+        );
+    --bg-image-size: cover;
+    --bg-image-position: center;
+    --bg-image-repeat: no-repeat;
+
+    --surface-color: linear-gradient(145deg, rgba(49, 72, 149, 0.76) 0%, rgba(25, 39, 103, 0.82) 18%, rgba(10, 20, 61, 0.90) 66%, rgba(7, 13, 43, 0.94) 100%);
+    --surface-hover: rgba(87, 158, 255, 0.18);
+    --text-color: #edf5ff;
+    --text-muted: #aab8d6;
+    --border-color: rgba(143, 210, 255, 0.44);
+
+    --shadow: 0 1px 0 rgba(233, 250, 255, 0.28) inset, 0 -1px 0 rgba(42, 92, 193, 0.22) inset, 0 14px 34px rgba(0, 0, 0, 0.42), 0 0 28px rgba(52, 128, 255, 0.16), 0 0 44px rgba(121, 68, 255, 0.10);
+    --shadow-lg: 0 1px 0 rgba(235, 251, 255, 0.38) inset, 0 -1px 0 rgba(71, 113, 231, 0.30) inset, 0 22px 52px rgba(0, 0, 0, 0.54), 0 0 38px rgba(45, 190, 255, 0.22), 0 0 58px rgba(142, 74, 255, 0.18);
+
+    --nav-active-bg: linear-gradient(135deg, rgba(62, 167, 255, 0.26), rgba(150, 77, 255, 0.26));
+    --nav-active-border: rgba(102, 220, 255, 0.68);
+    --nav-active-shadow: 0 0 20px rgba(34, 211, 238, 0.20), 0 0 30px rgba(139, 92, 246, 0.18);
+
+    --menu-scrim-color: rgba(1, 4, 22, 0.58);
+    --menu-scrim-padding: 16px;
+    --radius: 0.5rem;
+    --spacing: 1rem;
+    color-scheme: dark;
+}
+
+:root[data-theme="aurora-glass-1"] header {
+    background-color: rgba(7, 13, 42, 0.72);
+    background-image: linear-gradient(115deg, rgba(26, 104, 234, 0.30), rgba(76, 46, 190, 0.30) 48%, rgba(25, 205, 240, 0.22));
+    border-bottom-color: rgba(126, 219, 255, 0.62);
+    box-shadow: 0 1px 0 rgba(232, 249, 255, 0.34) inset, 0 -1px 0 rgba(125, 78, 255, 0.24) inset, 0 14px 36px rgba(1, 4, 21, 0.62), 0 0 36px rgba(60, 176, 255, 0.20), 0 0 56px rgba(122, 67, 255, 0.20);
+    backdrop-filter: blur(22px) saturate(150%);
+}
+
+:root[data-theme="aurora-glass-1"] body {
+    background-size: var(--bg-image-size);
+    background-position: var(--bg-image-position);
+    background-repeat: var(--bg-image-repeat);
+}
+
+:root[data-theme="aurora-glass-1"] h1,
+:root[data-theme="aurora-glass-1"] h2,
+:root[data-theme="aurora-glass-1"] h3,
+:root[data-theme="aurora-glass-1"] .nav-brand h1 {
+    font-family: var(--font-display);
+    letter-spacing: 0;
+    text-shadow: 0 0 18px rgba(135, 215, 255, 0.22);
+}
+
+:root[data-theme="aurora-glass-1"] .card,
+:root[data-theme="aurora-glass-1"] .epg-item,
+:root[data-theme="aurora-glass-1"] .timer-item,
+:root[data-theme="aurora-glass-1"] .recording-item,
+:root[data-theme="aurora-glass-1"] .toolbar,
+:root[data-theme="aurora-glass-1"] .config-panel,
+:root[data-theme="aurora-glass-1"] .watchtv-screen-inner,
+:root[data-theme="aurora-glass-1"] .watchtv-channels-panel,
+:root[data-theme="aurora-glass-1"] .remote-panel {
+    background-color: rgba(7, 15, 50, 0.78);
+    background-image: var(--surface-color);
+    border-color: rgba(143, 210, 255, 0.50);
+    box-shadow: var(--shadow);
+}
+
+:root[data-theme="aurora-glass-1"] .card,
+:root[data-theme="aurora-glass-1"] .epg-item,
+:root[data-theme="aurora-glass-1"] .timer-item,
+:root[data-theme="aurora-glass-1"] .recording-item {
+    position: relative;
+    overflow: hidden;
+}
+
+:root[data-theme="aurora-glass-1"] .card::before,
+:root[data-theme="aurora-glass-1"] .epg-item::before,
+:root[data-theme="aurora-glass-1"] .timer-item::before,
+:root[data-theme="aurora-glass-1"] .recording-item::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background-image: url('/static/img/themes/aurora-glass-1/panel-gloss.svg');
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+    mix-blend-mode: screen;
+    opacity: 0.9;
+}
+
+:root[data-theme="aurora-glass-1"] .card::after,
+:root[data-theme="aurora-glass-1"] .epg-item::after,
+:root[data-theme="aurora-glass-1"] .timer-item::after,
+:root[data-theme="aurora-glass-1"] .recording-item::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1px rgba(231, 247, 255, 0.18), inset 0 -30px 34px rgba(0, 0, 25, 0.24);
+    pointer-events: none;
+}
+
+:root[data-theme="aurora-glass-1"] .btn,
+:root[data-theme="aurora-glass-1"] .badge,
+:root[data-theme="aurora-glass-1"] .channels-day,
+:root[data-theme="aurora-glass-1"] .custom-select-trigger,
+:root[data-theme="aurora-glass-1"] input,
+:root[data-theme="aurora-glass-1"] select,
+:root[data-theme="aurora-glass-1"] textarea {
+    border-color: rgba(143, 210, 255, 0.58);
+    box-shadow: 0 1px 0 rgba(240, 252, 255, 0.22) inset, 0 -1px 0 rgba(57, 81, 188, 0.24) inset, 0 8px 20px rgba(0, 0, 24, 0.30), 0 0 16px rgba(53, 125, 255, 0.10);
+}
+
+:root[data-theme="aurora-glass-1"] .btn {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+}
+
+:root[data-theme="aurora-glass-1"] .btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: url('/static/img/themes/aurora-glass-1/button-glint.svg') center / 100% 100% no-repeat;
+    mix-blend-mode: screen;
+    opacity: 0.88;
+}
+
+:root[data-theme="aurora-glass-1"] .btn-primary {
+    background: linear-gradient(135deg, #2563eb 0%, #6d3df2 54%, #a344ec 100%);
+    border-color: rgba(170, 228, 255, 0.72);
+    box-shadow: 0 1px 0 rgba(245, 252, 255, 0.33) inset, 0 8px 20px rgba(42, 98, 255, 0.35), 0 0 22px rgba(153, 80, 255, 0.24);
+}
+
+:root[data-theme="aurora-glass-1"] .btn-primary:hover {
+    background: linear-gradient(135deg, #3b82f6 0%, #8055fa 54%, #ba57ef 100%);
+}
+
+:root[data-theme="aurora-glass-1"] .btn:hover::after {
+    opacity: 1;
+}
+
+:root[data-theme="aurora-glass-1"] .btn-secondary,
+:root[data-theme="aurora-glass-1"] .nav-burger-menu,
+:root[data-theme="aurora-glass-1"] .custom-select-dropdown {
+    background-color: rgba(6, 13, 45, 0.96);
+    background-image: linear-gradient(145deg, rgba(41, 82, 156, 0.34), rgba(27, 19, 78, 0.40));
+    border-color: rgba(126, 209, 255, 0.46);
+    box-shadow: var(--shadow-lg);
+}
+
+:root[data-theme="aurora-glass-1"] .btn-secondary:hover,
+:root[data-theme="aurora-glass-1"] .nav-burger-menu a:hover,
+:root[data-theme="aurora-glass-1"] .custom-select-option:hover {
+    color: #f5fbff;
+    background-color: rgba(85, 161, 255, 0.18);
+}
+
+:root[data-theme="aurora-glass-1"] .nav-burger-menu a.active,
+:root[data-theme="aurora-glass-1"] .nav-burger-menu a[aria-current="page"],
+:root[data-theme="aurora-glass-1"] .custom-select-option.selected {
+    background: var(--nav-active-bg);
+    border-color: var(--nav-active-border);
+    box-shadow: var(--nav-active-shadow);
+}
+
+:root[data-theme="aurora-glass-1"] input:focus,
+:root[data-theme="aurora-glass-1"] select:focus,
+:root[data-theme="aurora-glass-1"] textarea:focus,
+:root[data-theme="aurora-glass-1"] .btn:focus-visible,
+:root[data-theme="aurora-glass-1"] .nav-burger-menu a:focus-visible {
+    border-color: #67e8f9;
+    outline-color: rgba(103, 232, 249, 0.68);
+}
+
+:root[data-theme="aurora-glass-1"] .timer-item.recording {
+    border-left-color: var(--success-color);
+    background-image: linear-gradient(135deg, rgba(16, 185, 129, 0.20), rgba(22, 42, 88, 0.12) 48%), var(--surface-color);
+}
+
+:root[data-theme="aurora-glass-1"] .timer-item.collision {
+    border-left-color: var(--warning-color);
+    background-image: linear-gradient(135deg, rgba(251, 191, 36, 0.20), rgba(22, 42, 88, 0.12) 48%), var(--surface-color);
+}
+
+:root[data-theme="aurora-glass-1"] .timer-item.conflict {
+    border-left-color: var(--danger-color);
+    background-image: linear-gradient(135deg, rgba(251, 113, 133, 0.20), rgba(22, 42, 88, 0.12) 48%), var(--surface-color);
+}
+
+:root[data-theme="aurora-glass-1"] .timeline-block.ok {
+    background: linear-gradient(135deg, #059669, #0d9488);
+    border-color: #6ee7b7;
+}
+
+:root[data-theme="aurora-glass-1"] .timeline-block.collision {
+    background: linear-gradient(135deg, #d97706, #f59e0b);
+    border-color: #fde68a;
+}
+
+:root[data-theme="aurora-glass-1"] .timeline-block.critical {
+    background: linear-gradient(135deg, #e11d48, #f43f5e);
+    border-color: #fecdd3;
+}
+
+@media (max-width: 768px) {
+    :root[data-theme="aurora-glass-1"] {
+        --bg-image:
+            image-set(
+                url('/static/img/themes/aurora-glass-1/aurora-mobile.avif') type('image/avif'),
+                url('/static/img/themes/aurora-glass-1/aurora-mobile.webp') type('image/webp')
+            );
+        --spacing: 0.85rem;
+    }
+}
