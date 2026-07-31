@@ -8,7 +8,7 @@
     --primary-color: #3ab3c5;
     --primary-hover: #5bcfe0;
     --secondary-color: #94a3b8;
-    --success-color: #10b981;
+    --success-color: #087b68;
     --danger-color: #ef4444;
     --warning-color: #f59e0b;
 
@@ -95,3 +95,30 @@
     --spacing: 1rem;
     color-scheme: dark;
 }
+
+  :root[data-theme="space-night-1"] {
+    --bg-image:
+      image-set(
+        url('/static/img/themes/space-night-1/space-night-desktop.avif') type('image/avif'),
+        url('/static/img/themes/space-night-1/space-night-desktop.webp') type('image/webp'),
+        url('/static/img/themes/space-night-1/space-night-desktop.png') type('image/png')
+      );
+  }
+
+  :root[data-theme="space-night-1"] body {
+    background-attachment: fixed;
+    background-position: 50% 50%;
+    background-repeat: no-repeat;
+    background-size: cover;
+  }
+
+  @media (max-width: 768px) {
+    :root[data-theme="space-night-1"] {
+      --bg-image:
+        image-set(
+          url('/static/img/themes/space-night-1/space-night-mobile.avif') type('image/avif'),
+          url('/static/img/themes/space-night-1/space-night-mobile.webp') type('image/webp'),
+          url('/static/img/themes/space-night-1/space-night-mobile.png') type('image/png')
+        );
+    }
+  }
