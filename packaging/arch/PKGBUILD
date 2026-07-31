@@ -1,0 +1,41 @@
+# Maintainer: vdradmin-go contributors
+# Update pkgver and sha256sums after the first release that includes this package support.
+
+pkgname=vdradmin-go
+pkgver=0.10.0
+pkgrel=1
+pkgdesc='Web interface for VDR written in Go'
+arch=('x86_64')
+url='https://github.com/githubixx/vdradmin-go'
+license=('GPL-3.0-or-later')
+depends=('vdr')
+makedepends=('go' 'make')
+optdepends=(
+  'ffmpeg: archive encoding and HLS proxy streaming'
+  'vdr-epgsearch: EPG search integration'
+  'vdr-streamdev-server: HLS proxy stream source'
+)
+source=("${pkgname}-${pkgver}.tar.gz::${url}/archive/refs/tags/${pkgver}.tar.gz")
+sha256sums=('55de1e6b29698fd860df66e6e4d6b14fe68b0caac5f267d0cbda3bbd9026de6f')
+
+build() {
+  cd "${pkgname}-${pkgver}"
+  make VERSION="${pkgver}" COMMIT="${pkgver}" DATE="${SOURCE_DATE_EPOCH:-unknown}" build
+}
+
+check() {
+  cd "${pkgname}-${pkgver}"
+  go test ./...
+}
+
+package() {
+  cd "${pkgname}-${pkgver}"
+  make VERSION="${pkgver}" COMMIT="${pkgver}" DATE="${SOURCE_DATE_EPOCH:-unknown}" DESTDIR="${pkgdir}" install
+
+  install -Dm644 deployments/systemd/vdradmin-go.service \
+    "${pkgdir}/usr/lib/systemd/system/vdradmin-go.service"
+  install -Dm644 configs/config.example.yaml \
+    "${pkgdir}/etc/vdradmin-go/config.example.yaml"
+  install -Dm644 LICENSES/GPL-3.0-or-later.txt \
+    "${pkgdir}/usr/share/licenses/${pkgname}/GPL-3.0-or-later.txt"
+}

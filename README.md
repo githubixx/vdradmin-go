@@ -57,7 +57,7 @@ For a detailed overview (including more diagrams and examples), see `docs/ARCHIT
 ```plain
 vdradmin-go/
 ├── cmd/
-│   └── vdradmin/                # Application entry point (main)
+│   └── vdradmin-go/             # Application entry point (main)
 ├── internal/
 │   ├── domain/                  # Domain models + domain errors
 │   ├── ports/                   # Port interfaces (e.g. VDR client)
@@ -121,6 +121,13 @@ Arch Linux:
 ```bash
 sudo pacman -Syu
 sudo pacman -S --needed go make git
+```
+
+Build an Arch-ready binary with reproducible path handling:
+
+```bash
+make arch-build
+./build/vdradmin-go --version
 ```
 
 ### Using the released binary
@@ -193,13 +200,13 @@ tar xvfz vdradmin-go_${VDRADMIN_GO_VERSION}_linux_amd64.tar.gz
 - Run it with default settings:
 
 ```bash
-./vdradmin
+./vdradmin-go
 ```
 
 - Or with a configuration file
 
 ```bash
-./vdradmin --config /path/to/config.yaml
+./vdradmin-go --config /path/to/config.yaml
 ```
 
 ### 2) Use the Docker container (GHCR)
@@ -239,15 +246,25 @@ docker run \
 
 If you want vdradmin-go to start automatically on boot:
 
-1. Copy the example unit file from `deployments/systemd/vdradmin.service` to your systemd directory.
-2. Install the `vdradmin` binary somewhere like `/usr/local/bin/vdradmin`.
-3. Ensure the unit points to your config path.
+1. Install the `vdradmin-go` binary together with its `web/` asset directory, or use the Arch package.
+2. Copy `deployments/systemd/vdradmin-go.service` to your systemd directory and adjust the asset/config paths for a manual installation.
+3. Ensure the service account has VDR recording-directory and archive-target permissions.
 4. Enable and start:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now vdradmin
+sudo systemctl enable --now vdradmin-go
 ```
+
+### Arch Linux package
+
+The source package definition lives in `packaging/arch/`. It builds a tagged
+release into `/usr/bin/vdradmin-go`, installs web assets in
+`/usr/share/vdradmin-go/web`, and provides `vdradmin-go.service`.
+
+The service runs as `vdr:vdr` so it has the same recording-directory ownership
+model as VDR. Archive destination directories must also be writable by `vdr`.
+See `packaging/arch/README.md` for local package builds and AUR release steps.
 
 ### 4) Use docker-compose
 
@@ -445,4 +462,4 @@ Note: Coverage percentages reflect tested code paths. Low percentages often indi
 
 ## License
 
-LGPL v2.1 (same as original [vdradmin-am](http://andreas.vdr-developer.org/vdradmin-am/index.html))
+[GNU General Public License v3.0 or later](https://spdx.org/licenses/GPL-3.0-or-later.html)

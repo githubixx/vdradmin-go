@@ -1,0 +1,8 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: vdradmin-go
+Upstream-Contact: https://github.com/githubixx/vdradmin-go/issues
+Source: https://github.com/githubixx/vdradmin-go
+
+Files: **
+Copyright: 2025-2026 Robert Wimmer
+License: GPL-3.0-or-later

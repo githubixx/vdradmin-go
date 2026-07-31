@@ -1,8 +1,16 @@
-.PHONY: build run test clean lint docker help
+.PHONY: arch-build build clean deps docker fmt help install lint run test test-coverage
 
-BINARY_NAME=vdradmin
-BUILD_DIR=build
-GO_FILES=$(shell find . -name '*.go' -type f)
+BINARY_NAME ?= vdradmin-go
+BUILD_DIR ?= build
+CMD_DIR ?= ./cmd/vdradmin-go
+VERSION ?= dev
+COMMIT ?= none
+DATE ?= unknown
+LDFLAGS ?= -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
+PREFIX ?= /usr
+BINDIR ?= $(PREFIX)/bin
+DATADIR ?= $(PREFIX)/share/vdradmin-go
+DESTDIR ?=
 
 ## help: Show this help message
 help:
@@ -12,12 +20,22 @@ help:
 ## build: Build the application
 build:
 	@echo "Building..."
-	@go build -o ${BUILD_DIR}/${BINARY_NAME} ./cmd/vdradmin
+	@mkdir -p ${BUILD_DIR}
+	@go build -mod=readonly -trimpath -buildvcs=false -ldflags "${LDFLAGS}" -o ${BUILD_DIR}/${BINARY_NAME} ${CMD_DIR}
+
+## arch-build: Build an Arch package-ready binary
+arch-build: build
 
 ## run: Run the application
 run:
 	@echo "Running..."
-	@go run ./cmd/vdradmin
+	@go run ${CMD_DIR}
+
+## install: Install the binary and web assets (honors DESTDIR)
+install: build
+	@install -Dm755 ${BUILD_DIR}/${BINARY_NAME} ${DESTDIR}${BINDIR}/${BINARY_NAME}
+	@mkdir -p ${DESTDIR}${DATADIR}
+	@cp -a web ${DESTDIR}${DATADIR}/
 
 ## test: Run tests
 test:
