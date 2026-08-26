@@ -103,6 +103,16 @@ func TestEPGSearch_DisablesRecordWhenTimerOverlaps(t *testing.T) {
 	body := rw.Body.String()
 	const recordActionPrefix = "hx-post=\"/timers/create?channel="
 	const scheduledButton = "disabled>Scheduled</button>"
+	const eventInfoPopup = "onclick=\"window.open(this.href,'vdradmin_moreinfo','width=560,height=420,scrollbars=yes,resizable=yes'); return false;\""
+	const scheduledEventLink = "href=\"/event?channel=C-1-2-3&id=100\""
+	const otherEventLink = "href=\"/event?channel=C-1-2-3&id=101\""
+
+	if !strings.Contains(body, eventInfoPopup) {
+		t.Fatalf("expected event information links to open the standard popup")
+	}
+	if !strings.Contains(body, scheduledEventLink) || !strings.Contains(body, otherEventLink) {
+		t.Fatalf("expected search result titles to link to their channel-scoped event details")
+	}
 
 	scheduledIdx := strings.Index(body, scheduled.Title)
 	otherIdx := strings.Index(body, other.Title)
