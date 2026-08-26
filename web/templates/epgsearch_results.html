@@ -43,7 +43,7 @@
                             <time datetime="{{.Start.Format "2006-01-02T15:04"}}">{{.Start.Format "15:04"}}-{{.Stop.Format "15:04"}}</time>
                         </td>
                         <td>
-                            <div style="font-weight: 600;">{{.Title}}</div>
+                            <div style="font-weight: 600;">{{if gt .EventID 0}}<a href="/event?channel={{.ChannelID}}&id={{.EventID}}" onclick="window.open(this.href,'vdradmin_moreinfo','width=560,height=420,scrollbars=yes,resizable=yes'); return false;">{{.Title}}</a>{{else}}{{.Title}}{{end}}</div>
                             {{if .Subtitle}}<div class="epg-subtitle">{{.Subtitle}}</div>{{end}}
                         </td>
                         <td>{{.ChannelName}}</td>
