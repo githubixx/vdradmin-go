@@ -1,8 +1,10 @@
-.PHONY: arch-build build clean deps docker fmt help install lint run test test-coverage
+.PHONY: arch-build build build-mcp build-web clean deps docker fmt help install lint run run-mcp test test-coverage
 
 BINARY_NAME ?= vdradmin-go
+MCP_BINARY_NAME ?= vdradmin-go-mcp
 BUILD_DIR ?= build
 CMD_DIR ?= ./cmd/vdradmin-go
+MCP_CMD_DIR ?= ./cmd/vdradmin-go-mcp
 VERSION ?= dev
 COMMIT ?= none
 DATE ?= unknown
@@ -18,13 +20,22 @@ help:
 	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' | sed -e 's/^/ /'
 
 ## build: Build the application
-build:
-	@echo "Building..."
+build: build-web build-mcp
+
+## build-web: Build the web application
+build-web:
+	@echo "Building web application..."
 	@mkdir -p ${BUILD_DIR}
 	@go build -mod=readonly -trimpath -buildvcs=false -ldflags "${LDFLAGS}" -o ${BUILD_DIR}/${BINARY_NAME} ${CMD_DIR}
 
-## arch-build: Build an Arch package-ready binary
+## arch-build: Build Arch package-ready binaries
 arch-build: build
+
+## build-mcp: Build the MCP server
+build-mcp:
+	@echo "Building MCP server..."
+	@mkdir -p ${BUILD_DIR}
+	@go build -mod=readonly -trimpath -buildvcs=false -ldflags "${LDFLAGS}" -o ${BUILD_DIR}/${MCP_BINARY_NAME} ${MCP_CMD_DIR}
 
 ## run: Run the application
 run:
@@ -34,8 +45,14 @@ run:
 ## install: Install the binary and web assets (honors DESTDIR)
 install: build
 	@install -Dm755 ${BUILD_DIR}/${BINARY_NAME} ${DESTDIR}${BINDIR}/${BINARY_NAME}
+	@install -Dm755 ${BUILD_DIR}/${MCP_BINARY_NAME} ${DESTDIR}${BINDIR}/${MCP_BINARY_NAME}
 	@mkdir -p ${DESTDIR}${DATADIR}
 	@cp -a web ${DESTDIR}${DATADIR}/
+
+## run-mcp: Run the MCP server over stdio
+run-mcp:
+	@echo "Running MCP server over stdio..."
+	@go run ${MCP_CMD_DIR}
 
 ## test: Run tests
 test:

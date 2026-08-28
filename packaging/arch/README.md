@@ -18,8 +18,10 @@ sudo pacman -U vdradmin-go-*.pkg.tar.zst
 The package installs:
 
 - `/usr/bin/vdradmin-go`
+- `/usr/bin/vdradmin-go-mcp`
 - `/usr/share/vdradmin-go/web`
 - `/usr/lib/systemd/system/vdradmin-go.service`
+- `/usr/lib/systemd/system/vdradmin-go-mcp.service`
 - `/etc/vdradmin-go/config.example.yaml`
 - `/usr/share/licenses/vdradmin-go/GPL-3.0-or-later.txt`
 
@@ -29,6 +31,12 @@ Enable the service after installation:
 
 ```bash
 sudo systemctl enable --now vdradmin-go.service
+```
+
+The MCP service is optional and serves its unauthenticated Streamable HTTP endpoint only on `127.0.0.1:8081` by default:
+
+```bash
+sudo systemctl enable --now vdradmin-go-mcp.service
 ```
 
 The `vdr` account must be able to write each configured archive destination. `ffmpeg`, `vdr-epgsearch`, and `vdr-streamdev-server` are optional package dependencies for their respective features.

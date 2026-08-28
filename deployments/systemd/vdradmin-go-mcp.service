@@ -1,0 +1,24 @@
+[Unit]
+Description=vdradmin-go MCP Server
+Wants=network-online.target vdr.service
+After=network-online.target vdr.service
+
+[Service]
+Type=simple
+User=vdr
+Group=vdr
+StateDirectory=vdradmin-go
+WorkingDirectory=/var/lib/vdradmin-go
+ExecStart=/usr/bin/vdradmin-go-mcp --transport=http --config /var/lib/vdradmin-go/config.yaml
+Restart=on-failure
+RestartSec=5s
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=512
+
+[Install]
+WantedBy=multi-user.target

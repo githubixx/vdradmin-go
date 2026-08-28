@@ -41,7 +41,7 @@ vdradmin-go follows **Hexagonal Architecture** (Ports & Adapters): the domain an
 - **Application** (`internal/application`): use-cases/services that orchestrate domain logic and call ports.
 - **Ports** (`internal/ports`): interfaces the application depends on (e.g. VDR client).
 - **Adapters** (`internal/adapters`): concrete implementations of ports.
-  - **Primary adapters** (`internal/adapters/primary/http`): HTTP server, handlers, middleware.
+  - **Primary adapters** (`internal/adapters/primary/http`, `internal/adapters/primary/mcp`): web and MCP transports.
   - **Secondary adapters** (`internal/adapters/secondary/svdrp`): SVDRP client integration to talk to VDR.
 - **Infrastructure** (`internal/infrastructure`): cross-cutting concerns like configuration.
 - **Web UI assets** (`web/templates`, `web/static`): server-rendered templates + htmx + CSS/JS.
@@ -49,7 +49,7 @@ vdradmin-go follows **Hexagonal Architecture** (Ports & Adapters): the domain an
 Typical request flow:
 
 ```plain
-HTTP request → handler (primary adapter) → application service → port interface → secondary adapter (SVDRP) → VDR
+HTTP or MCP request → primary adapter → application service → port interface → secondary adapter (SVDRP) → VDR
 ```
 
 For a detailed overview (including more diagrams and examples), see `docs/ARCHITECTURE.md`.
@@ -209,6 +209,8 @@ tar xvfz vdradmin-go_${VDRADMIN_GO_VERSION}_linux_amd64.tar.gz
 ./vdradmin-go --config /path/to/config.yaml
 ```
 
+The release archive also contains `vdradmin-go-mcp`. See [docs/MCP.md](docs/MCP.md) for local stdio use, Streamable HTTP, systemd, and client integrations.
+
 ### 2) Use the Docker container (GHCR)
 
 - Check for latest version in [Github Container Registry (GHCR)](https://github.com/githubixx/vdradmin-go/releases)
@@ -266,6 +268,10 @@ The service runs as `vdr:vdr` so it has the same recording-directory ownership
 model as VDR. Archive destination directories must also be writable by `vdr`.
 See `packaging/arch/README.md` for local package builds and AUR release steps.
 
+### MCP systemd service
+
+For a systemd-managed MCP HTTP endpoint, install `deployments/systemd/vdradmin-go-mcp.service` and enable `vdradmin-go-mcp`. It is unauthenticated and binds to `127.0.0.1:8081` by default; see [docs/MCP.md](docs/MCP.md) before changing that listener.
+
 ### 4) Use docker-compose
 
 There is an example compose file at `deployments/docker-compose.yml`.
@@ -284,6 +290,10 @@ docker compose -f deployments/docker-compose.yml up -d
 
 See `configs/config.example.yaml` for full configuration options.
 
+## MCP
+
+`vdradmin-go-mcp` offers read-only advanced EPG search to MCP clients. It reuses the configured VDR connection and wanted-channel filtering. Direct execution uses stdio; the optional HTTP listener is intended for local systemd use and is loopback-only by default. See [docs/MCP.md](docs/MCP.md) for setup in VS Code, Claude Code, and Codex.
+
 ## Themes
 
 vdradmin-go includes a modular theme system for easy customization:
@@ -293,7 +303,7 @@ vdradmin-go includes a modular theme system for easy customization:
 - **System** (default): Automatically follows OS/browser dark/light mode preference
 - **Light**: Always use light theme
 - **Dark**: Always use dark theme
-- **Curated bundled themes**: `cartoon-1`, `fitness`, `glas-1`, `gold-1`, `golden-moon`, `lighting-1`, `luxury-1`, `mantle-1`, `metal-1`, `retro-arcade`, `solar-system-1`, `space-night-1`, `spaceship-2`
+- **Curated bundled themes**: `aurora-glass-1`, `cartoon-1`, `fitness`, `glas-1`, `gold-1`, `golden-moon`, `lighting-1`, `luxury-1`, `mantle-1`, `metal-1`, `retro-arcade`, `solar-system-1`, `space-night-1`, `spaceship-2`
 - **Spaceship variants**: `spaceship-blue-(dark|light)`, `spaceship-cyan-(dark|light)`, `spaceship-green-(dark|light)`, `spaceship-grey-(dark|light)`, `spaceship-magenta-(dark|light)`, `spaceship-mono-(dark|light)`, `spaceship-orange-(dark|light)`, `spaceship-purple-(dark|light)`, `spaceship-red-(dark|light)`, `spaceship-yellow-(dark|light)`
 
 Themes are discovered from subdirectories under `web/themes/` that contain a `theme.yaml` file. The Configurations page shows `System (auto)` plus all discovered themes, using the display name from `theme.yaml` when available.

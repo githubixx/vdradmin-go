@@ -18,6 +18,7 @@ Theme IDs are the directory names (for example: `luxury-1`).
 
 Curated themes currently included:
 
+- `aurora-glass-1`
 - `cartoon-1`
 - `fitness`
 - `glas-1`

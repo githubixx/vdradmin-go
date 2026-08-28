@@ -13,6 +13,7 @@ import (
 // Config represents the application configuration
 type Config struct {
 	Server  ServerConfig  `yaml:"server"`
+	MCP     MCPConfig     `yaml:"mcp"`
 	VDR     VDRConfig     `yaml:"vdr"`
 	Auth    AuthConfig    `yaml:"auth"`
 	Cache   CacheConfig   `yaml:"cache"`
@@ -133,6 +134,13 @@ type ServerConfig struct {
 	TLS            TLSConfig     `yaml:"tls"`
 }
 
+// MCPConfig contains settings for the Streamable HTTP MCP listener.
+// The stdio MCP transport does not use these settings.
+type MCPConfig struct {
+	Host string `yaml:"host"`
+	Port int    `yaml:"port"`
+}
+
 // TLSConfig contains TLS settings
 type TLSConfig struct {
 	Enabled  bool   `yaml:"enabled"`
@@ -196,6 +204,10 @@ func Load(path string) (*Config, error) {
 			ReadTimeout:    30 * time.Second,
 			WriteTimeout:   30 * time.Second,
 			MaxHeaderBytes: 1 << 20, // 1 MB
+		},
+		MCP: MCPConfig{
+			Host: "127.0.0.1",
+			Port: 8081,
 		},
 		VDR: VDRConfig{
 			Host:                "localhost",
@@ -273,6 +285,16 @@ func Load(path string) (*Config, error) {
 func (c *Config) Validate() error {
 	if c.Server.Port < 1 || c.Server.Port > 65535 {
 		return fmt.Errorf("invalid server port: %d", c.Server.Port)
+	}
+	c.MCP.Host = strings.TrimSpace(c.MCP.Host)
+	if c.MCP.Host == "" {
+		c.MCP.Host = "127.0.0.1"
+	}
+	if c.MCP.Port == 0 {
+		c.MCP.Port = 8081
+	}
+	if c.MCP.Port < 1 || c.MCP.Port > 65535 {
+		return fmt.Errorf("invalid MCP port: %d", c.MCP.Port)
 	}
 
 	if c.VDR.Port < 1 || c.VDR.Port > 65535 {
