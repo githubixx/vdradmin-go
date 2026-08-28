@@ -774,16 +774,15 @@ func runArchive(ctx context.Context, job *Job, plan Plan) error {
 	if err != nil {
 		return fmt.Errorf("invalid archive output path: %w", err)
 	}
-	plan.Preview = preview
 	// Ensure target dir exists.
-	if err := os.MkdirAll(plan.Preview.TargetDir, 0755); err != nil {
+	if err := os.MkdirAll(preview.TargetDir, 0755); err != nil {
 		return fmt.Errorf("mkdir target dir: %w", err)
 	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	finalOut := plan.Preview.VideoPath
+	finalOut := preview.VideoPath
 	// Keep a standard container extension at the end so ffmpeg can infer the muxer.
 	// Example: video.mkv -> video.tmp.mkv (instead of video.mkv.tmp which breaks format detection).
 	ext := filepath.Ext(finalOut)
@@ -802,7 +801,7 @@ func runArchive(ctx context.Context, job *Job, plan Plan) error {
 	}
 
 	// Create concat list file in the target dir so paths are easy to diagnose.
-	concatList, err := WriteConcatList(plan.Preview.TargetDir, plan.Segments)
+	concatList, err := WriteConcatList(preview.TargetDir, plan.Segments)
 	if err != nil {
 		return err
 	}
@@ -913,7 +912,7 @@ func runArchive(ctx context.Context, job *Job, plan Plan) error {
 
 	// Copy info file.
 	if len(plan.InfoBytes) > 0 {
-		_ = os.WriteFile(plan.Preview.InfoDstPath, plan.InfoBytes, 0644)
+		_ = os.WriteFile(preview.InfoDstPath, plan.InfoBytes, 0644)
 	}
 
 	return nil
