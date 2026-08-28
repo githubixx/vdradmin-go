@@ -11,6 +11,12 @@ server:
     cert_file: ""
     key_file: ""
 
+# Streamable HTTP endpoint for vdradmin-mcp when started with --transport=http.
+# Keep this on loopback until authentication is configured.
+mcp:
+  host: "127.0.0.1"
+  port: 8081
+
 vdr:
   host: "localhost"
   port: 6419  # Use 2001 for older VDR versions

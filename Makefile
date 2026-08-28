@@ -1,6 +1,7 @@
-.PHONY: build run test clean lint docker help
+.PHONY: build build-web build-mcp run run-mcp test clean lint docker help
 
 BINARY_NAME=vdradmin
+MCP_BINARY_NAME=vdradmin-mcp
 BUILD_DIR=build
 GO_FILES=$(shell find . -name '*.go' -type f)
 
@@ -10,14 +11,27 @@ help:
 	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' | sed -e 's/^/ /'
 
 ## build: Build the application
-build:
-	@echo "Building..."
+build: build-web build-mcp
+
+## build-web: Build the web application
+build-web:
+	@echo "Building web application..."
 	@go build -o ${BUILD_DIR}/${BINARY_NAME} ./cmd/vdradmin
+
+## build-mcp: Build the MCP server
+build-mcp:
+	@echo "Building MCP server..."
+	@go build -o ${BUILD_DIR}/${MCP_BINARY_NAME} ./cmd/vdradmin-mcp
 
 ## run: Run the application
 run:
 	@echo "Running..."
 	@go run ./cmd/vdradmin
+
+## run-mcp: Run the MCP server over stdio
+run-mcp:
+	@echo "Running MCP server over stdio..."
+	@go run ./cmd/vdradmin-mcp
 
 ## test: Run tests
 test:
