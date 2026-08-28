@@ -16,13 +16,6 @@ import (
 	"time"
 )
 
-func isPathWithinBase(baseDir, path string) bool {
-	baseDir = filepath.Clean(strings.TrimSpace(baseDir))
-	path = filepath.Clean(strings.TrimSpace(path))
-	return filepath.IsAbs(baseDir) && filepath.IsAbs(path) &&
-		(path == baseDir || strings.HasPrefix(path, baseDir+string(filepath.Separator)))
-}
-
 // validatePath checks that a path does not contain directory traversal sequences.
 // Callers that use a path for output must also validate its configured base directory.
 func validatePath(path string) error {
@@ -231,9 +224,25 @@ func ValidatePreview(profile ArchiveProfile, preview Preview, videoExt string) (
 	if err != nil {
 		return Preview{}, err
 	}
-	if !isPathWithinBase(profile.BaseDir, preview.TargetDir) {
+	baseDir := filepath.Clean(strings.TrimSpace(profile.BaseDir))
+	if !filepath.IsAbs(baseDir) {
+		return Preview{}, errors.New("archive profile base_dir must be an absolute path")
+	}
+	relativeTargetDir, err := filepath.Rel(baseDir, preview.TargetDir)
+	if err != nil || relativeTargetDir == "." || relativeTargetDir == ".." ||
+		strings.Contains(relativeTargetDir, "..") || filepath.IsAbs(relativeTargetDir) {
 		return Preview{}, errors.New("target_dir must be inside the archive profile base_dir")
 	}
+	videoName := filepath.Base(preview.VideoPath)
+	infoName := filepath.Base(preview.InfoDstPath)
+	if videoName != filepath.Base(filepath.Clean(preview.VideoPath)) || infoName != filepath.Base(filepath.Clean(preview.InfoDstPath)) ||
+		strings.Contains(videoName, "..") || strings.Contains(infoName, "..") ||
+		strings.ContainsAny(videoName, `/\`) || strings.ContainsAny(infoName, `/\`) || videoName == "." || infoName == "." {
+		return Preview{}, errors.New("archive output paths must be file names inside target_dir")
+	}
+	preview.TargetDir = filepath.Join(baseDir, relativeTargetDir)
+	preview.VideoPath = filepath.Join(preview.TargetDir, videoName)
+	preview.InfoDstPath = filepath.Join(preview.TargetDir, infoName)
 	return preview, nil
 }
 
