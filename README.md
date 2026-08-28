@@ -41,7 +41,7 @@ vdradmin-go follows **Hexagonal Architecture** (Ports & Adapters): the domain an
 - **Application** (`internal/application`): use-cases/services that orchestrate domain logic and call ports.
 - **Ports** (`internal/ports`): interfaces the application depends on (e.g. VDR client).
 - **Adapters** (`internal/adapters`): concrete implementations of ports.
-  - **Primary adapters** (`internal/adapters/primary/http`): HTTP server, handlers, middleware.
+  - **Primary adapters** (`internal/adapters/primary/http`, `internal/adapters/primary/mcp`): web and MCP transports.
   - **Secondary adapters** (`internal/adapters/secondary/svdrp`): SVDRP client integration to talk to VDR.
 - **Infrastructure** (`internal/infrastructure`): cross-cutting concerns like configuration.
 - **Web UI assets** (`web/templates`, `web/static`): server-rendered templates + htmx + CSS/JS.
@@ -49,7 +49,7 @@ vdradmin-go follows **Hexagonal Architecture** (Ports & Adapters): the domain an
 Typical request flow:
 
 ```plain
-HTTP request → handler (primary adapter) → application service → port interface → secondary adapter (SVDRP) → VDR
+HTTP or MCP request → primary adapter → application service → port interface → secondary adapter (SVDRP) → VDR
 ```
 
 For a detailed overview (including more diagrams and examples), see `docs/ARCHITECTURE.md`.
@@ -202,6 +202,8 @@ tar xvfz vdradmin-go_${VDRADMIN_GO_VERSION}_linux_amd64.tar.gz
 ./vdradmin --config /path/to/config.yaml
 ```
 
+The release archive also contains `vdradmin-mcp`. See [docs/MCP.md](docs/MCP.md) for local stdio use, Streamable HTTP, systemd, and client integrations.
+
 ### 2) Use the Docker container (GHCR)
 
 - Check for latest version in [Github Container Registry (GHCR)](https://github.com/githubixx/vdradmin-go/releases)
@@ -249,6 +251,8 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now vdradmin
 ```
 
+For a systemd-managed MCP HTTP endpoint, install `deployments/systemd/vdradmin-mcp.service` and enable `vdradmin-mcp`. It is unauthenticated and binds to `127.0.0.1:8081` by default; see [docs/MCP.md](docs/MCP.md) before changing that listener.
+
 ### 4) Use docker-compose
 
 There is an example compose file at `deployments/docker-compose.yml`.
@@ -266,6 +270,10 @@ docker compose -f deployments/docker-compose.yml up -d
 ## Configuration
 
 See `configs/config.example.yaml` for full configuration options.
+
+## MCP
+
+`vdradmin-mcp` offers read-only advanced EPG search to MCP clients. It reuses the configured VDR connection and wanted-channel filtering. Direct execution uses stdio; the optional HTTP listener is intended for local systemd use and is loopback-only by default. See [docs/MCP.md](docs/MCP.md) for setup in VS Code, Claude Code, and Codex.
 
 ## Themes
 
