@@ -16,8 +16,15 @@ import (
 	"time"
 )
 
-// validatePath checks that a path doesn't contain directory traversal sequences.
-// This is a defensive check for paths that should have been validated by the caller.
+func isPathWithinBase(baseDir, path string) bool {
+	baseDir = filepath.Clean(strings.TrimSpace(baseDir))
+	path = filepath.Clean(strings.TrimSpace(path))
+	return filepath.IsAbs(baseDir) && filepath.IsAbs(path) &&
+		(path == baseDir || strings.HasPrefix(path, baseDir+string(filepath.Separator)))
+}
+
+// validatePath checks that a path does not contain directory traversal sequences.
+// Callers that use a path for output must also validate its configured base directory.
 func validatePath(path string) error {
 	if strings.Contains(path, "..") {
 		return fmt.Errorf("path contains '..': %s", path)
@@ -191,6 +198,9 @@ func NormalizePreview(p Preview, videoExt string) (Preview, error) {
 		return Preview{}, errors.New("target_dir is required")
 	}
 	targetDir = filepath.Clean(targetDir)
+	if !filepath.IsAbs(targetDir) {
+		return Preview{}, errors.New("target_dir must be an absolute path")
+	}
 
 	if videoPath == "" {
 		videoPath = filepath.Join(targetDir, "video."+videoExt)
@@ -198,11 +208,13 @@ func NormalizePreview(p Preview, videoExt string) (Preview, error) {
 	if infoDstPath == "" {
 		infoDstPath = filepath.Join(targetDir, "video.info")
 	}
+	videoPath = filepath.Clean(videoPath)
+	infoDstPath = filepath.Clean(infoDstPath)
 
-	if filepath.Clean(filepath.Dir(videoPath)) != targetDir {
+	if !filepath.IsAbs(videoPath) || filepath.Dir(videoPath) != targetDir {
 		return Preview{}, errors.New("video_path must be inside target_dir")
 	}
-	if filepath.Clean(filepath.Dir(infoDstPath)) != targetDir {
+	if !filepath.IsAbs(infoDstPath) || filepath.Dir(infoDstPath) != targetDir {
 		return Preview{}, errors.New("info_dst_path must be inside target_dir")
 	}
 
@@ -210,6 +222,19 @@ func NormalizePreview(p Preview, videoExt string) (Preview, error) {
 	p.VideoPath = videoPath
 	p.InfoDstPath = infoDstPath
 	return p, nil
+}
+
+// ValidatePreview normalizes output paths and ensures they are contained by the
+// configured archive profile root.
+func ValidatePreview(profile ArchiveProfile, preview Preview, videoExt string) (Preview, error) {
+	preview, err := NormalizePreview(preview, videoExt)
+	if err != nil {
+		return Preview{}, err
+	}
+	if !isPathWithinBase(profile.BaseDir, preview.TargetDir) {
+		return Preview{}, errors.New("target_dir must be inside the archive profile base_dir")
+	}
+	return preview, nil
 }
 
 func BuildPreview(profile ArchiveProfile, title string, episode string, videoExt string) (Preview, error) {
@@ -252,7 +277,7 @@ func BuildPreview(profile ArchiveProfile, title string, episode string, videoExt
 type Plan struct {
 	RecordingID  string
 	RecordingDir string
-	InfoPath     string
+	InfoBytes    []byte
 	Segments     []string
 	ConcatList   string
 
@@ -347,8 +372,12 @@ func SplitArgs(s string) []string {
 	return fields
 }
 
-func BuildPlan(recordingID string, recordingDir string, infoPath string, profile ArchiveProfile, title string, episode string, videoExt string, ffmpegArgs []string) (Plan, error) {
+func BuildPlan(recordingID string, recordingDir string, infoBytes []byte, profile ArchiveProfile, title string, episode string, videoExt string, ffmpegArgs []string) (Plan, error) {
 	preview, err := BuildPreview(profile, title, episode, videoExt)
+	if err != nil {
+		return Plan{}, err
+	}
+	preview, err = ValidatePreview(profile, preview, videoExt)
 	if err != nil {
 		return Plan{}, err
 	}
@@ -359,7 +388,7 @@ func BuildPlan(recordingID string, recordingDir string, infoPath string, profile
 	return Plan{
 		RecordingID:  recordingID,
 		RecordingDir: recordingDir,
-		InfoPath:     infoPath,
+		InfoBytes:    append([]byte(nil), infoBytes...),
 		Segments:     segs,
 		Profile:      profile,
 		Preview:      preview,
@@ -370,17 +399,17 @@ func BuildPlan(recordingID string, recordingDir string, infoPath string, profile
 // BuildPlanWithPreview builds a plan using an explicitly provided Preview.
 // It will fill missing file paths from TargetDir and validate that output
 // files live inside TargetDir.
-func BuildPlanWithPreview(recordingID string, recordingDir string, infoPath string, profile ArchiveProfile, preview Preview, videoExt string, ffmpegArgs []string) (Plan, error) {
+func BuildPlanWithPreview(recordingID string, recordingDir string, infoBytes []byte, profile ArchiveProfile, preview Preview, videoExt string, ffmpegArgs []string) (Plan, error) {
 	if strings.TrimSpace(recordingID) == "" {
 		return Plan{}, errors.New("recordingID is required")
 	}
 	if strings.TrimSpace(recordingDir) == "" {
 		return Plan{}, errors.New("recordingDir is required")
 	}
-	if _, err := NormalizePreview(preview, videoExt); err != nil {
+	preview, err := ValidatePreview(profile, preview, videoExt)
+	if err != nil {
 		return Plan{}, err
 	}
-	preview, _ = NormalizePreview(preview, videoExt)
 
 	segs, err := DiscoverSegments(recordingDir)
 	if err != nil {
@@ -389,7 +418,7 @@ func BuildPlanWithPreview(recordingID string, recordingDir string, infoPath stri
 	return Plan{
 		RecordingID:  recordingID,
 		RecordingDir: recordingDir,
-		InfoPath:     infoPath,
+		InfoBytes:    append([]byte(nil), infoBytes...),
 		Segments:     segs,
 		Profile:      profile,
 		Preview:      preview,
@@ -740,20 +769,12 @@ func runArchive(ctx context.Context, job *Job, plan Plan) error {
 		return err
 	}
 
-	// Defensive validation: ensure paths don't contain traversal sequences
-	// (they should have been validated earlier, but this is defense in depth)
-	if err := validatePath(plan.Preview.TargetDir); err != nil {
-		return fmt.Errorf("invalid target dir: %w", err)
+	// Defense in depth: do not let callers bypass the configured profile root.
+	preview, err := ValidatePreview(plan.Profile, plan.Preview, filepath.Ext(plan.Preview.VideoPath))
+	if err != nil {
+		return fmt.Errorf("invalid archive output path: %w", err)
 	}
-	if err := validatePath(plan.Preview.VideoPath); err != nil {
-		return fmt.Errorf("invalid video path: %w", err)
-	}
-	if plan.InfoPath != "" {
-		if err := validatePath(plan.InfoPath); err != nil {
-			return fmt.Errorf("invalid info path: %w", err)
-		}
-	}
-
+	plan.Preview = preview
 	// Ensure target dir exists.
 	if err := os.MkdirAll(plan.Preview.TargetDir, 0755); err != nil {
 		return fmt.Errorf("mkdir target dir: %w", err)
@@ -891,11 +912,8 @@ func runArchive(ctx context.Context, job *Job, plan Plan) error {
 	}
 
 	// Copy info file.
-	if strings.TrimSpace(plan.InfoPath) != "" {
-		b, err := os.ReadFile(plan.InfoPath)
-		if err == nil {
-			_ = os.WriteFile(plan.Preview.InfoDstPath, b, 0644)
-		}
+	if len(plan.InfoBytes) > 0 {
+		_ = os.WriteFile(plan.Preview.InfoDstPath, plan.InfoBytes, 0644)
 	}
 
 	return nil

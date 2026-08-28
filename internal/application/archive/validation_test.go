@@ -53,3 +53,71 @@ func TestValidatePath(t *testing.T) {
 		})
 	}
 }
+
+func TestValidatePreview(t *testing.T) {
+	profile := ArchiveProfile{BaseDir: "/vdr/36/movies"}
+	tests := []struct {
+		name          string
+		preview       Preview
+		shouldSucceed bool
+	}{
+		{
+			name: "configured root descendant",
+			preview: Preview{
+				TargetDir:   "/vdr/36/movies/example",
+				VideoPath:   "/vdr/36/movies/example/video.mkv",
+				InfoDstPath: "/vdr/36/movies/example/video.info",
+			},
+			shouldSucceed: true,
+		},
+		{
+			name: "normalizes redundant separators",
+			preview: Preview{
+				TargetDir:   "/vdr/36/movies//example",
+				VideoPath:   "/vdr/36/movies/example//video.mkv",
+				InfoDstPath: "/vdr/36/movies/example//video.info",
+			},
+			shouldSucceed: true,
+		},
+		{
+			name:    "relative target directory",
+			preview: Preview{TargetDir: "example"},
+		},
+		{
+			name:    "target outside configured root",
+			preview: Preview{TargetDir: "/tmp/example"},
+		},
+		{
+			name:    "sibling prefix escape",
+			preview: Preview{TargetDir: "/vdr/36/movies-old/example"},
+		},
+		{
+			name: "video outside target directory",
+			preview: Preview{
+				TargetDir:   "/vdr/36/movies/example",
+				VideoPath:   "/vdr/36/movies/other/video.mkv",
+				InfoDstPath: "/vdr/36/movies/example/video.info",
+			},
+		},
+		{
+			name: "info outside target directory",
+			preview: Preview{
+				TargetDir:   "/vdr/36/movies/example",
+				VideoPath:   "/vdr/36/movies/example/video.mkv",
+				InfoDstPath: "/vdr/36/movies/other/video.info",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ValidatePreview(profile, tt.preview, "mkv")
+			if tt.shouldSucceed && err != nil {
+				t.Fatalf("ValidatePreview() error: %v", err)
+			}
+			if !tt.shouldSucceed && err == nil {
+				t.Fatal("ValidatePreview() succeeded, want error")
+			}
+		})
+	}
+}

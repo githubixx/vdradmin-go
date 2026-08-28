@@ -13,6 +13,7 @@ import (
 	nethttp "net/http"
 
 	"github.com/githubixx/vdradmin-go/internal/application/archive"
+	"github.com/githubixx/vdradmin-go/internal/infrastructure/config"
 )
 
 func TestNormalizeArchiveJobID(t *testing.T) {
@@ -55,6 +56,7 @@ func TestRecordingArchiveJobPoll_UnquotesID(t *testing.T) {
 	outDir := filepath.Join(t.TempDir(), "out")
 	plan := archive.Plan{
 		Segments: []string{"/does/not/matter/00001.ts"},
+		Profile:  archive.ArchiveProfile{BaseDir: outDir},
 		Preview: archive.Preview{
 			TargetDir:   outDir,
 			VideoPath:   filepath.Join(outDir, "video.mkv"),
@@ -112,5 +114,50 @@ func TestRecordingArchiveJobPoll_UnquotesID(t *testing.T) {
 	}
 	if payload.Status == "" {
 		t.Fatalf("payload status is empty")
+	}
+}
+
+func TestRecordingArchivePreview_RejectsUnsafeOutputPath(t *testing.T) {
+	h := &Handler{
+		cfg: &config.Config{Archive: config.ArchiveConfig{Profiles: []config.ArchiveProfileConfig{{
+			ID:      "movies",
+			Name:    "Movies",
+			Kind:    "movie",
+			BaseDir: "/vdr/36/movies",
+		}}}},
+	}
+
+	tests := []struct {
+		name  string
+		query string
+		want  int
+	}{
+		{
+			name:  "configured root descendant",
+			query: "profile=movies&title=Example&target_dir=%2Fvdr%2F36%2Fmovies%2Fexample&video_path=%2Fvdr%2F36%2Fmovies%2Fexample%2Fvideo.mkv",
+			want:  nethttp.StatusOK,
+		},
+		{
+			name:  "outside configured root",
+			query: "profile=movies&title=Example&video_path=%2Fetc%2Fpasswd",
+			want:  nethttp.StatusBadRequest,
+		},
+		{
+			name:  "removed none profile",
+			query: "profile=none&target_dir=%2Ftmp%2Fexample",
+			want:  nethttp.StatusBadRequest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(nethttp.MethodGet, "/recordings/archive/preview?"+tt.query, nil)
+			w := httptest.NewRecorder()
+
+			h.RecordingArchivePreview(w, req)
+			if w.Code != tt.want {
+				t.Fatalf("status=%d, want %d; body=%s", w.Code, tt.want, w.Body.String())
+			}
+		})
 	}
 }

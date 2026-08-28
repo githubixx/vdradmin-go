@@ -197,19 +197,19 @@ func (h *Handler) validateRecordingPath(recordingPath string) error {
 // validateRecordingDir validates that an absolute recording directory path (as returned by VDR)
 // is within the configured video directory. This protects against malicious VDR responses
 // or compromised VDR instances trying to access files outside the video directory.
-func (h *Handler) validateRecordingDir(recordingDir string) error {
+func (h *Handler) validatedRecordingDir(recordingDir string) (string, error) {
 	if h.cfg == nil {
-		return fmt.Errorf("configuration not available")
+		return "", fmt.Errorf("configuration not available")
 	}
 
 	videoDir := strings.TrimSpace(h.cfg.VDR.VideoDir)
 	if videoDir == "" {
-		return fmt.Errorf("video directory not configured")
+		return "", fmt.Errorf("video directory not configured")
 	}
 
 	recordingDir = strings.TrimSpace(recordingDir)
 	if recordingDir == "" {
-		return fmt.Errorf("recording directory is empty")
+		return "", fmt.Errorf("recording directory is empty")
 	}
 
 	// Clean both paths for comparison
@@ -218,10 +218,15 @@ func (h *Handler) validateRecordingDir(recordingDir string) error {
 
 	// Ensure recording directory is within video directory (or exactly the video directory)
 	if !filepath.HasPrefix(cleanRecDir, cleanVideoDir+string(filepath.Separator)) && cleanRecDir != cleanVideoDir {
-		return fmt.Errorf("recording directory outside video directory: %s", recordingDir)
+		return "", fmt.Errorf("recording directory outside video directory: %s", recordingDir)
 	}
 
-	return nil
+	return cleanRecDir, nil
+}
+
+func (h *Handler) validateRecordingDir(recordingDir string) error {
+	_, err := h.validatedRecordingDir(recordingDir)
+	return err
 }
 
 // ServeTheme serves the theme.css file for a given theme.
@@ -4511,7 +4516,8 @@ func (h *Handler) RecordingArchivePrepare(w http.ResponseWriter, r *http.Request
 	}
 
 	// Validate the absolute recording directory is within video directory
-	if err := h.validateRecordingDir(recDir); err != nil {
+	recDir, err = h.validatedRecordingDir(recDir)
+	if err != nil {
 		h.logger.Warn("invalid recording directory rejected in archive prepare", slog.String("dir", recDir), slog.Any("error", err))
 		h.renderTemplate(w, r, "recording_archive.html", map[string]any{
 			"Error":        "Invalid recording directory",
@@ -4572,17 +4578,14 @@ func (h *Handler) RecordingArchivePrepare(w http.ResponseWriter, r *http.Request
 	ffmpegProfiles := h.ffmpegProfilesFromConfig(h.cfg)
 	_, selectedFFMpegProfile, _ := h.selectedFFMpegProfile(h.cfg, r.URL.Query().Get("ffmpeg_profile"))
 
-	const profileNoneID = "none"
 	var preview archive.Preview
 	var perr error
-	if selectedID != profileNoneID {
-		selected, ok := archive.FindProfile(profiles, selectedID)
-		if !ok {
-			selectedID = h.defaultProfileIDForKind(profiles, parsed.Kind)
-			selected, _ = archive.FindProfile(profiles, selectedID)
-		}
-		preview, perr = archive.BuildPreview(selected, title, episode, format)
+	selected, ok := archive.FindProfile(profiles, selectedID)
+	if !ok {
+		selectedID = h.defaultProfileIDForKind(profiles, parsed.Kind)
+		selected, _ = archive.FindProfile(profiles, selectedID)
 	}
+	preview, perr = archive.BuildPreview(selected, title, episode, format)
 	var warn string
 	if strings.TrimSpace(h.cfg.Archive.BaseDir) == "" {
 		warn = "archive.base_dir is not set yet. Configure it in Configurations → Archive to get correct absolute target paths."
@@ -4604,13 +4607,11 @@ func (h *Handler) RecordingArchivePrepare(w http.ResponseWriter, r *http.Request
 	if perr != nil {
 		data["Error"] = perr.Error()
 	} else {
-		if selectedID != profileNoneID {
-			data["Preview"] = preview
-			if preview.VideoPath != "" {
-				if _, err := os.Stat(preview.VideoPath); err == nil {
-					data["OutputExists"] = true
-					data["OutputExistsPath"] = preview.VideoPath
-				}
+		data["Preview"] = preview
+		if preview.VideoPath != "" {
+			if _, err := os.Stat(preview.VideoPath); err == nil {
+				data["OutputExists"] = true
+				data["OutputExistsPath"] = preview.VideoPath
 			}
 		}
 	}
@@ -4688,7 +4689,8 @@ func (h *Handler) RecordingArchiveStart(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Validate the absolute recording directory is within video directory
-	if err := h.validateRecordingDir(recDir); err != nil {
+	recDir, err = h.validatedRecordingDir(recDir)
+	if err != nil {
 		h.logger.Warn("invalid recording directory rejected in archive start", slog.String("dir", recDir), slog.Any("error", err))
 		http.Error(w, "Invalid recording directory", http.StatusBadRequest)
 		return
@@ -4722,6 +4724,10 @@ func (h *Handler) RecordingArchiveStart(w http.ResponseWriter, r *http.Request) 
 		return strings.ToLower(strings.TrimSpace(profiles[i].ID)) < strings.ToLower(strings.TrimSpace(profiles[j].ID))
 	})
 	const profileNoneID = "none"
+	if profileID == profileNoneID {
+		http.Error(w, "Invalid archive profile", http.StatusBadRequest)
+		return
+	}
 
 	ffmpegProfiles := h.ffmpegProfilesFromConfig(h.cfg)
 	selectedFFMpeg, selectedFFMpegProfile, hasFFMpegProfile := h.selectedFFMpegProfile(h.cfg, ffmpegProfileName)
@@ -4732,20 +4738,14 @@ func (h *Handler) RecordingArchiveStart(w http.ResponseWriter, r *http.Request) 
 	var plan archive.Plan
 	var planErr error
 
-	if strings.TrimSpace(profileID) == profileNoneID {
-		// For "None", only TargetDir is editable; output paths are derived from TargetDir + format.
-		custom := archive.Preview{TargetDir: oTargetDir}
-		plan, planErr = archive.BuildPlanWithPreview(recID, recDir, infoPath, archive.ArchiveProfile{ID: profileNoneID, Name: "None", Kind: parsed.Kind}, custom, format, ffArgs)
-	} else {
-		if profileID == "" {
-			profileID = h.defaultProfileIDForKind(profiles, parsed.Kind)
-		}
-		selected, ok := archive.FindProfile(profiles, profileID)
-		if !ok {
-			selected, _ = archive.FindProfile(profiles, h.defaultProfileIDForKind(profiles, parsed.Kind))
-		}
-		plan, planErr = archive.BuildPlan(recID, recDir, infoPath, selected, title, episode, format, ffArgs)
+	if profileID == "" {
+		profileID = h.defaultProfileIDForKind(profiles, parsed.Kind)
 	}
+	selected, ok := archive.FindProfile(profiles, profileID)
+	if !ok {
+		selected, _ = archive.FindProfile(profiles, h.defaultProfileIDForKind(profiles, parsed.Kind))
+	}
+	plan, planErr = archive.BuildPlan(recID, recDir, infoBytes, selected, title, episode, format, ffArgs)
 	if planErr != nil {
 		h.renderTemplate(w, r, "recording_archive.html", map[string]any{
 			"Error":                 planErr.Error(),
@@ -4768,23 +4768,26 @@ func (h *Handler) RecordingArchiveStart(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	// Apply overrides after the plan is built so Profile changes won't clobber user edits.
-	if strings.TrimSpace(profileID) != profileNoneID {
-		if oTargetDir != "" {
-			plan.Preview.TargetDir = oTargetDir
-			// Only auto-derive paths from target dir when the user didn't override them.
-			if oVideoPath == "" {
-				plan.Preview.VideoPath = filepath.Join(oTargetDir, "video."+format)
-			}
-			if oInfoDstPath == "" {
-				plan.Preview.InfoDstPath = filepath.Join(oTargetDir, "video.info")
-			}
+	if oTargetDir != "" {
+		plan.Preview.TargetDir = oTargetDir
+		// Only auto-derive paths from target dir when the user didn't override them.
+		if oVideoPath == "" {
+			plan.Preview.VideoPath = filepath.Join(oTargetDir, "video."+format)
 		}
-		if oVideoPath != "" {
-			plan.Preview.VideoPath = oVideoPath
+		if oInfoDstPath == "" {
+			plan.Preview.InfoDstPath = filepath.Join(oTargetDir, "video.info")
 		}
-		if oInfoDstPath != "" {
-			plan.Preview.InfoDstPath = oInfoDstPath
-		}
+	}
+	if oVideoPath != "" {
+		plan.Preview.VideoPath = oVideoPath
+	}
+	if oInfoDstPath != "" {
+		plan.Preview.InfoDstPath = oInfoDstPath
+	}
+	plan.Preview, planErr = archive.ValidatePreview(plan.Profile, plan.Preview, format)
+	if planErr != nil {
+		http.Error(w, "Invalid archive output path", http.StatusBadRequest)
+		return
 	}
 	if plan.Preview.VideoPath != "" {
 		if _, err := os.Stat(plan.Preview.VideoPath); err == nil {
@@ -4851,11 +4854,14 @@ func (h *Handler) RecordingArchivePreview(w http.ResponseWriter, r *http.Request
 	}
 
 	const profileNoneID = "none"
-	var preview archive.Preview
 	if profileID == profileNoneID {
-		p, _ := archive.NormalizePreview(archive.Preview{TargetDir: targetDir}, format)
-		preview = p
-	} else {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]any{"error": "invalid archive profile"})
+		return
+	}
+	var preview archive.Preview
+	{
 		profiles := h.archiveProfilesFromConfig(h.cfg)
 		selected, ok := archive.FindProfile(profiles, profileID)
 		if !ok {
@@ -4874,11 +4880,25 @@ func (h *Handler) RecordingArchivePreview(w http.ResponseWriter, r *http.Request
 		preview = p
 	}
 
-	// Output existence warning should reflect the current effective path, not necessarily the suggested one.
-	checkPath := preview.VideoPath
-	if currentVideoPath != "" {
-		checkPath = currentVideoPath
+	// Check only a normalized path within the selected configured archive root.
+	checkPreview := preview
+	if targetDir != "" {
+		checkPreview.TargetDir = targetDir
+		checkPreview.InfoDstPath = ""
 	}
+	if currentVideoPath != "" {
+		checkPreview.VideoPath = currentVideoPath
+	}
+	profiles := h.archiveProfilesFromConfig(h.cfg)
+	selected, _ := archive.FindProfile(profiles, profileID)
+	checkPreview, err := archive.ValidatePreview(selected, checkPreview, format)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]any{"error": "invalid archive output path"})
+		return
+	}
+	checkPath := checkPreview.VideoPath
 	outputExists := false
 	if checkPath != "" {
 		if _, statErr := os.Stat(checkPath); statErr == nil {

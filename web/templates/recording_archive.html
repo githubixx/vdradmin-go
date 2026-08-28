@@ -57,7 +57,6 @@
 
                     <label for="profile">Profile</label>
                     <select id="profile" name="profile">
-                        <option value="none" data-kind="" data-base-dir="" {{if eq $.SelectedProfileID "none"}}selected{{end}}>None</option>
                         {{range .Profiles}}
                             <option value="{{.ID}}" data-kind="{{.Kind}}" data-base-dir="{{.BaseDir}}" {{if eq $.SelectedProfileID .ID}}selected{{end}}>{{.Name}}</option>
                         {{end}}
@@ -139,9 +138,6 @@
 
             const previewFieldIds = ['target_dir', 'video_path', 'info_dst_path'];
             const dirty = new Set();
-
-            const PROFILE_NONE = 'none';
-            let lastProfileValue = profileEl ? String(profileEl.value || '') : '';
 
             function get(id) {
                 return document.getElementById(id);
@@ -230,13 +226,6 @@
                 }
             }
 
-            function applyReadonlyForProfileNone(isNone) {
-                const videoEl = get('video_path');
-                const infoEl = get('info_dst_path');
-                if (videoEl) videoEl.readOnly = !!isNone;
-                if (infoEl) infoEl.readOnly = !!isNone;
-            }
-
             async function fetchPreview(params) {
                 const url = '/recordings/archive/preview?' + new URLSearchParams(params).toString();
                 const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
@@ -257,30 +246,6 @@
                 if (!profileEl) return;
                 try {
                     setError('');
-
-                    // "None" profile: don't suggest values; let the user fill everything.
-                    // Still check for an existing output if a custom video path is provided.
-                    if (profileEl.value === PROFILE_NONE) {
-                        applyReadonlyForProfileNone(true);
-                        deriveOutputPathsFromTargetDir(true);
-                        const vp = (get('video_path') ? get('video_path').value : '');
-                        if (String(vp || '').trim() === '') {
-                            updateOutputWarning(false, '');
-                            return;
-                        }
-                        const check = await fetchPreview({
-                            title: (titleEl ? titleEl.value : ''),
-                            episode: (episodeEl ? episodeEl.value : ''),
-                            profile: PROFILE_NONE,
-                            target_dir: (get('target_dir') ? get('target_dir').value : ''),
-                            format: selectedExt(),
-                            video_path: vp,
-                        });
-                        updateOutputWarning(!!check.output_exists, check.output_exists_path);
-                        return;
-                    }
-
-                    applyReadonlyForProfileNone(false);
 
                     const data = await fetchPreview({
                         title: (titleEl ? titleEl.value : ''),
@@ -322,25 +287,7 @@
             }
 
             if (profileEl) profileEl.addEventListener('change', () => {
-                const next = String(profileEl.value || '');
-                const prev = String(lastProfileValue || '');
-                lastProfileValue = next;
-
-                // Reset preview when leaving Profile=None so normal profiles can re-suggest values.
-                if (prev === PROFILE_NONE && next !== PROFILE_NONE) {
-                    clearPreviewFields();
-                    applyReadonlyForProfileNone(false);
-                    refreshPreviewSuggestions();
-                    return;
-                }
-
-                if (next === PROFILE_NONE) {
-                    clearPreviewFields();
-                    setError('');
-                    updateOutputWarning(false, '');
-                    applyReadonlyForProfileNone(true);
-                    return;
-                }
+                clearPreviewFields();
                 refreshPreviewSuggestions();
             });
             if (ffmpegProfileEl) ffmpegProfileEl.addEventListener('change', updateFFMpegProfileComment);
@@ -349,22 +296,14 @@
 
             if (formatEl) formatEl.addEventListener('change', () => {
                 // Keep output path extension in sync with selected container.
-                if (profileEl && profileEl.value === PROFILE_NONE) {
-                    deriveOutputPathsFromTargetDir(true);
-                } else {
-                    deriveOutputPathsFromTargetDir(false);
-                }
+                deriveOutputPathsFromTargetDir(false);
                 debounceRefresh();
             });
 
             // Keep dependent fields in sync when user edits target dir (without overriding explicit edits).
             const targetEl = get('target_dir');
             if (targetEl) targetEl.addEventListener('input', () => {
-                if (profileEl && profileEl.value === PROFILE_NONE) {
-                    deriveOutputPathsFromTargetDir(true);
-                } else {
-                    deriveOutputPathsFromTargetDir(false);
-                }
+                deriveOutputPathsFromTargetDir(false);
                 debounceRefresh();
             });
 
