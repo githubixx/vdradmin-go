@@ -150,7 +150,7 @@ Adapters are interchangeable:
 
 ### 5. MCP Primary Adapter
 
-`vdradmin-mcp` is a second primary adapter beside the web interface. Its `search_epg` tool converts typed MCP input into `services.EPGSearchCriteria`, then calls `EPGService`. The service owns validation, VDR access, wanted-channel filtering, matching, sorting, and result bounds; the MCP adapter only translates protocol values and formats structured output. The binary supports client-owned stdio and stateless Streamable HTTP for the loopback systemd service.
+`vdradmin-go-mcp` is a second primary adapter beside the web interface. Its `search_epg` tool converts typed MCP input into `services.EPGSearchCriteria`, then calls `EPGService`. The service owns validation, VDR access, wanted-channel filtering, matching, sorting, and result bounds; the MCP adapter only translates protocol values and formats structured output. The binary supports client-owned stdio and stateless Streamable HTTP for the loopback systemd service.
 
 ## Data Flow
 

@@ -32,7 +32,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("vdradmin-mcp v%s (%s %s)\n", version, commit, date)
+		fmt.Printf("vdradmin-go-mcp v%s (%s %s)\n", version, commit, date)
 		return
 	}
 

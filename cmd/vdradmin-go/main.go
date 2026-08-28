@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -25,24 +26,28 @@ var (
 )
 
 func main() {
-	// Parse command-line flags
 	configPath := flag.String("config", "config.yaml", "path to configuration file")
+	assetsDir := flag.String("assets-dir", "web", "path to the web asset directory")
 	showVersion := flag.Bool("version", false, "show version and exit")
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Printf("vdradmin-go v%s (%s %s)\n", version, commit, date)
-		os.Exit(0)
+		return
 	}
 
-	// Setup logging
+	templatesDir, staticDir, themesDir, err := assetDirectories(*assetsDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid assets directory: %v\n", err)
+		os.Exit(1)
+	}
+
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
 
 	logger.Info("starting vdradmin-go", slog.String("version", version), slog.String("commit", commit), slog.String("date", date))
 
-	// Load configuration
 	cfg, err := config.Load(*configPath)
 	if err != nil {
 		logger.Error("failed to load config", slog.Any("error", err))
@@ -56,15 +61,7 @@ func main() {
 		slog.Int("server_port", cfg.Server.Port),
 	)
 
-	// Initialize SVDRP client
-	vdrClient := svdrp.NewClient(
-		cfg.VDR.Host,
-		cfg.VDR.Port,
-		cfg.VDR.Timeout,
-	)
-
-	// Attempt an early connect to VDR (non-fatal).
-	// The SVDRP client will also connect lazily on demand.
+	vdrClient := svdrp.NewClient(cfg.VDR.Host, cfg.VDR.Port, cfg.VDR.Timeout)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	if err := vdrClient.Connect(ctx); err != nil {
 		logger.Warn("failed to connect to VDR (continuing without it)", slog.Any("error", err))
@@ -73,58 +70,36 @@ func main() {
 	}
 	cancel()
 
-	// Initialize services
 	epgService := services.NewEPGService(vdrClient, cfg.Cache.EPGExpiry)
 	epgService.SetWantedChannels(cfg.VDR.WantedChannels)
 	timerService := services.NewTimerService(vdrClient)
 	recordingService := services.NewRecordingService(vdrClient, cfg.Cache.RecordingExpiry)
 	autoTimerService := services.NewAutoTimerService(vdrClient, timerService, epgService)
 
-	// Initialize theme manager
-	themeManager := theme.NewManager("web/themes")
+	themeManager := theme.NewManager(themesDir)
 	if err := themeManager.Discover(); err != nil {
 		logger.Error("failed to discover themes", slog.Any("error", err))
 		os.Exit(1)
 	}
 	logger.Info("themes discovered", slog.Any("themes", themeManager.GetAvailableThemes()))
 
-	// Load templates - each page gets its own template set
-	templates := make(map[string]*template.Template)
-	pages := []string{"index.html", "epg.html", "playing.html", "watch.html", "timers.html", "timer_edit.html", "recordings.html", "recording_archive.html", "recording_archive_jobs.html", "recording_archive_job.html", "recording_archive_job_status.html", "archive_profiles.html", "ffmpeg_profiles.html", "search.html", "search_results.html", "epgsearch.html", "epgsearch_edit.html", "epgsearch_results.html", "event.html", "channels.html", "configurations.html"}
-
-	for _, page := range pages {
-		tmpl := template.Must(template.ParseFiles("web/templates/_nav.html", "web/templates/"+page))
-		templates[page] = tmpl
+	templates, err := loadTemplates(templatesDir)
+	if err != nil {
+		logger.Error("failed to load templates", slog.Any("error", err))
+		os.Exit(1)
 	}
-
-	// Convert map to single template (we'll handle lookup in handler)
-	// For now, just use the first one as base
 	baseTemplate := templates["index.html"]
 
-	// Initialize HTTP handler (pass template map)
-	httpHandler := httpAdapter.NewHandler(
-		logger,
-		baseTemplate, // We'll change Handler to accept map later
-		epgService,
-		timerService,
-		recordingService,
-		autoTimerService,
-	)
+	httpHandler := httpAdapter.NewHandler(logger, baseTemplate, epgService, timerService, recordingService, autoTimerService)
 	httpHandler.SetConfig(cfg, *configPath)
 	httpHandler.SetVDRClient(vdrClient)
-
-	// Set template map in handler
 	httpHandler.SetTemplates(templates)
 	httpHandler.SetUIThemeDefault(cfg.UI.Theme)
 	httpHandler.SetThemeManager(themeManager)
 
-	// Setup routes
-	mux := httpAdapter.SetupRoutes(httpHandler, &cfg.Auth, logger)
-
-	// Create HTTP server
+	mux := httpAdapter.SetupRoutes(httpHandler, &cfg.Auth, logger, staticDir)
 	server := httpAdapter.NewServer(&cfg.Server, logger, httpHandler, mux)
 
-	// Start server in goroutine
 	go func() {
 		if err := server.Start(); err != nil {
 			logger.Error("server error", slog.Any("error", err))
@@ -132,28 +107,50 @@ func main() {
 		}
 	}()
 
-	logger.Info("server started",
-		slog.String("addr", fmt.Sprintf("http://%s:%d", cfg.Server.Host, cfg.Server.Port)),
-	)
+	logger.Info("server started", slog.String("addr", fmt.Sprintf("http://%s:%d", cfg.Server.Host, cfg.Server.Port)))
 
-	// Wait for interrupt signal
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	<-sigChan
 
 	logger.Info("shutting down...")
-
-	// Graceful shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Error("shutdown error", slog.Any("error", err))
 	}
-
 	if err := vdrClient.Close(); err != nil {
 		logger.Error("failed to close VDR connection", slog.Any("error", err))
 	}
-
 	logger.Info("shutdown complete")
+}
+
+func assetDirectories(assetsDir string) (templatesDir, staticDir, themesDir string, err error) {
+	assetsDir = filepath.Clean(assetsDir)
+	for _, name := range []string{"templates", "static", "themes"} {
+		path := filepath.Join(assetsDir, name)
+		info, statErr := os.Stat(path)
+		if statErr != nil {
+			return "", "", "", fmt.Errorf("%s: %w", path, statErr)
+		}
+		if !info.IsDir() {
+			return "", "", "", fmt.Errorf("%s is not a directory", path)
+		}
+	}
+	return filepath.Join(assetsDir, "templates"), filepath.Join(assetsDir, "static"), filepath.Join(assetsDir, "themes"), nil
+}
+
+func loadTemplates(templatesDir string) (map[string]*template.Template, error) {
+	pages := []string{"index.html", "epg.html", "playing.html", "watch.html", "timers.html", "timer_edit.html", "recordings.html", "recording_archive.html", "recording_archive_jobs.html", "recording_archive_job.html", "recording_archive_job_status.html", "archive_profiles.html", "ffmpeg_profiles.html", "search.html", "search_results.html", "epgsearch.html", "epgsearch_edit.html", "epgsearch_results.html", "event.html", "channels.html", "configurations.html"}
+	templates := make(map[string]*template.Template, len(pages))
+	navigationTemplate := filepath.Join(templatesDir, "_nav.html")
+	for _, page := range pages {
+		tmpl, err := template.ParseFiles(navigationTemplate, filepath.Join(templatesDir, page))
+		if err != nil {
+			return nil, err
+		}
+		templates[page] = tmpl
+	}
+	return templates, nil
 }

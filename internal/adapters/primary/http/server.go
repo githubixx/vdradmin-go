@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 
 	"github.com/githubixx/vdradmin-go/internal/infrastructure/config"
 )
@@ -62,8 +63,8 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.server.Shutdown(ctx)
 }
 
-// SetupRoutes configures all HTTP routes using Go 1.22+ routing
-func SetupRoutes(handler *Handler, authCfg *config.AuthConfig, logger *slog.Logger) http.Handler {
+// SetupRoutes configures all HTTP routes using Go 1.22+ routing.
+func SetupRoutes(handler *Handler, authCfg *config.AuthConfig, logger *slog.Logger, staticDir string) http.Handler {
 	mux := http.NewServeMux()
 
 	// Apply middleware chain
@@ -146,7 +147,7 @@ func SetupRoutes(handler *Handler, authCfg *config.AuthConfig, logger *slog.Logg
 	mux.Handle("POST /recordings/delete", chain(handler.RecordingDelete, adminMiddleware...)) // For browsers without DELETE
 
 	// Static files
-	fs := http.FileServer(http.Dir("web/static"))
+	fs := http.FileServer(http.Dir(filepath.Clean(staticDir)))
 	mux.Handle("GET /static/", http.StripPrefix("/static/", fs))
 
 	// Theme files

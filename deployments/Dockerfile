@@ -14,7 +14,7 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o vdradmin ./cmd/vdradmin
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o vdradmin-go ./cmd/vdradmin-go
 
 # Final stage - minimal runtime image
 FROM alpine:latest
@@ -24,7 +24,7 @@ RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=builder /build/vdradmin .
+COPY --from=builder /build/vdradmin-go .
 
 # Copy web assets
 COPY --from=builder /build/web ./web
@@ -41,5 +41,5 @@ USER vdradmin
 
 EXPOSE 8080
 
-ENTRYPOINT ["/app/vdradmin"]
+ENTRYPOINT ["/app/vdradmin-go"]
 CMD ["--config", "/app/config.yaml"]

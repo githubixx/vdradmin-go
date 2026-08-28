@@ -47,7 +47,7 @@ type epgEventOutput struct {
 
 // NewServer constructs the MCP server and registers all vdradmin-go tools.
 func NewServer(epgService *services.EPGService, version string) *mcp.Server {
-	server := mcp.NewServer(&mcp.Implementation{Name: "vdradmin-mcp", Version: version}, &mcp.ServerOptions{
+	server := mcp.NewServer(&mcp.Implementation{Name: "vdradmin-go-mcp", Version: version}, &mcp.ServerOptions{
 		Instructions: "Search the configured VDR electronic program guide. Use search_epg for read-only TV show and programme searches.",
 	})
 	mcp.AddTool(server, &mcp.Tool{

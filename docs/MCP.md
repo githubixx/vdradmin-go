@@ -1,6 +1,6 @@
 # MCP Server
 
-`vdradmin-mcp` exposes read-only VDR electronic program guide (EPG) search through the [Model Context Protocol](https://modelcontextprotocol.io/). It uses the same VDR connection, EPG cache, and `vdr.wanted_channels` filtering as the web application.
+`vdradmin-go-mcp` exposes read-only VDR electronic program guide (EPG) search through the [Model Context Protocol](https://modelcontextprotocol.io/). It uses the same VDR connection, EPG cache, and `vdr.wanted_channels` filtering as the web application.
 
 The first release provides one tool: `search_epg`. It searches VDR EPG data; it does not use an external show catalogue and does not require `vdr-plugin-epgsearch`.
 
@@ -12,15 +12,15 @@ Build both binaries:
 make build
 ```
 
-The MCP executable is `build/vdradmin-mcp`. It accepts the shared `config.yaml` file:
+The MCP executable is `build/vdradmin-go-mcp`. It accepts the shared `config.yaml` file:
 
 ```bash
-build/vdradmin-mcp --config /etc/vdradmin/config.yaml
+build/vdradmin-go-mcp --config /var/lib/vdradmin-go/config.yaml
 ```
 
 Direct invocation defaults to the local stdio transport. Do not run it manually in an interactive terminal: it waits for JSON-RPC messages on standard input. Operational logs use standard error so they do not corrupt the MCP protocol on standard output.
 
-Use `build/vdradmin-mcp --version` to print build metadata.
+Use `build/vdradmin-go-mcp --version` to print build metadata.
 
 ## Search Tool
 
@@ -41,7 +41,7 @@ Results are ordered by event start time and channel. Each result contains the VD
 To run a persistent local server, select HTTP mode:
 
 ```bash
-build/vdradmin-mcp --transport=http --config /etc/vdradmin/config.yaml
+build/vdradmin-go-mcp --transport=http --config /var/lib/vdradmin-go/config.yaml
 ```
 
 The endpoint is `http://127.0.0.1:8081/mcp` by default. Configure another listener only when a trusted network boundary is already in place:
@@ -56,16 +56,16 @@ HTTP mode uses stateless Streamable HTTP and has no authentication in this relea
 
 ## systemd
 
-The included [vdradmin-mcp.service](../deployments/systemd/vdradmin-mcp.service) starts the HTTP transport for URL-based MCP clients:
+The included [vdradmin-go-mcp.service](../deployments/systemd/vdradmin-go-mcp.service) starts the HTTP transport for URL-based MCP clients:
 
 ```bash
-sudo install -m 0644 deployments/systemd/vdradmin-mcp.service /etc/systemd/system/
+sudo install -m 0644 deployments/systemd/vdradmin-go-mcp.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now vdradmin-mcp
-sudo systemctl status vdradmin-mcp
+sudo systemctl enable --now vdradmin-go-mcp
+sudo systemctl status vdradmin-go-mcp
 ```
 
-Install `vdradmin-mcp` at `/opt/vdradmin-go/vdradmin-mcp` or adjust `ExecStart` in the unit. The service shares the existing `vdr` user, working directory, VDR ordering, and filesystem hardening conventions.
+The packaged unit starts `/usr/bin/vdradmin-go-mcp` with configuration in `/var/lib/vdradmin-go/config.yaml`. The service shares the existing `vdr` user, working directory, VDR ordering, and filesystem hardening conventions.
 
 ## Client Setup
 
@@ -80,8 +80,8 @@ Create `.vscode/mcp.json` for a workspace-specific server, or run `MCP: Open Use
   "servers": {
     "vdradmin": {
       "type": "stdio",
-      "command": "/opt/vdradmin-go/vdradmin-mcp",
-      "args": ["--config", "/etc/vdradmin/config.yaml"]
+      "command": "/usr/bin/vdradmin-go-mcp",
+      "args": ["--config", "/var/lib/vdradmin-go/config.yaml"]
     }
   }
 }
@@ -102,10 +102,10 @@ For the systemd-managed HTTP service, use:
 
 VS Code asks you to trust newly configured local servers. Use `MCP: List Servers` to inspect status and logs.
 
-In the VS Code chat window you can then ask `How to use the vdradmin-mcp server?` e.g. Then you get something like this:
+In the VS Code chat window you can then ask `How to use the vdradmin-go-mcp server?` e.g. Then you get something like this:
 
 ```plain
-vdradmin-mcp provides a read-only electronic program guide search tool: search_epg.
+vdradmin-go-mcp provides a read-only electronic program guide search tool: search_epg.
 
 Ask for programme information in plain language, for example:
 
@@ -124,7 +124,7 @@ Add a local stdio server in the current project:
 
 ```bash
 claude mcp add --transport stdio vdradmin -- \
-  /opt/vdradmin-go/vdradmin-mcp --config /etc/vdradmin/config.yaml
+  /usr/bin/vdradmin-go-mcp --config /var/lib/vdradmin-go/config.yaml
 ```
 
 Add the HTTP service instead:
@@ -141,15 +141,15 @@ Add a local stdio server:
 
 ```bash
 codex mcp add vdradmin -- \
-  /opt/vdradmin-go/vdradmin-mcp --config /etc/vdradmin/config.yaml
+  /usr/bin/vdradmin-go-mcp --config /var/lib/vdradmin-go/config.yaml
 ```
 
 Alternatively, add one of these entries to `~/.codex/config.toml` or a trusted project's `.codex/config.toml`:
 
 ```toml
 [mcp_servers.vdradmin]
-command = "/opt/vdradmin-go/vdradmin-mcp"
-args = ["--config", "/etc/vdradmin/config.yaml"]
+command = "/usr/bin/vdradmin-go-mcp"
+args = ["--config", "/var/lib/vdradmin-go/config.yaml"]
 ```
 
 ```toml
@@ -162,7 +162,7 @@ Run `codex mcp list` or use `/mcp` in the Codex terminal UI to inspect the serve
 ## Troubleshooting
 
 - Confirm VDR is reachable with the configured `vdr.host` and `vdr.port`.
-- Check service logs with `journalctl -u vdradmin-mcp -e`.
+- Check service logs with `journalctl -u vdradmin-go-mcp -e`.
 - For stdio failures, inspect the MCP client log; standard output is protocol data and should remain silent outside MCP responses.
 - Use [MCP Inspector](https://github.com/modelcontextprotocol/inspector) to initialize the server, list tools, and call `search_epg` during development.
 - A zero-result search is valid; first verify the configured `vdr.wanted_channels` has not excluded the expected channel.

@@ -1,24 +1,21 @@
 [Unit]
 Description=vdradmin-go MCP Server
-After=network.target vdr.service
-Wants=vdr.service
+Wants=network-online.target vdr.service
+After=network-online.target vdr.service
 
 [Service]
 Type=simple
 User=vdr
 Group=vdr
-WorkingDirectory=/opt/vdradmin-go
-ExecStart=/opt/vdradmin-go/vdradmin-mcp --transport=http --config /etc/vdradmin/config.yaml
+StateDirectory=vdradmin-go
+WorkingDirectory=/var/lib/vdradmin-go
+ExecStart=/usr/bin/vdradmin-go-mcp --transport=http --config /var/lib/vdradmin-go/config.yaml
 Restart=on-failure
 RestartSec=5s
 
 # Security
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/var/log/vdradmin
-
 # Resource limits
 LimitNOFILE=65536
 LimitNPROC=512

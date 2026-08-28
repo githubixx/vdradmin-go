@@ -60,7 +60,7 @@ These paths are not subject to runtime validation since they require admin privi
 
 ### MCP HTTP Listener
 
-`vdradmin-mcp --transport=http` is intentionally unauthenticated in the initial release. Its default listener is `127.0.0.1:8081` and must remain loopback-only unless a trusted reverse proxy or other access-control boundary protects it. Do not expose the `/mcp` endpoint directly to a LAN or the public internet.
+`vdradmin-go-mcp --transport=http` is intentionally unauthenticated in the initial release. Its default listener is `127.0.0.1:8081` and must remain loopback-only unless a trusted reverse proxy or other access-control boundary protects it. Do not expose the `/mcp` endpoint directly to a LAN or the public internet.
 
 The MCP service exposes only read-only EPG search today. Future authentication will be implemented as HTTP middleware so it applies consistently before MCP tool execution.
 

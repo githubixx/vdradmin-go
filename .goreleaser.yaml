@@ -8,10 +8,10 @@ before:
     - go test ./...
 
 builds:
-  - id: vdradmin
+  - id: vdradmin-go
     dir: .
-    main: ./cmd/vdradmin
-    binary: vdradmin
+    main: ./cmd/vdradmin-go
+    binary: vdradmin-go
     env:
       - CGO_ENABLED=0
     goos:
@@ -23,10 +23,10 @@ builds:
       - -X main.version={{.Version}}
       - -X main.commit={{.Commit}}
       - -X main.date={{.Date}}
-  - id: vdradmin-mcp
+  - id: vdradmin-go-mcp
     dir: .
-    main: ./cmd/vdradmin-mcp
-    binary: vdradmin-mcp
+    main: ./cmd/vdradmin-go-mcp
+    binary: vdradmin-go-mcp
     env:
       - CGO_ENABLED=0
     goos:
