@@ -6,12 +6,20 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/githubixx/vdradmin-go/internal/application/services"
+	"github.com/githubixx/vdradmin-go/internal/domain"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-const searchEPGToolName = "search_epg"
+const (
+	searchEPGToolName        = "search_epg"
+	searchRecordingsToolName = "search_recordings"
+	defaultResultLimit       = 50
+	maxResultLimit           = 200
+	minRecordingPatternRunes = 3
+)
 
 type searchEPGInput struct {
 	Pattern     string   `json:"pattern" jsonschema:"The text or regular expression to search for."`
@@ -45,10 +53,38 @@ type epgEventOutput struct {
 	DurationSecs  int64  `json:"durationSeconds"`
 }
 
+type searchRecordingsInput struct {
+	Pattern       string `json:"pattern" jsonschema:"The phrase to search for; must be at least 3 characters."`
+	InSubtitle    bool   `json:"inSubtitle,omitempty" jsonschema:"Search recording subtitles in addition to titles."`
+	InPath        bool   `json:"inPath,omitempty" jsonschema:"Search recording paths in addition to titles."`
+	InDescription bool   `json:"inDescription,omitempty" jsonschema:"Search recording descriptions in addition to titles."`
+	InChannel     bool   `json:"inChannel,omitempty" jsonschema:"Search recording channel names in addition to titles."`
+	SortBy        string `json:"sortBy,omitempty" jsonschema:"Sort order: date (default), name, date_oldest, or length."`
+	ResultLimit   int    `json:"resultLimit,omitempty" jsonschema:"Maximum number of results, from 1 to 200; defaults to 50."`
+}
+
+type searchRecordingsOutput struct {
+	Recordings []recordingOutput `json:"recordings" jsonschema:"The sorted matching recordings."`
+	Total      int               `json:"total" jsonschema:"Number of matches before the result limit."`
+	Truncated  bool              `json:"truncated" jsonschema:"Whether additional matches were omitted because of the result limit."`
+}
+
+type recordingOutput struct {
+	Path          string `json:"path"`
+	Title         string `json:"title"`
+	Subtitle      string `json:"subtitle,omitempty"`
+	Description   string `json:"description,omitempty"`
+	Channel       string `json:"channel,omitempty"`
+	Date          string `json:"date,omitempty"`
+	LengthSeconds int64  `json:"lengthSeconds"`
+	SizeBytes     int64  `json:"sizeBytes"`
+	IsFolder      bool   `json:"isFolder"`
+}
+
 // NewServer constructs the MCP server and registers all vdradmin-go tools.
-func NewServer(epgService *services.EPGService, version string) *mcp.Server {
+func NewServer(epgService *services.EPGService, recordingService *services.RecordingService, version string) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{Name: "vdradmin-go-mcp", Version: version}, &mcp.ServerOptions{
-		Instructions: "Search the configured VDR electronic program guide. Use search_epg for read-only TV show and programme searches.",
+		Instructions: "Search the configured VDR electronic program guide and recordings. Use search_epg for read-only TV show and programme searches, and search_recordings for read-only completed recording searches.",
 	})
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        searchEPGToolName,
@@ -59,6 +95,15 @@ func NewServer(epgService *services.EPGService, version string) *mcp.Server {
 			IdempotentHint: true,
 		},
 	}, searchEPGHandler(epgService))
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        searchRecordingsToolName,
+		Title:       "Search recordings",
+		Description: "Search completed VDR recordings by phrase, with optional fields, sort order, and result limit.",
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint:   true,
+			IdempotentHint: true,
+		},
+	}, searchRecordingsHandler(recordingService))
 	return server
 }
 
@@ -121,6 +166,97 @@ func searchCriteriaFromInput(input searchEPGInput) (services.EPGSearchCriteria, 
 		EndsAt:      endsAt,
 		ResultLimit: input.ResultLimit,
 	}, nil
+}
+
+func searchRecordingsHandler(recordingService *services.RecordingService) mcp.ToolHandlerFor[searchRecordingsInput, searchRecordingsOutput] {
+	return func(ctx context.Context, _ *mcp.CallToolRequest, input searchRecordingsInput) (*mcp.CallToolResult, searchRecordingsOutput, error) {
+		pattern := strings.TrimSpace(input.Pattern)
+		if pattern == "" {
+			return nil, searchRecordingsOutput{}, fmt.Errorf("pattern is required")
+		}
+		if utf8.RuneCountInString(pattern) < minRecordingPatternRunes {
+			return nil, searchRecordingsOutput{}, fmt.Errorf("pattern must be at least %d characters", minRecordingPatternRunes)
+		}
+		limit, err := normalizedResultLimit(input.ResultLimit)
+		if err != nil {
+			return nil, searchRecordingsOutput{}, err
+		}
+
+		recordings, err := recordingService.GetAllRecordings(ctx)
+		if err != nil {
+			return nil, searchRecordingsOutput{}, err
+		}
+		matches := filterMatchingRecordings(recordings, pattern, input)
+		matches = recordingService.SortRecordings(matches, strings.TrimSpace(input.SortBy))
+
+		total := len(matches)
+		truncated := total > limit
+		if truncated {
+			matches = matches[:limit]
+		}
+
+		output := searchRecordingsOutput{
+			Recordings: make([]recordingOutput, 0, len(matches)),
+			Total:      total,
+			Truncated:  truncated,
+		}
+		for _, recording := range matches {
+			output.Recordings = append(output.Recordings, recordingToOutput(recording))
+		}
+		return nil, output, nil
+	}
+}
+
+func normalizedResultLimit(value int) (int, error) {
+	if value == 0 {
+		return defaultResultLimit, nil
+	}
+	if value < 1 || value > maxResultLimit {
+		return 0, fmt.Errorf("resultLimit must be between 1 and %d", maxResultLimit)
+	}
+	return value, nil
+}
+
+func filterMatchingRecordings(recordings []domain.Recording, pattern string, input searchRecordingsInput) []domain.Recording {
+	needle := strings.ToLower(pattern)
+	matches := make([]domain.Recording, 0, len(recordings))
+	for _, recording := range recordings {
+		if recordingMatches(recording, needle, input) {
+			matches = append(matches, recording)
+		}
+	}
+	return matches
+}
+
+func recordingMatches(recording domain.Recording, needle string, input searchRecordingsInput) bool {
+	haystackParts := []string{recording.Title}
+	if input.InSubtitle {
+		haystackParts = append(haystackParts, recording.Subtitle)
+	}
+	if input.InPath {
+		haystackParts = append(haystackParts, recording.Path)
+	}
+	if input.InDescription {
+		haystackParts = append(haystackParts, recording.Description)
+	}
+	if input.InChannel {
+		haystackParts = append(haystackParts, recording.Channel)
+	}
+	return strings.Contains(strings.ToLower(strings.Join(haystackParts, "\n")), needle)
+}
+
+func recordingToOutput(recording domain.Recording) recordingOutput {
+	return recordingOutput{
+		Path:          recording.Path,
+		Title:         recording.Title,
+		Subtitle:      recording.Subtitle,
+		Description:   recording.Description,
+		Channel:       recording.Channel,
+		Date:          formatEPGTime(recording.Date),
+		LengthSeconds: int64(recording.Length / time.Second),
+		SizeBytes:     recording.Size,
+		IsFolder:      recording.IsFolder,
+	}
 }
 
 func parseRFC3339Time(name, value string) (*time.Time, error) {
