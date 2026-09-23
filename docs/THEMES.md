@@ -20,6 +20,7 @@ Curated themes currently included:
 
 - `aurora-glass-1`
 - `cartoon-1`
+- `crt-starfield-1`
 - `fitness`
 - `glas-1`
 - `gold-1`
@@ -47,6 +48,27 @@ Spaceship themes currently included:
 - `spaceship-yellow-(dark|light)`
 
 The Configurations page theme dropdown shows the display name from each theme's `theme.yaml` (`name:`).
+
+### CRT Starfield artwork
+
+`crt-starfield-1` uses the original `web/static/img/themes/crt-starfield-1/crt-hero.png` across every page. The optimized `crt-hero-fade.webp` dissolves the television scene into `crt-sky.webp`, a dark photographic starfield derived from the sky in the same image. Page content starts immediately below the navigation and overlays the television; no hero spacer is inserted. The background scrolls with the page; occasional CSS comets stop moving when reduced motion is preferred. No reference-site images or logos are bundled.
+
+To regenerate the WebP assets after replacing `crt-hero.png`, use ImageMagick from the repository root (the dimensions below match the supplied 1672x941 image). Keep the original source and attribution details:
+
+```bash
+magick web/static/img/themes/crt-starfield-1/crt-hero.png -alpha on \
+    \( -size 1x941 gradient:white-black -level 0%,32% -resize 1672x941\! \) \
+    -compose CopyOpacity -composite -quality 88 \
+    web/static/img/themes/crt-starfield-1/crt-hero-fade.webp
+magick web/static/img/themes/crt-starfield-1/crt-hero.png \
+    -crop 1672x300+0+0 +repage \( +clone -flip \) -append \
+    -fill '#08101d' -colorize 17 -quality 87 \
+    web/static/img/themes/crt-starfield-1/crt-sky.webp
+```
+
+The image-model prompt used for the scene was:
+
+> Original editorial product photograph for a dark astronomy-themed television scheduling dashboard. Wide 16:9 composition: a late-1970s portable CRT television with physical dials, curved glass and gently worn graphite casing stands on dark ground under a detailed midnight sky. On its screen is an original abstract space-program telemetry graphic with orbital arcs, a planet silhouette, and dim amber and cyan indicator lights. A thin golden glow marks the distant horizon; small sharp stars vary naturally in brightness, with a few faint meteor traces. Cinematic but crisp, dimensional lighting, restrained ink/navy/charcoal and amber palette. Keep the entire CRT in the middle third, with generous sky above and room to crop at the sides; fade the bottom into near-black. No typography, labels, watermarks, logos, people, additional devices, recognizable mission insignia, broadcast footage, glowing blobs, or exaggerated nebulae. Render at approximately 2400x1350. Also create a separately composed portrait 4:5 mobile version with the whole CRT visible and extra sky above.
 
 ## Using Themes
 
