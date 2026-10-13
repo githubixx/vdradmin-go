@@ -411,8 +411,9 @@
                 }
 
                 hls = new window.Hls({
-                    // Keep defaults; we want stability, not extra tuning.
                     enableWorker: true,
+                    // Avoid Firefox's short-video PiP filter for live streams.
+                    liveDurationInfinity: true,
                 });
 
                 hls.on(window.Hls.Events.ERROR, (event, data) => {
