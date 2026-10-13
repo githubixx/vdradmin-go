@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -159,7 +158,7 @@ func mustBaseURL(t *testing.T, ctx context.Context, c testcontainers.Container, 
 	if err != nil {
 		t.Fatalf("host: %v", err)
 	}
-	mapped, err := c.MappedPort(ctx, nat.Port(port))
+	mapped, err := c.MappedPort(ctx, port)
 	if err != nil {
 		t.Fatalf("mapped port: %v", err)
 	}
