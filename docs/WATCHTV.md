@@ -142,6 +142,7 @@ If your VDR is headless/recording-only and `GRAB` fails (for example `451 Grab i
 **vdradmin-go includes a built-in HLS transcoding proxy** that converts a streamdev MPEG-TS HTTP stream into browser-playable HLS.
 
 **Setup:**
+
 1. Install ffmpeg on the vdradmin-go host: `pacman -S ffmpeg` (Arch) or `apt install ffmpeg` (Debian/Ubuntu)
 2. In vdradmin-go web UI, go to **Configurations** → **VDR** section
 3. Set **Streamdev backend URL (HLS proxy)** to: `http://127.0.0.1:3000/{channel}`
@@ -149,6 +150,7 @@ If your VDR is headless/recording-only and `GRAB` fails (for example `451 Grab i
 5. Navigate to `/watch` — streams will automatically transcode to HLS
 
 **How it works:**
+
 - When `/watch` is in streaming mode, the UI calls `POST /watch/channel` for tuning.
 - When the browser requests `/watch/stream/{channel}/index.m3u8`, vdradmin-go starts (or reuses) a per-channel `ffmpeg` process.
 - ffmpeg outputs a live HLS playlist (`index.m3u8`) and `.ts` segments under the OS temp directory (typically `/tmp/vdradmin-hls/{channel}/`).
@@ -159,14 +161,18 @@ If your VDR is headless/recording-only and `GRAB` fails (for example `451 Grab i
 - Idle streams are cleaned up after ~5 minutes without access.
 
 **Browser playback:**
+
 - Chromium/Firefox: playback uses **hls.js** (via the `/watch` page) for reliability.
 - Safari/iOS: usually relies on native HLS (hls.js may be unsupported there).
+- hls.js reports an indefinite duration for live streams (`liveDurationInfinity: true`), so Firefox's floating Picture-in-Picture (PiP) button does not have to wait for the reported duration to reach its short-video threshold. The stream still needs to load, and Firefox's other PiP eligibility checks still apply. This also applies to external live HLS streams; snapshot mode and native HLS playback are unchanged.
 
 **Requirements:**
+
 - `ffmpeg` installed on the vdradmin-go host
 - `vdr-plugin-streamdev-server` configured and running on VDR host
 
 **Notes:**
+
 - The first playlist request may take a few seconds while the DVB device tunes and ffmpeg starts.
 - If you see `non-existing PPS ...` / `no frame!` messages from ffmpeg, that usually indicates corrupt/partial input during tuning; it often stabilizes after the channel lock.
 
@@ -182,6 +188,7 @@ vdr:
 Note: This does not implement transcoding; it only embeds the URL.
 
 Important:
+
 - The `/watch` page prefers **hls.js** in Chromium/Firefox, so the URL should be an **HLS manifest** (`.m3u8`).
 - Raw streamdev URLs like `http://127.0.0.1:3000/{channel}` typically serve MPEG-TS and are usually not playable directly in browsers.
 
