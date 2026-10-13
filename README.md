@@ -93,7 +93,7 @@ vdradmin-go/
 
 ## Technology Stack
 
-- **Language**: Go 1.25+
+- **Language**: Go 1.26+
 - **Web**: Go 1.22+ internal router
 - **Templates**: html/template
 - **Config**: YAML with validation
@@ -113,7 +113,7 @@ vdradmin-go/
 
 ### Build from source ("make run" / "make build")
 
-- **Go 1.25+** (see `go.mod`). If your distro packages an older Go version, install Go from [go.dev/dl](https://go.dev/dl/).
+- **Go 1.26+** (see `go.mod`). If your distro packages an older Go version, install Go from [go.dev/dl](https://go.dev/dl/).
 - `make` and `git`.
 
 Arch Linux:

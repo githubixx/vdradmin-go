@@ -1,5 +1,48 @@
 # Security
 
+## Dependency Security
+
+Docker SDK dependencies are used only by the Docker-backed integration tests,
+not by the application binaries. Testcontainers uses the supported
+`github.com/moby/moby/api` and `github.com/moby/moby/client` modules instead of
+the deprecated `github.com/docker/docker` module. The legacy module has
+advisories without a fixed version, including
+[GO-2026-4883](https://pkg.go.dev/vuln/GO-2026-4883).
+
+The archive, compression, and SSH dependencies are also pinned to patched
+versions. The SSH fixes require Go 1.26 or newer.
+
+Module-level scanners may still report
+[GO-2026-5932](https://pkg.go.dev/vuln/GO-2026-5932) for the unmaintained
+`golang.org/x/crypto/openpgp` package. The Docker test stack uses SSH from that
+module, but does not import OpenPGP; this module-only advisory is distinct from
+a vulnerability in an imported package or linked symbol.
+
+Include integration tests when checking dependency security:
+
+```bash
+go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+go run golang.org/x/vuln/cmd/govulncheck@latest -tags=integration -test ./internal/integration
+```
+
+Verify that the scanner includes transitive modules, not only this repository.
+Scanning compiled binaries also checks the actual linked dependency versions:
+
+```bash
+scan_dir=$(mktemp -d)
+go build -o "$scan_dir/vdradmin-go" ./cmd/vdradmin-go
+go build -o "$scan_dir/vdradmin-go-mcp" ./cmd/vdradmin-go-mcp
+go test -tags=integration -c -o "$scan_dir/integration.test" ./internal/integration
+go run golang.org/x/vuln/cmd/govulncheck@latest -mode=binary "$scan_dir/vdradmin-go"
+go run golang.org/x/vuln/cmd/govulncheck@latest -mode=binary "$scan_dir/vdradmin-go-mcp"
+go run golang.org/x/vuln/cmd/govulncheck@latest -mode=binary "$scan_dir/integration.test"
+rm "$scan_dir/vdradmin-go" "$scan_dir/vdradmin-go-mcp" "$scan_dir/integration.test"
+rmdir "$scan_dir"
+```
+
+Updating the Go SDK does not update Docker Engine or its container runtime.
+Keep the Docker installation on development and CI hosts patched separately.
+
 ## Path Traversal Protection
 
 vdradmin-go includes protection against path traversal attacks (CWE-22) to prevent unauthorized access to files outside configured directories.

@@ -380,7 +380,7 @@ func startSVDRPStub(t *testing.T, ctx context.Context) *svdrp.Client {
 		t.Fatalf("get container host: %v", err)
 	}
 
-	port := mappedPort.Int()
+	port := int(mappedPort.Num())
 	t.Logf("SVDRP stub running at %s:%d", host, port)
 
 	// Create and connect client

@@ -174,7 +174,7 @@ HTTP → Handler → TimerService → EPGService → VDRClient (interface) → S
 
 ### Core
 
-- **Go 1.25+**: Latest features, enhanced routing
+- **Go 1.26+**: Latest features, enhanced routing
 - **net/http**: Standard library routing (Go 1.22+ enhancements)
 - **html/template**: Standard library templating
 - **slog**: Standard library structured logging
