@@ -38,6 +38,9 @@ func TestTemplate_Watch_LiveDurationInfinity(t *testing.T) {
 			}
 
 			body := buf.String()
+			if !strings.Contains(body, `<script src="https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js"></script>`) {
+				t.Fatal("expected the pinned hls.js 1.7.3 script")
+			}
 			if !hlsConfig.MatchString(body) {
 				t.Fatal("expected hls.js to report indefinite live stream duration")
 			}
