@@ -162,9 +162,10 @@ If your VDR is headless/recording-only and `GRAB` fails (for example `451 Grab i
 
 **Browser playback:**
 
-- Chromium/Firefox: playback uses **hls.js** (via the `/watch` page) for reliability.
+- Chromium/Firefox: playback uses **hls.js 1.7.3**, pinned to the jsDelivr `dist/hls.min.js` script (via the `/watch` page), for reliability.
 - Safari/iOS: usually relies on native HLS (hls.js may be unsupported there).
 - hls.js reports an indefinite duration for live streams (`liveDurationInfinity: true`), so Firefox's floating Picture-in-Picture (PiP) button does not have to wait for the reported duration to reach its short-video threshold. The stream still needs to load, and Firefox's other PiP eligibility checks still apply. This also applies to external live HLS streams; snapshot mode and native HLS playback are unchanged.
+- When upgrading hls.js, verify live playback, repeated channel switching, startup delays, interruption recovery, Firefox PiP, and Safari/iOS playback for both built-in and external HLS streams. Version 1.7 changes MPEG-TS timeline offsets to use decode timestamps instead of presentation timestamps; the built-in proxy produces MPEG-TS segments, so template tests alone do not establish playback compatibility. See the [upstream migration guide](https://github.com/video-dev/hls.js/blob/v1.7.3/MIGRATING.md).
 
 **Requirements:**
 
