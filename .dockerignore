@@ -37,3 +37,10 @@ coverage.html
 # Misc
 .DS_Store
 Thumbs.db
+
+# Browser dependencies and generated reports are installed in the test image.
+node_modules/
+.cache/
+test-results/
+playwright-report/
+test/e2e/snapshots/

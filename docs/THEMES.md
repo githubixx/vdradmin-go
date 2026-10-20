@@ -12,7 +12,25 @@ These are always available:
 
 ## Bundled Themes
 
-This repository ships multiple theme directories under `web/themes/`. All themes are discovered dynamically at startup from subdirectories that contain a `theme.yaml` file.
+All 37 original themes are embedded by
+[Chroma UI](https://github.com/githubixx/chroma-ui); an installed `themes/`
+directory is no longer required. VDR keeps its page layouts, domain-specific
+theme adjustments, menu contents, authorization, and configured selection.
+Shared theme assets are served through the application, not downloaded from
+GitHub at runtime. Original Google Fonts imports still need network access.
+
+An optional `themes/` directory below `--assets-dir` supplies additional themes
+or complete replacements of embedded IDs. Each local directory must contain
+valid `theme.yaml` metadata and readable, nonempty `theme.css`; malformed or
+incomplete local themes fail startup explicitly rather than silently falling
+back. A local theme replaces the whole shared theme, including its artwork:
+missing files are not borrowed from the embedded original.
+
+Existing installations may still have the old shipped theme files. Installation
+does not delete them, since they may contain user changes; they become overrides
+and can mask embedded theme updates. Back up that directory outside the active
+assets tree, then restore only intentional complete overrides. A missing local
+theme directory is valid and uses the embedded catalog.
 
 Theme IDs are the directory names (for example: `luxury-1`).
 
@@ -49,21 +67,84 @@ Spaceship themes currently included:
 
 The Configurations page theme dropdown shows the display name from each theme's `theme.yaml` (`name:`).
 
+Shared assets use `/ui/css/` and `/ui/js/`. The existing
+`/themes/<id>/theme.css` route remains available with revalidation, and relative
+theme artwork resolves under `/themes/<id>/assets/`. Legacy
+`/static/img/themes/<id>/...` URLs remain supported; application-local files
+take precedence on those legacy URLs. Theme routes retain application
+middleware; local static assets retain their existing serving policy.
+
+Stylesheet ordering is shared foundation, VDR layout, selected theme, then
+VDR compatibility rules. Existing domain class names remain available alongside
+generic component hooks for custom themes. Built-in-theme-specific compatibility
+rules apply only when `data-theme-source="bundled"` is rendered; complete local
+replacements with the same ID retain control of their theme styling.
+Generic items follow Chroma UI's
+[item state color contract](https://github.com/githubixx/chroma-ui#item-state-color-contract):
+active borders are green, warnings yellow/orange, and errors red. Default
+items use an ordinary theme border, not the active-state accent. These meanings
+also apply to SVG frames. VDR-specific recording/tuner treatments remain in
+the application compatibility layer rather than redefining generic statuses.
+For bundled Metal 1, timer collisions use orange borders and critical conflicts
+use red, including their timeline blocks. Its neutral button palette and
+recording treatment remain separate from these problem indicators.
+Desktop programme lists reserve a consistent font-relative width for time
+ranges, so titles and subtitles align across cards and channel groups.
+Mobile stacking and Information-popup date layouts are unchanged.
+Editing local CSS takes effect on
+refresh; adding themes or changing metadata requires rediscovery/restart.
+
+### Verifying Chroma UI is in use
+
+Inspect an actual executable, not the repository directory. From the repository
+root, build and inspect a standalone binary:
+
+```sh
+GOWORK=off make build-web
+go version -m ./build/vdradmin-go | grep github.com/githubixx/chroma-ui
+```
+
+This verifies the newly built binary; it does not identify an already-running
+process. `make run` uses `go run`, which creates a temporary executable.
+
+To check the running application's assets, select an explicit theme and run
+`document.documentElement.dataset` in the browser developer console.
+`themeSource: "bundled"` identifies a Chroma-embedded theme; `"custom"` identifies
+a local replacement managed by Chroma, and `"system"` identifies System mode.
+In the Network tab, disable caching and reload: `/ui/css/base.css` and the
+`/ui/js/` helpers should load successfully. Explicit themes also load
+`/themes/<id>/theme.css`; this retained URL does not imply the old implementation.
+The additional `/static/css/base.css` and `/static/css/theme-compat.css` are
+expected VDR-owned layouts and compatibility rules.
+
 ### CRT Starfield artwork
 
-`crt-starfield-1` uses the original `web/static/img/themes/crt-starfield-1/crt-hero.png` across every page. The optimized `crt-hero-fade.webp` dissolves the television scene into `crt-sky.webp`, a dark photographic starfield derived from the sky in the same image. Page content starts immediately below the navigation and overlays the television; no hero spacer is inserted. The background scrolls with the page; occasional CSS comets stop moving when reduced motion is preferred. No reference-site images or logos are bundled.
+`crt-starfield-1` uses artwork derived from the original
+`web/static/img/themes/crt-starfield-1/crt-hero.png` across every page.
+The optimized `crt-hero-fade.webp` dissolves the television scene into
+`crt-sky.webp`, a dark photographic starfield derived from the sky in the same
+image. Both runtime WebPs are embedded by Chroma UI. Page content starts
+immediately below the navigation and overlays the television; no hero spacer
+is inserted. The background scrolls with the page; occasional CSS comets stop
+moving when reduced motion is preferred. No reference-site images or logos
+are bundled.
 
-To regenerate the WebP assets after replacing `crt-hero.png`, use ImageMagick from the repository root (the dimensions below match the supplied 1672x941 image). Keep the original source and attribution details:
+To customize the WebPs after replacing `crt-hero.png`, first create a complete
+local `crt-starfield-1` override using that theme's CSS and metadata from the
+Chroma UI checkout. Then use ImageMagick from the VDR repository root (the
+dimensions below match the supplied 1672x941 image). Keep the original source
+and attribution details:
 
 ```bash
+mkdir -p web/themes/crt-starfield-1/assets
 magick web/static/img/themes/crt-starfield-1/crt-hero.png -alpha on \
     \( -size 1x941 gradient:white-black -level 0%,32% -resize 1672x941\! \) \
     -compose CopyOpacity -composite -quality 88 \
-    web/static/img/themes/crt-starfield-1/crt-hero-fade.webp
+    web/themes/crt-starfield-1/assets/crt-hero-fade.webp
 magick web/static/img/themes/crt-starfield-1/crt-hero.png \
     -crop 1672x300+0+0 +repage \( +clone -flip \) -append \
     -fill '#08101d' -colorize 17 -quality 87 \
-    web/static/img/themes/crt-starfield-1/crt-sky.webp
+    web/themes/crt-starfield-1/assets/crt-sky.webp
 ```
 
 The image-model prompt used for the scene was:
@@ -86,17 +167,23 @@ ui:
 - **system**: Respects OS preference (auto-switches between light and dark)
 - **light**: Always uses light theme regardless of OS setting  
 - **dark**: Always uses dark theme regardless of OS setting
-- **spaceship-*-light**: Spaceship theme (light variant)
-- **spaceship-*-dark**: Spaceship theme (dark variant)
+- **spaceship-*-light**: Spaceship theme with lighter accents on a dark page
+- **spaceship-*-dark**: Spaceship theme with darker accents on a dark page
 - **custom-name**: Uses your custom theme from `web/themes/custom-name/`
 
 ## Creating Custom Themes
 
-Custom themes are easy to create - just copy an existing theme and modify the CSS variables.
+Start from the CSS, metadata, and any referenced artwork in
+`assets/themes/<id>/` of the Chroma UI revision pinned in `go.mod`, not the
+removed VDR bundled-theme directories. Copy the complete theme into your local
+override directory, then modify its variables and rules. When assigning a new
+ID, update the CSS `data-theme` selectors to match it. Keep artwork in the
+theme's `assets/` subdirectory and use relative URLs.
 
 ### Step 1: Create Theme Directory
 
-Create a new directory under `web/themes/`:
+Create a new directory under the `themes/` directory of your configured
+`--assets-dir` (the source checkout uses `web/themes/`):
 
 ```bash
 mkdir -p web/themes/my-theme
@@ -237,8 +324,11 @@ You still need to restart vdradmin-go when adding a new theme directory, renamin
 ## Example: Creating a "Blue" Theme
 
 ```bash
-# Copy existing theme
-cp -r web/themes/light web/themes/blue
+# Copy a complete theme from your Chroma UI checkout, including any artwork
+CHROMA_UI_DIR=/path/to/chroma-ui
+mkdir -p web/themes
+cp -r "$CHROMA_UI_DIR/assets/themes/light" web/themes/blue
+sed -i 's/data-theme="light"/data-theme="blue"/g' web/themes/blue/theme.css
 
 # Edit metadata
 cat > web/themes/blue/theme.yaml << EOF
@@ -248,9 +338,8 @@ description: Cool blue theme
 version: 1.0.0
 EOF
 
-# Edit colors in theme.css
-sed -i 's/#7c3aed/#2563eb/g' web/themes/blue/theme.css  # Change purple to blue
-sed -i 's/#6d28d9/#1d4ed8/g' web/themes/blue/theme.css  # Change hover to dark blue
+# Edit --primary-color and --primary-hover in theme.css
+nano web/themes/blue/theme.css
 
 # Configure
 sed -i 's/theme: "system"/theme: "blue"/' config.yaml
@@ -264,7 +353,7 @@ Restart vdradmin-go.
 
 Check that:
 
-1. Theme directory exists in `web/themes/`
+1. For a custom theme, its directory exists in `themes/` below `--assets-dir`
 2. `theme.yaml` exists and is valid YAML
 3. `theme.css` exists
 4. Theme name in config matches directory name exactly (case-sensitive)
@@ -312,4 +401,6 @@ You can add media queries or conditional styles within your theme.css:
 
 - Theme CSS updates are picked up on reload because `/themes/<id>/theme.css` is served with `Cache-Control: no-cache`.
 - The Configurations page theme dropdown shows `System (auto)` plus all discovered themes, using the display name from each `theme.yaml` when available.
-- Theme discovery is dynamic across directories under `web/themes/`, but the available theme list is built at startup, so adding or renaming themes still requires a restart.
+- Embedded themes are always available. Optional local directories supplement
+  or replace them, but the available theme list is built at startup, so adding
+  or renaming local themes still requires a restart.
