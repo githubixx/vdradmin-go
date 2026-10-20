@@ -138,11 +138,26 @@ hashes in `resources.lock.json`. The same applies to Watch TV's pinned hls.js.
 This keeps the actual font files and JavaScript
 implementation stable without redistributing them in the repository.
 
-`npm run test:e2e:resources` downloads missing cached resources and rejects any
-hash mismatch. To intentionally update the resource lock, run
+The reviewed Google Fonts CSS responses are stored in `test/e2e/resources/`
+under their SHA-256 names. Google Fonts CSS endpoints can return different
+bytes across requests or locations, so cold builds use these test-only fixtures
+rather than refetching mutable stylesheets. Font binaries and version-pinned
+JavaScript are still downloaded into the ignored cache and strictly verified;
+they are not committed. Missing or modified CSS fixtures fail explicitly, even
+when a warm cache exists.
+
+`npm run test:e2e:resources` verifies the CSS fixtures, downloads other missing
+cached resources, and rejects any hash mismatch. To intentionally update the
+resource lock and CSS fixtures, first download the pinned Chroma module with
+`GOWORK=off go mod download github.com/githubixx/chroma-ui`, then run
 `npm run test:e2e:resources:update`, review URL/hash changes, and review the
-resulting screenshot differences. A cold cache requires network access during
+resulting screenshot differences. Discovery includes the pinned Chroma shared
+and theme stylesheets plus VDR templates/styles and any local overrides.
+A cold cache requires network access during
 setup; screenshot rendering does not depend on live external responses.
+
+Run `npm run test:e2e:resources:test` for the offline resource-bootstrap
+regressions. The Docker build also runs them before preparing its cold cache.
 
 Do not silently substitute system fonts or a fake htmx implementation.
 

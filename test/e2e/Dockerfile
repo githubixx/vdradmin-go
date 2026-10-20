@@ -21,8 +21,9 @@ FROM mcr.microsoft.com/playwright:v1.64.1-noble@sha256:7852dc5a7d72f5fe458a597d6
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
-COPY test/e2e/resources.mjs test/e2e/resources.lock.json ./test/e2e/
-RUN npm run test:e2e:resources
+COPY test/e2e/resources.mjs test/e2e/resources.test.mjs test/e2e/resources.lock.json ./test/e2e/
+COPY test/e2e/resources ./test/e2e/resources
+RUN npm run test:e2e:resources:test && npm run test:e2e:resources
 COPY --from=fixture-selected /ui-fixture /usr/local/bin/ui-fixture
 COPY go.mod ./
 COPY web ./web
