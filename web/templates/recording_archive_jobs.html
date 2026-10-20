@@ -1,13 +1,17 @@
 {{define "recording_archive_jobs.html"}}
 <!DOCTYPE html>
-<html lang="en" {{if ne .ThemeMode "system"}}data-theme="{{.ThemeMode}}"{{end}} data-theme-default="{{.ThemeDefault}}">
+<html lang="en" {{if ne .ThemeMode "system"}}data-theme="{{.ThemeMode}}"{{end}} data-theme-default="{{.ThemeDefault}}" data-theme-source="{{.ThemeSource}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VDRAdmin-go - Archive Jobs</title>
-    <link rel="stylesheet" href="/static/css/base.css?v=20260212-Z">
+    <link rel="stylesheet" href="/ui/css/base.css?v=20261017-chroma">
+    <link rel="stylesheet" href="/static/css/base.css?v=20261017-chroma">
     {{if and .ThemeMode (ne .ThemeMode "system")}}<link rel="stylesheet" href="/themes/{{.ThemeMode}}/theme.css?v=20260212-Z">{{end}}
-    <script src="/static/js/theme.js?v=20260212-Z" defer></script>
+    <link rel="stylesheet" href="/static/css/theme-compat.css?v=20261017-chroma">
+    <script src="/ui/js/theme.js?v=20261017-chroma" defer></script>
+    <script src="/ui/js/menu.js?v=20261017-chroma" defer></script>
+    <script src="/ui/js/select.js?v=20261017-chroma" defer></script>
 </head>
 <body>
     {{template "nav_header" .}}
@@ -26,8 +30,8 @@
             {{else}}
                 <div class="recording-list">
                     {{range .Jobs}}
-                    <div class="recording-item">
-                        <div class="recording-info">
+                    <div class="recording-item ui-item">
+                        <div class="recording-info ui-item-info">
                             <h3 style="margin: 0;">Job {{.ID}}</h3>
                             <div class="recording-meta">
                                 <span class="recording-date">{{if .StartedAt.IsZero}}{{.CreatedAt.Format "2006-01-02 15:04:05"}}{{else}}{{.StartedAt.Format "2006-01-02 15:04:05"}}{{end}}</span>
@@ -36,7 +40,7 @@
                             </div>
                             <div style="margin-top: 0.25rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; overflow-wrap: anywhere;">{{.Preview.VideoPath}}</div>
                         </div>
-                        <div class="recording-actions">
+                        <div class="recording-actions ui-item-actions">
                             <a class="btn btn-sm btn-primary" href="/recordings/archive/job?id={{.ID}}">Open</a>
                         </div>
                     </div>

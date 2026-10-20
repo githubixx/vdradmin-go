@@ -61,7 +61,7 @@ func TestSearch_DisablesRecordWhenTimerExists(t *testing.T) {
 	epgService := services.NewEPGService(mock, 0)
 	timerService := services.NewTimerService(mock)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "search_results.html"),
 	))
 

@@ -2,9 +2,13 @@ version: 2
 
 project_name: vdradmin-go
 
+env:
+  - GOWORK=off
+  - GOFLAGS=-mod=readonly
+
 before:
   hooks:
-    - go mod tidy
+    - sh scripts/check-release-readiness.sh
     - go test ./...
 
 builds:
@@ -42,6 +46,15 @@ builds:
 archives:
   - formats:
       - tar.gz
+    # Chroma UI is embedded; only VDR templates/static assets need installation.
+    # Optional web/themes overrides are user-owned and must not ship in archives.
+    files:
+      - README*
+      - LICENSE*
+      - CHANGELOG*
+      - web/templates/**
+      - web/static/**
+      - configs/config.example.yaml
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
     format_overrides:

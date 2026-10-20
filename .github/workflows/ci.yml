@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+env:
+  GOWORK: "off"
+  GOFLAGS: "-mod=readonly"
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -23,8 +27,14 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Check standalone dependency readiness
+        run: sh scripts/check-release-readiness.sh
+
       - name: Go test
-        run: go test ./...
+        run: go test -race ./...
+
+      - name: Go vet
+        run: go vet ./...
 
       - name: Go build
         run: go build ./...

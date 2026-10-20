@@ -126,22 +126,9 @@ version: 1.0.0
 		t.Fatal(err)
 	}
 
-	handler := &Handler{
-		logger: slog.Default(),
-	}
 	manager := theme.NewManager(tmpDir)
-	if err := manager.Discover(); err != nil {
-		t.Fatal(err)
-	}
-	handler.SetThemeManager(manager)
-
-	req := httptest.NewRequest("GET", "/themes/nocss/theme.css", nil)
-	req.SetPathValue("name", "nocss")
-	rr := httptest.NewRecorder()
-
-	handler.ServeTheme(rr, req)
-
-	if rr.Code != http.StatusNotFound {
-		t.Errorf("Expected status 404 when theme.css missing, got %d", rr.Code)
+	defer manager.Close()
+	if err := manager.Discover(); err == nil {
+		t.Fatal("theme with missing CSS must fail discovery, not silently fall back")
 	}
 }

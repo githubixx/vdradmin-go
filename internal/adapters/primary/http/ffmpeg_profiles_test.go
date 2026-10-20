@@ -1,7 +1,6 @@
 package http
 
 import (
-	"html/template"
 	"io"
 	"log/slog"
 	"net/http"
@@ -75,7 +74,7 @@ func TestSelectedFFMpegProfile_UsesNamedProfileOrDefault(t *testing.T) {
 }
 
 func TestFFMpegProfileTemplatesParse(t *testing.T) {
-	_, err := template.ParseFiles(
+	_, err := ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "configurations.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "ffmpeg_profiles.html"),

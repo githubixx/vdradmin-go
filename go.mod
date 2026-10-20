@@ -5,9 +5,9 @@ go 1.26.0
 require go.yaml.in/yaml/v4 v4.0.0-rc.4
 
 require (
+	github.com/githubixx/chroma-ui v0.1.0
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/testcontainers/testcontainers-go v0.44.0
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -70,4 +70,5 @@ require (
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.48.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

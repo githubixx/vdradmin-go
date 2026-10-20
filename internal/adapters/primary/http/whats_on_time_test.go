@@ -33,7 +33,7 @@ func TestWhatsOnNow_AtTimeSelectsPrograms(t *testing.T) {
 
 	epgService := services.NewEPGService(m, 0)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "index.html"),
 	))
@@ -73,7 +73,7 @@ func TestWhatsOnNow_InvalidTimeShowsErrorAndFallsBack(t *testing.T) {
 	m := ports.NewMockVDRClient()
 	epgService := services.NewEPGService(m, 0)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "index.html"),
 	))
@@ -121,7 +121,7 @@ func TestWhatsOnNow_RendersInformationLinkWhenEventIDPresent(t *testing.T) {
 
 	epgService := services.NewEPGService(m, 0)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "index.html"),
 	))

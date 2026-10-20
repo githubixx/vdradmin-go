@@ -73,7 +73,7 @@ func TestChannels_DisablesRecordOnlyForScheduledShow(t *testing.T) {
 	epqService := services.NewEPGService(mock, 0)
 	timerService := services.NewTimerService(mock)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "channels.html"),
 	))
@@ -207,7 +207,7 @@ func TestChannels_AnchorsEPGRequestToSelectedDay(t *testing.T) {
 
 	epqService := services.NewEPGService(spy, 0)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "channels.html"),
 	))

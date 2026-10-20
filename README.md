@@ -73,7 +73,7 @@ vdradmin-go/
 │   └── integration/             # Container-based integration tests
 ├── web/
 │   ├── templates/               # HTML templates
-│   ├── themes/                  # Theme CSS and metadata (light, dark, custom)
+│   ├── themes/                  # Optional complete local theme overrides
 │   └── static/                  # Frontend assets
 │       ├── css/
 │       └── js/
@@ -99,7 +99,7 @@ vdradmin-go/
 - **Config**: YAML with validation
 - **Logging**: slog (stdlib)
 - **Frontend**: htmx + modern CSS
-- **Themes**: Modular CSS theme system with automatic discovery
+- **Themes**: Embedded Chroma UI catalog with optional local theme overrides
 
 ## Requirements
 
@@ -112,6 +112,26 @@ vdradmin-go/
 - `config.yaml` needs to be writeable by the user `vdradmin-go` process uses (e.g. `vdr`) if you make changes via the UI.
 
 ### Build from source ("make run" / "make build")
+
+Shared themes and components come from
+[Chroma UI](https://github.com/githubixx/chroma-ui). This checkout pins the
+published release `v0.1.0`. Normal builds fetch that exact version;
+no sibling checkout or local workspace is required.
+
+For coordinated local changes to both projects, optionally create a workspace
+outside either repository:
+
+```sh
+mkdir -p /tmp/vdradmin-chroma-work
+cd /tmp/vdradmin-chroma-work
+go work init /path/to/vdradmin-go /path/to/chroma-ui
+export GOWORK=/tmp/vdradmin-chroma-work/go.work
+```
+
+Do not commit a local `replace` directive or a machine-specific workspace.
+Shared themes, CSS, navigation, and optional JavaScript are embedded; VDR
+templates and application static assets still need `--assets-dir`.
+See [the theme guide](docs/THEMES.md) for complete local overrides.
 
 - **Go 1.26+** (see `go.mod`). If your distro packages an older Go version, install Go from [go.dev/dl](https://go.dev/dl/).
 - `make` and `git`.
@@ -129,6 +149,48 @@ Build an Arch-ready binary with reproducible path handling:
 make arch-build
 ./build/vdradmin-go --version
 ```
+
+### Release readiness and post-review handoff
+
+Local workspace checks are not evidence of a portable release. The
+non-publishing preflight is:
+
+```sh
+sh scripts/check-release-readiness.sh
+```
+
+It always disables workspaces, requires a versioned Chroma UI dependency
+without a replacement, checks `go mod tidy -diff`, and verifies module
+integrity. It never edits dependency manifests or publishes anything.
+The current dependency is pinned to the published Chroma UI release `v0.1.0`.
+
+Go/UI CI, GoReleaser's pre-build hooks, and default Docker builders enforce
+this gate rather than silently resolving an arbitrary library revision.
+Explicit workspace development and `CHROMA_UI_DIR` Docker/browser builds
+remain available. The library's own standalone CI can run independently.
+No publishing workflow has been added to Chroma UI.
+
+To update Chroma after code review, first push the chosen library commit.
+Merging its branch, adding a version tag, or creating a GitHub Release is not
+required. Set `CHROMA_VERSION` to the exact pushed commit hash or a published
+tag/pseudo-version; Go resolves commit hashes to immutable pseudo-versions:
+
+```sh
+: "${CHROMA_VERSION:?Set the exact reviewed and pushed Chroma UI revision}"
+GOWORK=off go get "github.com/githubixx/chroma-ui@$CHROMA_VERSION"
+GOWORK=off go mod tidy
+sh scripts/check-release-readiness.sh
+GOWORK=off GOFLAGS=-mod=readonly go test -race ./...
+GOWORK=off GOFLAGS=-mod=readonly go vet ./...
+GOWORK=off GOFLAGS=-mod=readonly go build ./...
+CHROMA_UI_DIR= bash scripts/test-e2e.sh
+docker build -f deployments/Dockerfile -t vdradmin-go:reviewed .
+```
+
+Review the resulting `go.mod`/`go.sum` diff and browser reports before committing
+VDR. Do not add a local `replace`, manufacture a version, or use a sibling
+checkout to make a release check pass. No release, Git tag, commit, or push is
+performed by the preflight or the commands above.
 
 ### Using the released binary
 
@@ -303,18 +365,24 @@ vdradmin-go includes a modular theme system for easy customization:
 - **System** (default): Automatically follows OS/browser dark/light mode preference
 - **Light**: Always use light theme
 - **Dark**: Always use dark theme
-- **Curated bundled themes**: `aurora-glass-1`, `cartoon-1`, `fitness`, `glas-1`, `gold-1`, `golden-moon`, `lighting-1`, `luxury-1`, `mantle-1`, `metal-1`, `retro-arcade`, `solar-system-1`, `space-night-1`, `spaceship-2`
+- **Curated bundled themes**: `aurora-glass-1`, `cartoon-1`, `crt-starfield-1`, `fitness`, `glas-1`, `gold-1`, `golden-moon`, `lighting-1`, `luxury-1`, `mantle-1`, `metal-1`, `retro-arcade`, `solar-system-1`, `space-night-1`, `spaceship-2`
 - **Spaceship variants**: `spaceship-blue-(dark|light)`, `spaceship-cyan-(dark|light)`, `spaceship-green-(dark|light)`, `spaceship-grey-(dark|light)`, `spaceship-magenta-(dark|light)`, `spaceship-mono-(dark|light)`, `spaceship-orange-(dark|light)`, `spaceship-purple-(dark|light)`, `spaceship-red-(dark|light)`, `spaceship-yellow-(dark|light)`
 
-Themes are discovered from subdirectories under `web/themes/` that contain a `theme.yaml` file. The Configurations page shows `System (auto)` plus all discovered themes, using the display name from `theme.yaml` when available.
+All 37 themes are embedded by Chroma UI. Optional subdirectories under
+`web/themes/` add complete custom themes or replace embedded IDs. Each must
+contain valid `theme.yaml` and nonempty `theme.css`. The Configurations page
+shows `System (auto)` plus the merged catalog.
 
 ### Custom themes
 
 Create custom themes by copying an existing theme directory:
 
 ```bash
-# Copy built-in theme as starting point
-cp -r web/themes/light web/themes/mytheme
+# Copy a complete theme from your Chroma UI checkout
+CHROMA_UI_DIR=/path/to/chroma-ui
+mkdir -p web/themes
+cp -r "$CHROMA_UI_DIR/assets/themes/light" web/themes/mytheme
+sed -i 's/data-theme="light"/data-theme="mytheme"/g' web/themes/mytheme/theme.css
 
 # Edit colors in theme.css (40 CSS variables)
 nano web/themes/mytheme/theme.css
@@ -412,9 +480,17 @@ make test-coverage
 # Run integration tests (requires Docker)
 go test -tags=integration ./internal/integration -v
 
+# Compare UI screenshots and run browser interactions (requires Docker)
+CHROMA_UI_DIR= bash scripts/test-e2e.sh
+
 # Run fuzz tests (optional, time-intensive)
 go test -fuzz=FuzzParseSVDRPResponse -fuzztime=5m ./internal/adapters/secondary/svdrp/
 ```
+
+The browser runner uses the pinned Chroma dependency by default. For coordinated
+changes with a local Chroma checkout, explicitly set
+`CHROMA_UI_DIR=/path/to/chroma-ui` instead; see the
+[browser test guide](test/e2e/README.md).
 
 ### Test Coverage
 
@@ -425,6 +501,8 @@ go test -fuzz=FuzzParseSVDRPResponse -fuzztime=5m ./internal/adapters/secondary/
 - **Fuzz tests**: SVDRP protocol parsing with Go 1.18+ fuzzing
 - **Race detection**: Concurrent access validation (automatically enabled by `make test`)
 - **Port contract tests**: VDRClient interface compliance validation
+- **Browser regression tests**: Playwright theme screenshots and Chromium/Firefox
+  interactions against isolated fixtures; see [the browser test guide](test/e2e/README.md)
 
 ### Test Architecture
 

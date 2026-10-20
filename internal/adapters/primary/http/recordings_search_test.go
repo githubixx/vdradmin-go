@@ -24,7 +24,7 @@ func TestRecordings_SearchThresholdAndFiltering(t *testing.T) {
 
 	recordingService := services.NewRecordingService(mock, 0)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "recordings.html"),
 	))

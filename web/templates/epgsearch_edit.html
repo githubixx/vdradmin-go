@@ -1,13 +1,17 @@
 {{define "epgsearch_edit.html"}}
 <!DOCTYPE html>
-<html lang="en" {{if ne .ThemeMode "system"}}data-theme="{{.ThemeMode}}"{{end}} data-theme-default="{{.ThemeDefault}}">
+<html lang="en" {{if ne .ThemeMode "system"}}data-theme="{{.ThemeMode}}"{{end}} data-theme-default="{{.ThemeDefault}}" data-theme-source="{{.ThemeSource}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{if .PageTitle}}VDRAdmin-go - {{.PageTitle}}{{else}}VDRAdmin-go - EPG Search{{end}}</title>
-    <link rel="stylesheet" href="/static/css/base.css?v=20260212-AE">
+    <link rel="stylesheet" href="/ui/css/base.css?v=20261017-chroma">
+    <link rel="stylesheet" href="/static/css/base.css?v=20261017-chroma">
     {{if and .ThemeMode (ne .ThemeMode "system")}}<link rel="stylesheet" href="/themes/{{.ThemeMode}}/theme.css?v=20260212-AE">{{end}}
-    <script src="/static/js/theme.js?v=20260212-AE" defer></script>
+    <link rel="stylesheet" href="/static/css/theme-compat.css?v=20261017-chroma">
+    <script src="/ui/js/theme.js?v=20261017-chroma" defer></script>
+    <script src="/ui/js/menu.js?v=20261017-chroma" defer></script>
+    <script src="/ui/js/select.js?v=20261017-chroma" defer></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
 <body>
@@ -107,7 +111,7 @@
         <div class="channels-day">{{.DayLabel}}</div>
         <div class="epg-list">
             {{range .Events}}
-            <div class="epg-item">
+            <div class="epg-item ui-item">
                 <div class="epg-time">
                     <time datetime="{{.Start.Format "2006-01-02T15:04"}}">{{.Start.Format "15:04"}}-{{.Stop.Format "15:04"}}</time>
                 </div>
@@ -117,11 +121,11 @@
                         <span class="epg-channel">{{.ChannelName}}</span>
                     </div>
                     {{if .Subtitle}}
-                    <p class="epg-subtitle">{{.Subtitle}}</p>
+                    <p class="epg-subtitle ui-item-subtitle">{{.Subtitle}}</p>
                     {{end}}
                 </div>
                 {{if eq $.Role "admin"}}
-                <div class="epg-actions">
+                <div class="epg-actions ui-item-actions">
                     {{if or .TimerActive (le .EventID 0)}}
                     <button type="button" class="btn btn-sm btn-secondary" disabled>Scheduled</button>
                     {{else}}

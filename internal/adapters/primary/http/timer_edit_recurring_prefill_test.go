@@ -38,7 +38,7 @@ func TestTimerEdit_PrefillsWeeklyTimer(t *testing.T) {
 	epgService := services.NewEPGService(mock, 0)
 	timerService := services.NewTimerService(mock)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "timer_edit.html"),
 	))

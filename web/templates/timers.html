@@ -1,13 +1,17 @@
 {{define "timers.html"}}
 <!DOCTYPE html>
-<html lang="en" {{if ne .ThemeMode "system"}}data-theme="{{.ThemeMode}}"{{end}} data-theme-default="{{.ThemeDefault}}">
+<html lang="en" {{if ne .ThemeMode "system"}}data-theme="{{.ThemeMode}}"{{end}} data-theme-default="{{.ThemeDefault}}" data-theme-source="{{.ThemeSource}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VDRAdmin-go - Timers</title>
-    <link rel="stylesheet" href="/static/css/base.css?v=20260212-AE">
+    <link rel="stylesheet" href="/ui/css/base.css?v=20261017-chroma">
+    <link rel="stylesheet" href="/static/css/base.css?v=20261017-chroma">
     {{if and .ThemeMode (ne .ThemeMode "system")}}<link rel="stylesheet" href="/themes/{{.ThemeMode}}/theme.css?v=20260212-AE">{{end}}
-    <script src="/static/js/theme.js?v=20260212-AE" defer></script>
+    <link rel="stylesheet" href="/static/css/theme-compat.css?v=20261017-chroma">
+    <script src="/ui/js/theme.js?v=20261017-chroma" defer></script>
+    <script src="/ui/js/menu.js?v=20261017-chroma" defer></script>
+    <script src="/ui/js/select.js?v=20261017-chroma" defer></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
 <body>
@@ -57,8 +61,8 @@
 
         <div class="timer-list">
             {{range .Timers}}
-            <div class="timer-item {{if .IsRecording}}recording{{end}} {{if .IsCollision}}collision{{end}} {{if .IsCritical}}conflict{{end}} {{if .Active}}active{{else}}inactive{{end}}">
-                <div class="timer-info">
+            <div class="timer-item ui-item {{if .IsRecording}}recording is-active{{end}} {{if .IsCollision}}collision is-warning{{end}} {{if .IsCritical}}conflict is-error{{end}} {{if .Active}}active{{else}}inactive is-inactive{{end}}">
+                <div class="timer-info ui-item-info">
                     <h3>{{.Title}}</h3>
                     <div class="timer-meta">
                         <span class="timer-channel">{{.ChannelName}}</span>
@@ -72,7 +76,7 @@
                     </div>
                 </div>
                 {{if eq $.Role "admin"}}
-                <div class="timer-actions">
+                <div class="timer-actions ui-item-actions">
                     <button type="button" class="btn btn-sm btn-primary" onclick="window.location.href='/timers/edit?id={{.ID}}'">Edit</button>
                     {{if .IsRecording}}
                     <button type="button" class="btn btn-sm btn-secondary" disabled>Recording</button>

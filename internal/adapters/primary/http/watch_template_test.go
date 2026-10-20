@@ -10,7 +10,7 @@ import (
 )
 
 func TestTemplate_Watch_LiveDurationInfinity(t *testing.T) {
-	tmpl := template.Must(template.ParseFiles(
+	tmpl := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "watch.html"),
 	))

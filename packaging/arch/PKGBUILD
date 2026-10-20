@@ -30,6 +30,7 @@ check() {
 
 package() {
   cd "${pkgname}-${pkgver}"
+  # Install required VDR assets only; optional web/themes overrides stay user-owned.
   make VERSION="${pkgver}" COMMIT="${pkgver}" DATE="${SOURCE_DATE_EPOCH:-unknown}" DESTDIR="${pkgdir}" install
 
   install -Dm644 deployments/systemd/vdradmin-go.service \

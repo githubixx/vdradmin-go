@@ -8,7 +8,7 @@ import (
 
 func TestAssetDirectories(t *testing.T) {
 	assetsDir := t.TempDir()
-	for _, name := range []string{"templates", "static", "themes"} {
+	for _, name := range []string{"templates", "static"} {
 		if err := os.Mkdir(filepath.Join(assetsDir, name), 0755); err != nil {
 			t.Fatal(err)
 		}

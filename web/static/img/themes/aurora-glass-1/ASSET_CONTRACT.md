@@ -2,6 +2,12 @@
 
 These assets are decorative. Text, status, icons, focus indicators, and click targets remain HTML/CSS.
 
+The six runtime background/SVG files now live in Chroma UI under
+`assets/themes/aurora-glass-1/assets/` and are embedded in the application.
+This directory retains the source-only PNG artwork. To customize runtime
+artwork locally, create a complete `aurora-glass-1` theme override and place
+its replacement files in that override's `assets/` directory.
+
 ## Replaceable Assets
 
 - `aurora-desktop.avif` and `aurora-desktop.webp`: 2560x1440, 16:9 background artwork.
