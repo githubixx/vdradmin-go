@@ -57,6 +57,8 @@ Playing at 1440px, 769px, and 390px in Chromium and Firefox, including varied
 time digits and long-title wrapping. Metal-specific checks verify orange
 collisions and red critical conflicts on timer cards and timeline blocks while
 retaining metallic buttons and recording styling.
+An additional Chromium/Firefox check verifies Aurora's centered navigation
+badge/menu and aligned archive-job actions, bringing the suite to 195 tests.
 
 Reports, actual/expected/diff images, and failure traces are written to ignored
 `test-results/` and `playwright-report/` directories. CI runs comparisons, never
@@ -104,6 +106,10 @@ explicitly approved updates:
   `chromium/behavior.spec.js/metal-menu-open.png`: consistent desktop time-column
   widths so programme titles align. Mobile stacking and Information popups
   remain unchanged.
+- `chromium/themes.spec.js/aurora-glass-1-{desktop,mobile}-{channels,timers}.png`:
+  the later navigation-centering fix changes the desktop header height and
+  mobile menu-button placement. These references retain that fix rather than
+  reverting it to match the earlier screenshots.
 
 The last alignment update changed exactly 40 images and preserved the other
 176 reference hashes, including the earlier approved Metal fixes. The complete
