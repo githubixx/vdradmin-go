@@ -39,6 +39,29 @@ for (const theme of representatives) {
       ]) {
         await openPage(page, url);
         if (name === 'watch') await assertWatchLayout(page);
+        if (theme === 'spaceship-grey-light' && size === 'mobile' && name === 'recordings') {
+          const cards = page.locator('.recording-item');
+          await expect(cards).toHaveCount(3);
+          for (const card of await cards.all()) {
+            await expect(card.getByRole('button', { name: 'Delete', exact: true })).toBeVisible();
+            await expect(card.getByRole('link', { name: 'Archive', exact: true })).toBeVisible();
+            const geometry = await card.evaluate(item => {
+              const box = item.getBoundingClientRect();
+              const [remove, archive] = Array.from(item.querySelectorAll('.recording-actions .btn'),
+                action => action.getBoundingClientRect());
+              return {
+                topOffset: remove.top - archive.top,
+                gap: archive.left - remove.right,
+                leftInset: remove.left - box.left,
+                rightInset: box.right - archive.right,
+              };
+            });
+            expect(geometry.topOffset, 'Recording actions must share a top edge').toBeCloseTo(0, 1);
+            expect(geometry.gap, 'Recording actions must not overlap').toBeGreaterThanOrEqual(0);
+            expect(geometry.leftInset, 'Delete must remain inside its card').toBeGreaterThanOrEqual(0);
+            expect(geometry.rightInset, 'Archive must remain inside its card').toBeGreaterThanOrEqual(0);
+          }
+        }
         if (theme === 'crt-starfield-1' && size === 'mobile' && name === 'configurations') {
           const geometry = await page.getByRole('link', { name: 'Manage ffmpeg profiles', exact: true }).evaluate(button => {
             const box = button.getBoundingClientRect();

@@ -32,7 +32,7 @@ verifying the pinned dependency through the standalone builder.
 
 The runner builds an isolated fixture server and uses the pinned Playwright
 1.64.1 Ubuntu amd64 image, including its pinned browser binaries and system fonts.
-Chromium uses **exact pixel comparisons**, with the five exceptions documented
+Chromium uses **exact pixel comparisons**, with the six exceptions documented
 below; Firefox runs
 behavior tests. Do not generate authoritative screenshots on the host OS:
 font rendering can differ.
@@ -56,9 +56,21 @@ images and repeating the affected cases four times locally:
   Text, page dimensions and surrounding layout were unchanged. This case also
   asserts the button's single-line height, action-row alignment and containment.
 
-These exceptions retain the original reference images and zero color threshold;
-dimension changes still fail. All other screenshots permit zero differing
-pixels. Do not broaden these exceptions to accommodate application changes.
+Those five exceptions retain a zero color threshold.
+
+A sixth exception, `spaceship-grey-light-mobile-recordings.png`, uses a
+perceptual color threshold of `0.02` and at most 450 differing pixels. The actual
+GitHub image differed in 9,107 pixels at zero threshold, mostly one-level RGB
+changes in soft shadows/blur regions; at `0.02`, 419 pixels differ. This
+image-specific threshold is one tenth of Playwright's default `0.2`; it is not
+a percentage of pixels. The case independently verifies all three cards'
+Delete/Archive labels, visibility, alignment and containment.
+
+All six exceptions retain the original reference images; dimension changes
+still fail. Every other screenshot retains zero color threshold and zero
+differing pixels. Do not broaden these exceptions to accommodate application
+changes. Local passes alone do not prove identical rendering on another CI
+host; review failed CI images before attributing differences to rendering noise.
 
 All 37 themes cover channels and timers at desktop and mobile widths.
 Representative themes additionally cover recordings, configuration, the Watch
