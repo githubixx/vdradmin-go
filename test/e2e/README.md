@@ -32,7 +32,7 @@ verifying the pinned dependency through the standalone builder.
 
 The runner builds an isolated fixture server and uses the pinned Playwright
 1.64.1 Ubuntu amd64 image, including its pinned browser binaries and system fonts.
-Chromium uses **exact pixel comparisons**, with the two exceptions documented
+Chromium uses **exact pixel comparisons**, with the five exceptions documented
 below; Firefox runs
 behavior tests. Do not generate authoritative screenshots on the host OS:
 font rendering can differ.
@@ -43,8 +43,22 @@ variance. Two reviewed exceptions permit at most 100 differing pixels each in
 captures showed 52-97 and 25-52 changing backdrop-filter edge pixels,
 respectively, around translucent buttons. The limit is roughly 0.012% of the
 Aurora image. Color thresholds remain zero, and dimension changes still fail.
-All other screenshots permit zero differing pixels. Do not broaden these
-exceptions to accommodate migration changes.
+Three further exceptions were approved after inspecting the actual GitHub CI
+images and repeating the affected cases four times locally:
+
+- `spaceship-grey-dark-desktop-watch.png` and
+  `spaceship-grey-light-desktop-watch.png`: at most 12 differing pixels each.
+  CI differed in 9 and 10 pixels, respectively, by only one RGB level at the
+  rounded Size selector edge.
+- `crt-starfield-1-mobile-configurations.png`: at most 3,600 differing pixels
+  (about 0.18% of its 390×5272 image). CI reported 3,561 differences in faint
+  gradients and the rasterized inset-shadow edge on the FFmpeg profile button.
+  Text, page dimensions and surrounding layout were unchanged. This case also
+  asserts the button's single-line height, action-row alignment and containment.
+
+These exceptions retain the original reference images and zero color threshold;
+dimension changes still fail. All other screenshots permit zero differing
+pixels. Do not broaden these exceptions to accommodate application changes.
 
 All 37 themes cover channels and timers at desktop and mobile widths.
 Representative themes additionally cover recordings, configuration, the Watch

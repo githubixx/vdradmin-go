@@ -39,6 +39,26 @@ for (const theme of representatives) {
       ]) {
         await openPage(page, url);
         if (name === 'watch') await assertWatchLayout(page);
+        if (theme === 'crt-starfield-1' && size === 'mobile' && name === 'configurations') {
+          const geometry = await page.getByRole('link', { name: 'Manage ffmpeg profiles', exact: true }).evaluate(button => {
+            const box = button.getBoundingClientRect();
+            const actions = button.parentElement.getBoundingClientRect();
+            const style = getComputedStyle(button);
+            const expectedHeight = ['lineHeight', 'paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth']
+              .reduce((height, property) => height + parseFloat(style[property]), 0);
+            return {
+              height: box.height,
+              expectedHeight,
+              topOffset: box.top - actions.top,
+              leftOffset: box.left - actions.left,
+              rightOverflow: box.right - actions.right,
+            };
+          });
+          expect(geometry.height, 'Profile button must remain a single line at its CSS height').toBeCloseTo(geometry.expectedHeight, 1);
+          expect(geometry.topOffset, 'Profile button must align with its action row').toBeCloseTo(0, 1);
+          expect(geometry.leftOffset, 'Profile button must remain left-aligned').toBeCloseTo(0, 1);
+          expect(geometry.rightOverflow, 'Profile button must fit its action row').toBeLessThanOrEqual(0);
+        }
         await screenshot(page, `${theme}-${size}-${name}`);
       }
       await openPage(page, '/channels?day=2026-10-17');

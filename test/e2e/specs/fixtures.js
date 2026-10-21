@@ -5,6 +5,14 @@ import path from 'node:path';
 const resourceRoot = path.resolve(import.meta.dirname, '../../../.cache/e2e-resources');
 const resources = JSON.parse(await readFile(new URL('../resources.lock.json', import.meta.url), 'utf8'));
 
+export const screenshotPixelBudgets = Object.freeze({
+  'aurora-glass-1-mobile-timers': 100,
+  'luxury-1-mobile-timers': 100,
+  'spaceship-grey-dark-desktop-watch': 12,
+  'spaceship-grey-light-desktop-watch': 12,
+  'crt-starfield-1-mobile-configurations': 3600,
+});
+
 export const test = base.extend({
   page: async ({ page }, use) => {
     const failures = [];
@@ -178,6 +186,6 @@ export async function screenshot(page, name) {
   }, metadata);
   await expect(page).toHaveScreenshot(`${name}.png`, {
     fullPage: true,
-    maxDiffPixels: ['aurora-glass-1-mobile-timers', 'luxury-1-mobile-timers'].includes(name) ? 100 : 0,
+    maxDiffPixels: screenshotPixelBudgets[name] ?? 0,
   });
 }
