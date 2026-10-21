@@ -30,7 +30,7 @@
             <div>{{if .Job.Error}}{{.Job.Error}}{{else}}—{{end}}</div>
 
             <label>Actions</label>
-            <div>
+            <div class="archive-job-actions">
                 <a class="btn btn-sm btn-secondary" href="/recordings/archive/jobs">Jobs</a>
                 {{if or (eq .Job.Status "queued") (eq .Job.Status "running")}}
                 <button class="btn btn-sm btn-danger"

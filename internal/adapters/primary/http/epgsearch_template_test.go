@@ -19,7 +19,7 @@ func TestTemplate_EPGSearchEdit_HasFormAndGlossyButtons(t *testing.T) {
 	// We cannot reliably test CSS rendering in Go unit tests, but we *can* ensure
 	// the expected semantic structure and class names are present in the rendered HTML.
 
-	tmpl := template.Must(template.ParseFiles(
+	tmpl := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "epgsearch_edit.html"),
 	))
@@ -74,7 +74,7 @@ func TestTemplate_EPGSearchEdit_HasFormAndGlossyButtons(t *testing.T) {
 }
 
 func TestTemplate_EPGSearchEdit_ShowsRunButtonOnEdit(t *testing.T) {
-	tmpl := template.Must(template.ParseFiles(
+	tmpl := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "epgsearch_edit.html"),
 	))
@@ -112,7 +112,7 @@ func TestTemplate_EPGSearchEdit_ShowsRunButtonOnEdit(t *testing.T) {
 }
 
 func TestTemplate_EPGSearchIndex_ShowsExecuteButtonTopAndBottom(t *testing.T) {
-	tmpl := template.Must(template.ParseFiles(
+	tmpl := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "epgsearch.html"),
 	))

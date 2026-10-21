@@ -1,0 +1,32 @@
+name: UI regression tests
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Check standalone dependency readiness
+        run: sh scripts/check-release-readiness.sh
+      - name: Compare original UI baselines and test interactions
+        run: bash scripts/test-e2e.sh
+      - name: Upload browser reports and screenshot differences
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-regression-failures
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 14

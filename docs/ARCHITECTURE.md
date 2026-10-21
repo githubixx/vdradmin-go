@@ -99,12 +99,13 @@ vdradmin-go/
 │   │       └── svdrp/
 │   │           └── client.go  # SVDRP protocol implementation
 │   └── infrastructure/        # Cross-cutting concerns
-│       └── config/
-│           └── config.go
+│       ├── config/
+│       │   └── config.go
+│       └── theme/             # Adapter around the Chroma UI catalog
 ├── web/
 │   ├── templates/             # HTML templates
-│   ├── themes/                # Theme CSS + metadata (theme.yaml + theme.css)
-│   └── static/                # CSS, minimal JS
+│   ├── themes/                # Optional complete local theme overrides
+│   └── static/                # VDR layouts, compatibility CSS, and application assets
 │       ├── css/
 │       ├── js/
 │       └── img/
@@ -183,7 +184,28 @@ HTTP → Handler → TimerService → EPGService → VDRClient (interface) → S
 
 - **htmx**: Dynamic UI without JavaScript frameworks
 - **Modern CSS**: Grid, Flexbox, CSS Variables
-- **Minimal JavaScript**: htmx plus small helper scripts (for example `web/static/js/theme.js`)
+- **Minimal JavaScript**: htmx plus optional Chroma UI theme, menu, and select helpers served from `/ui/js/`
+
+### Shared UI boundary
+
+[Chroma UI](https://github.com/githubixx/chroma-ui) is a pinned Go module, not
+a separate service or runtime asset download. Its catalog embeds all 37 themes,
+runtime artwork, shared component CSS, navigation templates, and optional
+JavaScript helpers. The infrastructure theme adapter delegates discovery,
+validation, reload, and asset serving to that catalog.
+
+VDR owns navigation contents, authorization, routes, configured theme selection,
+page templates, domain layouts, and recording/tuner presentation. Styles load
+in this order: Chroma foundation, VDR layout, selected theme, VDR compatibility.
+Compatibility rules for bundled themes are gated by catalog-assigned source
+metadata rather than merely matching a theme ID.
+
+The filesystem still supplies VDR templates and application static assets.
+An optional theme directory provides complete replacements or additional themes;
+replacement assets never fall back to a bundled theme. Ordinary builds fetch
+the module revision pinned in `go.mod`; external workspaces are optional for
+coordinated development, not a requirement for deployment. See the
+[theme guide](THEMES.md) and [browser test guide](../test/e2e/README.md).
 
 ### Configuration
 

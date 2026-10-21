@@ -1,13 +1,17 @@
 {{define "watch.html"}}
 <!DOCTYPE html>
-<html lang="en" {{if ne .ThemeMode "system"}}data-theme="{{.ThemeMode}}"{{end}} data-theme-default="{{.ThemeDefault}}">
+<html lang="en" {{if ne .ThemeMode "system"}}data-theme="{{.ThemeMode}}"{{end}} data-theme-default="{{.ThemeDefault}}" data-theme-source="{{.ThemeSource}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VDRAdmin-go - Watch TV</title>
-    <link rel="stylesheet" href="/static/css/base.css?v=20260212-AH">
+    <link rel="stylesheet" href="/ui/css/base.css?v=20261017-chroma">
+    <link rel="stylesheet" href="/static/css/base.css?v=20261017-chroma">
     {{if and .ThemeMode (ne .ThemeMode "system")}}<link rel="stylesheet" href="/themes/{{.ThemeMode}}/theme.css?v=20260212-AH">{{end}}
-    <script src="/static/js/theme.js?v=20260212-AH" defer></script>
+    <link rel="stylesheet" href="/static/css/theme-compat.css?v=20261017-chroma">
+    <script src="/ui/js/theme.js?v=20261017-chroma" defer></script>
+    <script src="/ui/js/menu.js?v=20261017-chroma" defer></script>
+    <script src="/ui/js/select.js?v=20261017-chroma" defer></script>
 </head>
 <body{{if .StreamURLTemplate}} data-stream-template="{{.StreamURLTemplate}}"{{end}}>
     {{template "nav_header" .}}
@@ -161,7 +165,7 @@
         <div class="toolbar watchtv-now" id="watchtv-now" hidden>
             <div><strong id="watchtv-now-title"></strong></div>
             <div class="epg-duration" id="watchtv-now-time"></div>
-            <p class="epg-subtitle" id="watchtv-now-subtitle" hidden></p>
+            <p class="epg-subtitle ui-item-subtitle" id="watchtv-now-subtitle" hidden></p>
             <p class="watchtv-now-description" id="watchtv-now-description" hidden></p>
         </div>
     </main>

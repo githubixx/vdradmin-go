@@ -110,7 +110,7 @@ func TestPlayingToday_DisablesRecordWhenTimerExists(t *testing.T) {
 	epqService := services.NewEPGService(mock, 0)
 	timerService := services.NewTimerService(mock)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "playing.html"),
 	))
@@ -197,7 +197,7 @@ func TestPlayingToday_RendersChannelJumpDropdown(t *testing.T) {
 	epqService := services.NewEPGService(mock, 0)
 	timerService := services.NewTimerService(mock)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "playing.html"),
 	))

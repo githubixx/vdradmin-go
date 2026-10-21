@@ -1,0 +1,192 @@
+import { test as base, expect } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+
+const resourceRoot = path.resolve(import.meta.dirname, '../../../.cache/e2e-resources');
+const resources = JSON.parse(await readFile(new URL('../resources.lock.json', import.meta.url), 'utf8'));
+
+export const screenshotComparisonOptions = Object.freeze({
+  'aurora-glass-1-mobile-timers': { maxDiffPixels: 100 },
+  'luxury-1-mobile-timers': { maxDiffPixels: 100 },
+  'spaceship-grey-dark-desktop-watch': { maxDiffPixels: 12 },
+  'spaceship-grey-light-desktop-watch': { maxDiffPixels: 12 },
+  'crt-starfield-1-mobile-configurations': { maxDiffPixels: 3600 },
+  'spaceship-grey-light-mobile-recordings': { threshold: 0.02, maxDiffPixels: 450 },
+});
+
+export const test = base.extend({
+  page: async ({ page }, use) => {
+    const failures = [];
+    page.on('pageerror', error => failures.push(error.message));
+    page.on('response', response => {
+      if (response.status() >= 400) failures.push(`${response.status()} ${response.url()}`);
+    });
+    page.on('requestfailed', request => {
+      if (request.failure()?.errorText !== 'net::ERR_ABORTED') {
+        failures.push(`${request.failure()?.errorText} ${request.url()}`);
+      }
+    });
+    await routeResources(page, failures);
+    await page.clock.install({ time: new Date('2026-10-17T12:00:00Z') });
+    await use(page);
+    expect(failures, 'Browser errors and unavailable resources').toEqual([]);
+  },
+});
+
+export async function routeResources(target, failures) {
+    await target.route('https://**/*', async route => {
+      const url = new URL(route.request().url()).href;
+      const resource = resources[url];
+      if (!resource) {
+        failures.push(`Unregistered external resource: ${url}`);
+        await route.abort('blockedbyclient');
+        return;
+      }
+      await route.fulfill({
+        contentType: resource.contentType,
+        body: await readFile(path.join(resourceRoot, resource.sha256)),
+        headers: { 'access-control-allow-origin': '*' },
+      });
+    });
+}
+
+export { expect };
+
+export const themes = [
+  'aurora-glass-1', 'cartoon-1', 'crt-starfield-1', 'dark', 'fitness',
+  'glas-1', 'gold-1', 'golden-moon', 'light', 'lighting-1', 'luxury-1',
+  'mantle-1', 'metal-1', 'retro-arcade', 'solar-system-1', 'space-night-1',
+  'spaceship-2',
+  ...['blue', 'cyan', 'green', 'grey', 'magenta', 'mono', 'orange', 'purple', 'red', 'yellow']
+    .flatMap(color => [`spaceship-${color}-dark`, `spaceship-${color}-light`]),
+];
+
+export const representatives = [
+  'light', 'dark', 'cartoon-1', 'metal-1', 'spaceship-grey-dark',
+  'spaceship-grey-light', 'spaceship-2', 'crt-starfield-1',
+];
+
+export async function selectTheme(request, theme) {
+  const reset = await request.post('/__test/reset');
+  expect(reset.ok(), `Reset fixtures: ${await reset.text()}`).toBeTruthy();
+  const response = await request.post('/__test/theme', { data: { theme } });
+  expect(response.ok(), `Select theme ${theme}: ${await response.text()}`).toBeTruthy();
+}
+
+export async function openPage(page, url) {
+  if (url.startsWith('/timers?day=')) {
+    const readiness = await page.request.get('/__test/ready');
+    expect(readiness.ok()).toBeTruthy();
+    url = (await readiness.json()).urls.timers;
+  }
+  const watchRequests = url.startsWith('/watch?')
+    ? Promise.all([
+      page.waitForResponse(response => new URL(response.url()).pathname === '/watch/snapshot'),
+      page.waitForResponse(response => new URL(response.url()).pathname === '/watch/now'),
+    ])
+    : null;
+  const response = await page.goto(url);
+  expect(response?.status()).toBe(200);
+  if (watchRequests) {
+    for (const result of await watchRequests) expect(result.ok()).toBeTruthy();
+  }
+  await expect(page.locator('main')).toBeVisible();
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.all(Array.from(document.images, async image => {
+      if (!image.complete) {
+        await new Promise((resolve, reject) => {
+          image.addEventListener('load', resolve, { once: true });
+          image.addEventListener('error', reject, { once: true });
+        });
+      }
+      if (image.naturalWidth === 0) throw new Error(`Image failed to load: ${image.src}`);
+    }));
+  });
+}
+
+export async function assertWatchLayout(page) {
+  const layout = await page.evaluate(() => {
+    const box = selector => {
+      const element = document.querySelector(selector);
+      if (!element) throw new Error(`Missing Watch TV layout element: ${selector}`);
+      const { left, top, right, bottom, width, height } = element.getBoundingClientRect();
+      return { left, top, right, bottom, width, height };
+    };
+    return {
+      wide: matchMedia('(min-width: 1101px)').matches,
+      viewportWidth: innerWidth,
+      gridContentWidth: document.querySelector('.watchtv-grid').scrollWidth,
+      grid: box('.watchtv-grid'),
+      screenColumn: box('.watchtv-screen'),
+      screen: box('#watchtv-screen'),
+      remote: box('.remote-panel'),
+      channels: box('.watchtv-channels-panel'),
+      programme: box('#watchtv-now'),
+    };
+  });
+  expect(layout.screen.right, 'Screen must fit its own grid column').toBeLessThanOrEqual(layout.screenColumn.right + 1);
+  expect(layout.grid.right, 'Watch TV grid must fit the viewport').toBeLessThanOrEqual(layout.viewportWidth + 1);
+  expect(layout.gridContentWidth, 'Watch TV content must not overflow its grid').toBeLessThanOrEqual(layout.grid.width + 1);
+  for (const panel of [layout.screen, layout.remote, layout.channels, layout.programme]) {
+    expect(panel.width, 'Watch TV panels must have a visible width').toBeGreaterThan(0);
+    expect(panel.left, 'Watch TV panels must stay inside the grid').toBeGreaterThanOrEqual(layout.grid.left - 1);
+    expect(panel.right, 'Watch TV panels must stay inside the grid').toBeLessThanOrEqual(layout.grid.right + 1);
+  }
+  if (layout.wide) {
+    expect(layout.screen.right, 'Screen must not cover the remote').toBeLessThanOrEqual(layout.remote.left);
+    expect(layout.remote.right, 'Remote must not cover the channel list').toBeLessThanOrEqual(layout.channels.left);
+    expect(Math.abs(layout.screen.top - layout.remote.top)).toBeLessThanOrEqual(1);
+    expect(Math.abs(layout.screen.top - layout.channels.top)).toBeLessThanOrEqual(1);
+    expect(Math.abs(layout.screen.height - layout.remote.height)).toBeLessThanOrEqual(1);
+    expect(Math.abs(layout.screen.height - layout.channels.height)).toBeLessThanOrEqual(1);
+  } else {
+    expect(layout.remote.top, 'Mobile remote must follow the screen').toBeGreaterThanOrEqual(layout.screen.bottom);
+    expect(layout.channels.top, 'Mobile channel list must follow the remote').toBeGreaterThanOrEqual(layout.remote.bottom);
+  }
+  expect(layout.programme.top, 'Programme information must be below every panel')
+    .toBeGreaterThanOrEqual(Math.max(layout.screen.bottom, layout.remote.bottom, layout.channels.bottom));
+  expect(Math.abs(layout.programme.width - layout.grid.width)).toBeLessThanOrEqual(1);
+}
+
+export async function screenshot(page, name) {
+  expect(process.env.E2E_SCREENSHOT_RUNTIME, 'Generate and compare screenshots through scripts/test-e2e.sh')
+    .toBe('playwright-1.64.1-noble');
+  const readiness = await page.request.get('/__test/ready');
+  expect(readiness.ok()).toBeTruthy();
+  const metadata = await readiness.json();
+  await page.evaluate(({ storagePathNormalization }) => {
+    const normalize = text => text
+      .replace(/\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?= \d{4}-\d{2}-\d{2})/g, 'Sun')
+      .replace(/\b\d{4}-\d{2}-\d{2}\b/g, '2026-10-18');
+    if (location.pathname === '/timers') {
+      for (const container of document.querySelectorAll('.timer-time, #day ~ .custom-select-phantom, #day ~ .custom-select-trigger')) {
+        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+        while (walker.nextNode()) walker.currentNode.textContent = normalize(walker.currentNode.textContent);
+      }
+    }
+    for (const footer of document.querySelectorAll('footer p')) {
+      const walker = document.createTreeWalker(footer, NodeFilter.SHOW_TEXT);
+      while (walker.nextNode()) {
+        walker.currentNode.textContent = walker.currentNode.textContent.replace(/© \d{4}/, '© 2026');
+      }
+    }
+    if (location.pathname === '/configurations') {
+      const prefix = storagePathNormalization.prefix;
+      for (const input of document.querySelectorAll('#vdr_video_dir, #vdr_config_dir, #archive_base_dir')) {
+        input.value = input.value.replace(prefix, '/fixture');
+      }
+      const table = document.querySelector('#archive_profiles_table');
+      if (table) {
+        const walker = document.createTreeWalker(table, NodeFilter.SHOW_TEXT);
+        while (walker.nextNode()) {
+          walker.currentNode.textContent = walker.currentNode.textContent.replaceAll(prefix, '/fixture');
+        }
+      }
+    }
+  }, metadata);
+  await expect(page).toHaveScreenshot(`${name}.png`, {
+    fullPage: true,
+    ...screenshotComparisonOptions[name],
+  });
+}

@@ -87,7 +87,7 @@ func TestTimerList_RendersTimeline(t *testing.T) {
 	epqService := services.NewEPGService(mock, 0)
 	timerService := services.NewTimerService(mock)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "timers.html"),
 	))
@@ -159,7 +159,7 @@ func TestTimerList_TimelineDaysOnlyContainTimerDays_AndDoNotShiftWithSelection(t
 	epqService := services.NewEPGService(mock, 0)
 	timerService := services.NewTimerService(mock)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "timers.html"),
 	))
@@ -222,7 +222,7 @@ func TestTimerList_SnapsSelectedDayToNearestAvailableTimerDay(t *testing.T) {
 	epqService := services.NewEPGService(mock, 0)
 	timerService := services.NewTimerService(mock)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "timers.html"),
 	))
@@ -274,7 +274,7 @@ func TestTimerList_DoesNotIncludeMidnightEndDay(t *testing.T) {
 	epqService := services.NewEPGService(mock, 0)
 	timerService := services.NewTimerService(mock)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "timers.html"),
 	))
@@ -327,7 +327,7 @@ func TestTimerList_CurrentlyRecordingTimer_ShowsRecordingStatusInsteadOfToggle(t
 	epqService := services.NewEPGService(mock, 0)
 	timerService := services.NewTimerService(mock)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "timers.html"),
 	))
@@ -407,7 +407,7 @@ func TestTimerList_RecurringTimerDaysCappedToNextWeek_OneTimeBeyondWeekStillIncl
 	epqService := services.NewEPGService(mock, 0)
 	timerService := services.NewTimerService(mock)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "timers.html"),
 	))
@@ -486,7 +486,7 @@ func TestTimerList_RecurringThuFriMidnight_ShowsBothUpcomingOccurrencesInList(t 
 	epqService := services.NewEPGService(mock, 0)
 	timerService := services.NewTimerService(mock)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "timers.html"),
 	))

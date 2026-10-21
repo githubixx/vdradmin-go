@@ -1,0 +1,346 @@
+{
+  "https://unpkg.com/htmx.org@1.9.10": {
+    "sha256": "b3bdcf5c741897a53648b1207fff0469a0d61901429ba1f6e88f98ebd84e669e",
+    "contentType": "text/javascript; charset=utf-8"
+  },
+  "https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js": {
+    "sha256": "a12e7ee1cd64a69dcdb314157e45dafcba705bfb0b1440b7935cb265d374423e",
+    "contentType": "application/javascript; charset=utf-8"
+  },
+  "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@500;600;700&display=swap": {
+    "sha256": "dc48a909c910cf7029c9ab97d06bc012b03ea84b8338aad38f2b3e6d9f1bf56b",
+    "contentType": "text/css; charset=utf-8"
+  },
+  "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap": {
+    "sha256": "fcb04820dee4de03e76d05701af63d7123857a0cbf84471212c6845fc8e3c12c",
+    "contentType": "text/css; charset=utf-8"
+  },
+  "https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap": {
+    "sha256": "0b7597d2763b321cdd4df8846eba1acef5f3c02430115e552a02dff24e9d1ffe",
+    "contentType": "text/css; charset=utf-8"
+  },
+  "https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap": {
+    "sha256": "4074fa0810cde4098b76b9fe285891680827094a4deffd2e9ecd5faf89002625",
+    "contentType": "text/css; charset=utf-8"
+  },
+  "https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap": {
+    "sha256": "227eb5933229cd891f8fbb2843af3dfa988721eb9a0c2fb59247669d2c3cf9cd",
+    "contentType": "text/css; charset=utf-8"
+  },
+  "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap": {
+    "sha256": "bc6475ae1415654f4933c3b441539ca51085199e599b3b6b27b0bd1ffdf91c2f",
+    "contentType": "text/css; charset=utf-8"
+  },
+  "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600&family=Michroma&display=swap": {
+    "sha256": "7056ebe41c434b372cdf5c94d19a144fa85ee7f9dcdfbdf3d37c9206466372b8",
+    "contentType": "text/css; charset=utf-8"
+  },
+  "https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap": {
+    "sha256": "07ac23b7a1e86bba8f628613b8fbdedbe01391df95bba5e12f3a313e029094ff",
+    "contentType": "text/css; charset=utf-8"
+  },
+  "https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&display=swap": {
+    "sha256": "9f6b1bc9bf1b6db0a7d9d6467ad7fca76a9c17192d5ba42f31e6965974508171",
+    "contentType": "text/css; charset=utf-8"
+  },
+  "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2JL7SUc.woff2": {
+    "sha256": "ca157063339ac4ad418f214f3abfed119b0798ab4d377386ce5c9e5a7a435ebd",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa0ZL7SUc.woff2": {
+    "sha256": "71d5ee93cc1e9f1d520a3a8b66456de18c7879d8df09d57fcd2eaff75fef0075",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2ZL7SUc.woff2": {
+    "sha256": "6e9e020a25f9b56d418f2c085b1d3c09725a4da23fe693a5b463064606732190",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1pL7SUc.woff2": {
+    "sha256": "1be3448e292fbf05ffe176fe1e43f135013d50b1e7d324ad1a558f623d3bb6f6",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2pL7SUc.woff2": {
+    "sha256": "5c66f9e07e90c6d4ac4922cc68d60de26c17b1858e677fb5e603fce3952b3ff2",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa25L7SUc.woff2": {
+    "sha256": "34b9c504cab7a73e37b746343a449132e56cf7b5481af2cb81dc74dcff25c956",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2": {
+    "sha256": "3100e775e8616cd2611beecfa23a4263d7037586789b43f035236a2e6fbd4c62",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/orbitron/v35/yMJRMIlzdpvBhQQL_Qq7dy0.woff2": {
+    "sha256": "c25a9f9da5d9f3db1bf2a01474722dc9b377675b7bbab6d0dfda6902794fd1ed",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/rajdhani/v17/LDIxapCSOBg7S-QT7p4GM-aUWA.woff2": {
+    "sha256": "fddff0d50ea869f66f84183e6e0b37709c917f040da160857134ddddca4c8e00",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/rajdhani/v17/LDIxapCSOBg7S-QT7p4JM-aUWA.woff2": {
+    "sha256": "90721cae01bf677b419b28fec9896e50923c9e956817b85f4b6ab1e5ad028a56",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/rajdhani/v17/LDIxapCSOBg7S-QT7p4HM-Y.woff2": {
+    "sha256": "759a9000e47b028799d7a4ca602634a7ac7adf415775df070a335d18d9b66f38",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/rajdhani/v17/LDI2apCSOBg7S-QT7pb0EPOqeef2kg.woff2": {
+    "sha256": "b1d1cb6385a9d5cece76e1a11935cd3a0d94f8cc6b2a95c6075387113dd1bcc7",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/rajdhani/v17/LDI2apCSOBg7S-QT7pb0EPOleef2kg.woff2": {
+    "sha256": "16fd373954f7569ad294444531caa2e7e5ffd1a6798c6df3f56b9faf691190c2",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/rajdhani/v17/LDI2apCSOBg7S-QT7pb0EPOreec.woff2": {
+    "sha256": "23afdb9b5b89b878fab04d80cc30bf41bb4f3f7e8be88e5f16a7cc7671cdb2dc",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/rajdhani/v17/LDI2apCSOBg7S-QT7pbYF_Oqeef2kg.woff2": {
+    "sha256": "93328dcb323f55b8d7feb192ebf969bbd4674e52d3a5a47c5cb1bce7ab266426",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/rajdhani/v17/LDI2apCSOBg7S-QT7pbYF_Oleef2kg.woff2": {
+    "sha256": "f57c2b379ba92460d25730ef1f7b8745afb4eadb401d652900f2059f8ee2f2b6",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/rajdhani/v17/LDI2apCSOBg7S-QT7pbYF_Oreec.woff2": {
+    "sha256": "433a7007e4747a02a790167a6efa2625855f013970ba49b9b739a5d3db8b2601",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/rajdhani/v17/LDI2apCSOBg7S-QT7pa8FvOqeef2kg.woff2": {
+    "sha256": "52dd95964b4141bdacd5b785e68079fd40ef2c4b2483bc0eb0b1a3190cedf2bc",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/rajdhani/v17/LDI2apCSOBg7S-QT7pa8FvOleef2kg.woff2": {
+    "sha256": "c6b9df58743ccca1236e9521720b135138309bc4149d5d027a9bd10183cc8ed5",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/rajdhani/v17/LDI2apCSOBg7S-QT7pa8FvOreec.woff2": {
+    "sha256": "5b7e4a6f97163c2636724d4de90304fc895653dcfe64c67a7a22f26331ca5c5f",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/spacegrotesk/v22/V8mDoQDjQSkFtoMM3T6r8E7mPb54C-s0.woff2": {
+    "sha256": "8895e3d49825128bfa5238e4c96e9b432d7a3dadbe5c17c6081267398305dc71",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/spacegrotesk/v22/V8mDoQDjQSkFtoMM3T6r8E7mPb94C-s0.woff2": {
+    "sha256": "952dddb45d2f96f71cbf3b7f510b24379afc3c89ea02fcf89d377b45d62c0166",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/spacegrotesk/v22/V8mDoQDjQSkFtoMM3T6r8E7mPbF4Cw.woff2": {
+    "sha256": "0640890476fc1198ab4de571fb658de443c4d85b66466ec09534a8737ab1ce9d",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/manrope/v20/xn7gYHE41ni1AdIRggqxSuXd.woff2": {
+    "sha256": "de37de877dc17e4577341fa68bb5cb526b53d54cb29721e674208546a3c7849d",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/manrope/v20/xn7gYHE41ni1AdIRggOxSuXd.woff2": {
+    "sha256": "c268b459a9329e59fecf39a17618efd44c71735532048d60b12aab76a8c14914",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/manrope/v20/xn7gYHE41ni1AdIRggSxSuXd.woff2": {
+    "sha256": "2fb2e8cbfd52ae46179a8b6024eb162f1f9c6de3d22d6e3a30d8f395de7220be",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/manrope/v20/xn7gYHE41ni1AdIRggixSuXd.woff2": {
+    "sha256": "6bbb044ab420e07edb0a3042d2eb314b85e83a0182e945a15ab3b9092668dfd5",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/manrope/v20/xn7gYHE41ni1AdIRggmxSuXd.woff2": {
+    "sha256": "3911b66d9f2e005a4b989223405d0e5032619c668597ba467cc76a23c8fffcfb",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/manrope/v20/xn7gYHE41ni1AdIRggexSg.woff2": {
+    "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/sora/v17/xMQ9uFFYT72X5wkB_18qmnndmSdSnh2BAfO5mnuyOo1lfiQwWa-xsaQ.woff2": {
+    "sha256": "08e1ba85bcb55277782f56766af09467dfe18cbeea49704203100c5797ac4cc5",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/sora/v17/xMQ9uFFYT72X5wkB_18qmnndmSdSnh2BAfO5mnuyOo1lfiQwV6-x.woff2": {
+    "sha256": "811e11966d29f3a01fcb19b087b61ac067d380665a55aebb7fcdf2cda95e4a93",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/fredoka/v17/X7n64b87HvSqjb_WIi2yDCRwoQ_k7367_DWs89XyHw.woff2": {
+    "sha256": "ab46fdbead875af9c6e967705a149f398554e9bb0f2f50c19d13b54ea4fa3195",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/fredoka/v17/X7n64b87HvSqjb_WIi2yDCRwoQ_k7367_DWg89XyHw.woff2": {
+    "sha256": "18a1723c878c0d8acc2e45a108fd62fbb976e408337804afa2908982fac13e2a",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/fredoka/v17/X7n64b87HvSqjb_WIi2yDCRwoQ_k7367_DWu89U.woff2": {
+    "sha256": "99d6c78e043710d4f83ed90716779798b7b04eb690f73e0ad0e8f32d1f0e98c2",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/cinzel/v26/8vIJ7ww63mVu7gt7-GT7LEc.woff2": {
+    "sha256": "8fc2606f8ae6c569f444e138dba052d9a6e3f0657f9031796503bbb94eced600",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/cinzel/v26/8vIJ7ww63mVu7gt79mT7.woff2": {
+    "sha256": "09941fb1c169c38fd414536b37690057fc01b3117a5c63dd6571186540c8f370",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/lora/v37/0QI8MX1D_JOuMw_hLdO6T2wV9KnW-MoFoqJ2nOeZ.woff2": {
+    "sha256": "ffe99c49959dea073fcf7c4d1703d944fcf0ac07282ddd382b212ef22a9b0649",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/lora/v37/0QI8MX1D_JOuMw_hLdO6T2wV9KnW-MoFoqt2nOeZ.woff2": {
+    "sha256": "aaeb039ba0ecdbc75108a6f66ee9f6745315412de78a4061cc90365b513fc4a3",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/lora/v37/0QI8MX1D_JOuMw_hLdO6T2wV9KnW-MoFotN2nOeZ.woff2": {
+    "sha256": "d6a5c00176ed3a371a691afa4e3fd398ba5a61182bf2cc39bef35f05fcf9b18c",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/lora/v37/0QI8MX1D_JOuMw_hLdO6T2wV9KnW-MoFosF2nOeZ.woff2": {
+    "sha256": "2877d988532ba8d11f1529ab2b1e8bf871268c57c65ddeaedc060a7299c3f12e",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/lora/v37/0QI8MX1D_JOuMw_hLdO6T2wV9KnW-MoFoqB2nOeZ.woff2": {
+    "sha256": "a506cef75e0506008fa1d8d34bc1a6eac5e7a2823ae8560c8344f1592a8f01d9",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/lora/v37/0QI8MX1D_JOuMw_hLdO6T2wV9KnW-MoFoqF2nOeZ.woff2": {
+    "sha256": "3bb65e234cd07a69127592cafd08ce4242a1a4ace24dcc4c466881693fc74867",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/lora/v37/0QI8MX1D_JOuMw_hLdO6T2wV9KnW-MoFoq92nA.woff2": {
+    "sha256": "723cc14fe86bc9fadb2f5f34efb421d246edb240a18d2a7828d2edc041d79996",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/lora/v37/0QIvMX1D_JOuMwf7I-NP.woff2": {
+    "sha256": "0e523e4bc3c6308f002a3208ea2990cb4f64282d4fbb67c12f5726d13b66eef6",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/lora/v37/0QIvMX1D_JOuMw77I-NP.woff2": {
+    "sha256": "c57d9ca3bd42e6bc093badc7744dd2059a78f66a3a4dc6ca40574480c870f553",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/lora/v37/0QIvMX1D_JOuM3b7I-NP.woff2": {
+    "sha256": "a8c4cb778ab6202d22bdea2ccc8d7e7caf802cfe0a7ce37df7b212f82341468f",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/lora/v37/0QIvMX1D_JOuM2T7I-NP.woff2": {
+    "sha256": "2df52199eac56e2ec7a735e609bb151bdab79422c3e73948f4b6580c66bb5a50",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/lora/v37/0QIvMX1D_JOuMwX7I-NP.woff2": {
+    "sha256": "98c22de85f6e83bcd6ae1a443e12e256fbc8de7142bec4f76b059f8ff9c2797e",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/lora/v37/0QIvMX1D_JOuMwT7I-NP.woff2": {
+    "sha256": "2a2d9c22c9863086a23f5013fede1428585321812b25f2662542c39d02967c5e",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/lora/v37/0QIvMX1D_JOuMwr7Iw.woff2": {
+    "sha256": "ddb8c66035104e233fc024669183aad3738b6daa16deee2ebb1241bd0f98ace1",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYpHtKgS4.woff2": {
+    "sha256": "a4d7cf345b8091e1d2c8c5c8fa3bd0f9bb9d00bc8988185471db398ddb5ae4c4",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYrXtKgS4.woff2": {
+    "sha256": "017fab69b4be8ffc08ca312823327989ade6dc3d948f0afa125e12ec2e5e7ca1",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYpntKgS4.woff2": {
+    "sha256": "6252e819a7665ae512c2d046308a9016ada63c06d0d8f96984c4b29f6c9e1bd2",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYp3tKgS4.woff2": {
+    "sha256": "cfa9a397d86f66c5c51775a2500a712d5f632a04f0c5eca6930dfaf612d4566d",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtK.woff2": {
+    "sha256": "d80df8ff5aecd299a61549f9e29ab1ed0b9b05f4ea71d50fe978e07d5240b235",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/barlowcondensed/v13/HTx3L3I-JCGChYJ8VI-L6OO_au7B6x7T2kn3.woff2": {
+    "sha256": "9e7e7207af0d66872b3d480231a7f767fbc3424d42c46b41d372b40c3f0b423a",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/barlowcondensed/v13/HTx3L3I-JCGChYJ8VI-L6OO_au7B6x_T2kn3.woff2": {
+    "sha256": "1eb62753e2922d13801bed22f0a35af396035da04958d4d7fcead522fbaae4ea",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/barlowcondensed/v13/HTx3L3I-JCGChYJ8VI-L6OO_au7B6xHT2g.woff2": {
+    "sha256": "7fff1bb22e5773f0d1a55d3093068b6dac4539e8bb3ac23fb9f0a729df2c7bb4",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/barlowcondensed/v13/HTxwL3I-JCGChYJ8VI-L6OO_au7B4-Lwz3nWuZEC.woff2": {
+    "sha256": "892fed0cfb3e65a5064277ed3f79f7098915587515b6c1e866cf8e79857bd8eb",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/barlowcondensed/v13/HTxwL3I-JCGChYJ8VI-L6OO_au7B4-Lwz3jWuZEC.woff2": {
+    "sha256": "a6ff9214bfa7832cb91d246454fd48b10ef921e8af052d479fdf1f0ecb903504",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/barlowcondensed/v13/HTxwL3I-JCGChYJ8VI-L6OO_au7B4-Lwz3bWuQ.woff2": {
+    "sha256": "460f141ec8f6c9a1516bfd2bd9fe71656246d7a9d04a0955faf53158d8970c4c",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/barlowcondensed/v13/HTxwL3I-JCGChYJ8VI-L6OO_au7B4873z3nWuZEC.woff2": {
+    "sha256": "5598861e729ef9e8e40996cc1a4dddafa72df5981205cc929b900524e8c58890",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/barlowcondensed/v13/HTxwL3I-JCGChYJ8VI-L6OO_au7B4873z3jWuZEC.woff2": {
+    "sha256": "aef7edf54f79a5329fbca9c065b56dcec3852c680d58cf89a9ef2db6940ca4b3",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/barlowcondensed/v13/HTxwL3I-JCGChYJ8VI-L6OO_au7B4873z3bWuQ.woff2": {
+    "sha256": "215a93c696f442034a46fbb382958f753fda60e30490683aeea6b235fcbb2b66",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/michroma/v21/PN_zRfy9qWD8fEagAPgzpTnr_w.woff2": {
+    "sha256": "389fd1a84c8a275eea953ff215a11396982d8091591075733af086b400a9b2c5",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/michroma/v21/PN_zRfy9qWD8fEagAPg9pTk.woff2": {
+    "sha256": "754fdb31c9906e82cf9c0ecb1d0b528073818fc2c418a39932c83a34cca027b6",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/pressstart2p/v16/e3t4euO8T-267oIAQAu6jDQyK3nYivN04w.woff2": {
+    "sha256": "954380ff6f96dcb0cde857bb1cb906401908729cfbdd98140174bb1965f025c7",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/pressstart2p/v16/e3t4euO8T-267oIAQAu6jDQyK3nRivN04w.woff2": {
+    "sha256": "c2a20dcb95ec8f4d1e8db6bd01dfedb669913f5e691e7baa3981b2d88a3b9ae3",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/pressstart2p/v16/e3t4euO8T-267oIAQAu6jDQyK3nWivN04w.woff2": {
+    "sha256": "fb54a8f8c24cd5c532c5d52ece3d82b9a08ed83bad076446b938f8f50353753f",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/pressstart2p/v16/e3t4euO8T-267oIAQAu6jDQyK3nbivN04w.woff2": {
+    "sha256": "3c7df3a15e173b8fa04ec9191171e72c314ddbac1b395e2b2e2092bb4f47cc8c",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/pressstart2p/v16/e3t4euO8T-267oIAQAu6jDQyK3nVivM.woff2": {
+    "sha256": "afec86997fdaf54af1f59358fa2c1e2a0f1d04146edad18e5cd141d0384a7548",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/vt323/v18/pxiKyp0ihIEF2isQFJXGdg.woff2": {
+    "sha256": "84b335a53b55c33f919f11b5cf83d857f053097171461eaba10d44be1c623609",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/vt323/v18/pxiKyp0ihIEF2isRFJXGdg.woff2": {
+    "sha256": "4435f062ebe744d097d0d618ac5ad6b8ea25ee3bd6004c5369c24518e70af1f0",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/vt323/v18/pxiKyp0ihIEF2isfFJU.woff2": {
+    "sha256": "8ddbebcc1048154132e1d78eb9b1f7850bca1b7d857035ccf1cb4318ebc615b6",
+    "contentType": "font/woff2"
+  },
+  "https://fonts.gstatic.com/s/sharetechmono/v16/J7aHnp1uDWRBEqV98dVQztYldFcLowEF.woff2": {
+    "sha256": "41e6b9f297f7d9a2df2aaa274092f76d2f72711a15ca455f7f4f4f92caf16b72",
+    "contentType": "font/woff2"
+  }
+}

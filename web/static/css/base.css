@@ -1,120 +1,18 @@
-/* Base Styles - vdradmin-go */
-/* Structure and layout only - theme variables loaded separately */
+/* VDR application layouts. Load after /ui/css/base.css, before theme CSS. */
 
-/* Webfonts (Google Fonts) */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@500;600;700&display=swap');
-
-/* System theme support - NO explicit theme variables, just respects OS preference */
-/* Light theme as fallback for system theme */
-:root:not([data-theme]) {
-    --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-    --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-
-    --primary-color: #7c3aed;
-    --primary-hover: #6d28d9;
-    --secondary-color: #64748b;
-    --success-color: #10b981;
-    --danger-color: #ef4444;
-    --warning-color: #f59e0b;
-
-    --bg-color: #f6f7fb;
-    --bg-image: radial-gradient(900px 500px at 15% 10%, rgba(124, 58, 237, 0.10), transparent 60%),
-        radial-gradient(800px 520px at 85% 15%, rgba(14, 165, 233, 0.09), transparent 55%),
-        radial-gradient(900px 700px at 50% 90%, rgba(245, 158, 11, 0.06), transparent 55%);
-
-    --surface-color: #ffffff;
-    --surface-hover: rgba(2, 6, 23, 0.02);
-
-    --text-color: #0f172a;
-    --text-muted: rgba(15, 23, 42, 0.70);
-    --border-color: rgba(15, 23, 42, 0.10);
-
-    --shadow: 0 1px 2px rgba(2, 6, 23, 0.06), 0 12px 24px rgba(2, 6, 23, 0.06);
-    --shadow-lg: 0 2px 4px rgba(2, 6, 23, 0.08), 0 18px 44px rgba(2, 6, 23, 0.12);
-
-    --nav-active-bg: linear-gradient(180deg, rgba(124, 58, 237, 0.14), rgba(124, 58, 237, 0.08));
-    --nav-active-border: rgba(124, 58, 237, 0.22);
-    --nav-active-shadow: 0 10px 26px rgba(124, 58, 237, 0.16);
-
-    --menu-scrim-color: rgba(0, 0, 0, 0.18);
-    --menu-scrim-padding: 20px;
-    --radius: 0.75rem;
-    --spacing: 1rem;
-    color-scheme: light;
+/* Preserve the legacy header link's inherited color after removing inline styling. */
+:root .nav-brand h1 a {
+    color: inherit;
+    text-decoration: none;
 }
 
-@media (prefers-color-scheme: dark) {
-    :root:not([data-theme]) {
-        --primary-color: #a78bfa;
-        --primary-hover: #c4b5fd;
-        --bg-color: #070814;
-        --bg-image: radial-gradient(1100px 650px at 40% -10%, rgba(124, 58, 237, 0.30), transparent 60%),
-            radial-gradient(900px 620px at 90% 10%, rgba(236, 72, 153, 0.18), transparent 55%),
-            radial-gradient(900px 700px at 10% 90%, rgba(14, 165, 233, 0.18), transparent 55%);
-
-        --surface-color: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
-        --surface-hover: rgba(255, 255, 255, 0.04);
-
-        --text-color: rgba(226, 232, 240, 0.96);
-        --text-muted: rgba(148, 163, 184, 0.82);
-        --border-color: rgba(255, 255, 255, 0.10);
-
-        --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 16px 40px rgba(0, 0, 0, 0.45);
-        --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.35), 0 28px 70px rgba(0, 0, 0, 0.55);
-
-        --nav-active-bg: linear-gradient(180deg, rgba(167, 139, 250, 0.20), rgba(167, 139, 250, 0.10));
-        --nav-active-border: rgba(167, 139, 250, 0.22);
-        --nav-active-shadow: 0 14px 34px rgba(167, 139, 250, 0.22);
-
-        --menu-scrim-color: rgba(0, 0, 0, 0.32);
-        --menu-scrim-padding: 20px;
-        --radius: 0.75rem;
-        --spacing: 1rem;
-
-        --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-        --font-display: 'Space Grotesk', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-
-        --secondary-color: #64748b;
-        --success-color: #10b981;
-        --danger-color: #ef4444;
-        --warning-color: #f59e0b;
-
-        color-scheme: dark;
-    }
+/* The Channels pill deliberately keeps its native control font. */
+.nav-channel-form input,
+.nav-channel-form select,
+.nav-channel-form textarea {
+    font-family: revert;
 }
 
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
-
-/* Ensure the HTML hidden attribute always wins over component display rules. */
-[hidden] {
-    display: none !important;
-}
-
-body {
-    font-family: var(--font-sans);
-    line-height: 1.6;
-    color: var(--text-color);
-    background-color: var(--bg-color);
-    background-image: var(--bg-image-selected, var(--bg-image));
-    background-attachment: fixed;
-    text-rendering: optimizeLegibility;
-}
-
-/*
-  Form controls: use a UI/system font, but keep the Channels selector pill
-  (`.nav-channel-form select`) on the browser default styling.
-*/
-form:not(.nav-channel-form) input,
-form:not(.nav-channel-form) select,
-form:not(.nav-channel-form) textarea {
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-}
-
-/* Classic vdradmin-am-like start screen (scoped to home only) */
 body.legacy-home {
     --legacy-accent: #6d96a9;
     --legacy-bg-alt: #dee6ee;
@@ -127,7 +25,6 @@ body.legacy-home {
     margin: 3px;
 }
 
-/* Popup window: add a bit more breathing room at top */
 .event-popup main {
     padding-top: calc(var(--spacing) * 2 + 22px);
 }
@@ -326,239 +223,15 @@ body.legacy-home {
     color: #000000;
 }
 
-/* Layout */
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 var(--spacing);
-}
-
-/* Header & Navigation */
-header {
-    background: var(--surface-color);
-    border-bottom: 1px solid var(--border-color);
-    box-shadow: var(--shadow);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    backdrop-filter: blur(10px);
-    padding: 10px 0;
-    margin-bottom: 12px;
-}
-
-header nav {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--spacing) 0;
-}
-
-.nav-brand h1 {
-    font-family: var(--font-display);
-    font-size: 1.35rem;
-    letter-spacing: -0.02em;
-    color: var(--text-color);
-}
-
-.nav-links {
-    display: flex;
-    list-style: none;
-    gap: calc(var(--spacing) * 2);
-}
-
-.nav-links a {
-    text-decoration: none;
-    color: var(--text-color);
-    font-weight: 500;
-    transition: color 0.2s;
-    padding: 0.35rem 0.6rem;
-    border-radius: 999px;
-}
-
-.nav-links a:hover {
-    color: var(--primary-color);
-    background: var(--surface-hover);
-}
-
-.nav-links a.active,
-.nav-links a[aria-current="page"] {
-    color: var(--text-color);
-    background: var(--nav-active-bg);
-    border: 1px solid var(--nav-active-border);
-    box-shadow: var(--nav-active-shadow);
-    text-decoration: none;
-    backdrop-filter: blur(10px);
-}
-
-.nav-links a:focus-visible {
-    outline: 2px solid var(--nav-active-border);
-    outline-offset: 2px;
-}
-
-.nav-user {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.nav-right {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.nav-burger {
-    position: relative;
-}
-
-.nav-burger summary {
-    list-style: none;
-    cursor: pointer;
-}
-
-.nav-burger summary::-webkit-details-marker {
-    display: none;
-}
-
-.nav-burger-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.45rem 0.6rem;
-}
-
-.burger-icon {
-    width: 18px;
-    height: 12px;
-    display: inline-block;
-    position: relative;
-}
-
-.burger-icon::before,
-.burger-icon::after,
-.burger-icon {
-    background: transparent;
-}
-
-.burger-icon::before,
-.burger-icon::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: var(--text-color);
-    border-radius: 2px;
-}
-
-.burger-icon::before {
-    top: 0;
-}
-
-.burger-icon::after {
-    bottom: 0;
-}
-
-.nav-burger-button .burger-icon {
-    background: none;
-}
-
-.nav-burger-button .burger-icon {
-    box-shadow: inset 0 0 0 0 transparent;
-}
-
-.nav-burger-button .burger-icon {
-    /* Middle line */
-    background-image: linear-gradient(var(--text-color), var(--text-color));
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: 100% 2px;
-    border-radius: 2px;
-}
-
-.nav-burger-menu {
-    position: absolute;
-    top: calc(100% + 10px);
-    right: 0;
-    min-width: 220px;
-    padding: 0.4rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-
-    background: var(--surface-color);
-    border: 1px solid var(--border-color);
-    border-radius: 14px;
-    box-shadow: var(--shadow);
-    backdrop-filter: blur(10px);
-    z-index: 200;
-
-    /* Keep menu content above its own scrim layer */
-    isolation: isolate;
-}
-
-/* Dim only a tight area around the dropdown (menu size + padding). */
-.nav-burger-menu::before {
-    content: "";
-    position: absolute;
-    inset: calc(var(--menu-scrim-padding) * -1);
-    border-radius: calc(14px + var(--menu-scrim-padding));
-    background: var(--menu-scrim-color);
-    z-index: -1;
-    pointer-events: none;
-}
-
-/* In dark mode, --surface-color is a translucent gradient. Layer it over a solid base
-   so underlying page content doesn't show through the open menu. */
-@media (prefers-color-scheme: dark) {
-    :root:not([data-theme]) .nav-burger-menu {
-        background-color: var(--bg-color);
-        background-image: var(--surface-color);
-    }
-}
-
-:root[data-theme="dark"] .nav-burger-menu {
-    background-color: var(--bg-color);
-    background-image: var(--surface-color);
-}
-
-details.nav-burger:not([open]) .nav-burger-menu {
-    display: none;
-}
-
-.nav-burger-menu a {
-    text-decoration: none;
-    color: var(--text-color);
-    font-weight: 500;
-    transition: color 0.2s;
-    padding: 0.45rem 0.7rem;
-    border-radius: 12px;
-}
-
-.nav-burger-menu a:hover {
-    color: var(--primary-color);
-    background: var(--surface-hover);
-}
-
-.nav-burger-menu a.active,
-.nav-burger-menu a[aria-current="page"] {
-    color: var(--text-color);
-    background: var(--nav-active-bg);
-    border: 1px solid var(--nav-active-border);
-    box-shadow: var(--nav-active-shadow);
-    text-decoration: none;
-    backdrop-filter: blur(10px);
-}
-
-.nav-burger-menu a:focus-visible {
-    outline: 2px solid var(--nav-active-border);
-    outline-offset: 2px;
-}
-
 .nav-channel-form {
     display: flex;
     align-items: center;
     gap: 1rem;
+}
+
+.nav-burger {
+    display: flex;
+    align-items: center;
 }
 
 .nav-select {
@@ -596,7 +269,6 @@ details.nav-burger:not([open]) .nav-burger-menu {
     transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
 }
 
-/* Match the glossy select styling for the "What's on" time input. */
 .nav-time,
 .nav-channel-form input[type="time"] {
     appearance: none;
@@ -651,173 +323,12 @@ details.nav-burger:not([open]) .nav-burger-menu {
     color: var(--text-color);
 }
 
-.badge {
-    background-color: var(--primary-color);
-    color: white;
-    padding: 0.25rem 0.5rem;
-    border-radius: var(--radius);
-    font-size: 0.875rem;
-}
-
-/* Main Content */
 main {
     min-height: calc(100vh - 200px);
     padding-top: calc(var(--spacing) * 2 + 22px);
     padding-bottom: calc(var(--spacing) * 2);
 }
 
-/* Hero Section */
-.hero {
-    text-align: center;
-    padding: calc(var(--spacing) * 4) 0;
-}
-
-.hero h2 {
-    font-size: 2.5rem;
-    margin-bottom: var(--spacing);
-}
-
-.hero p {
-    font-size: 1.25rem;
-    color: var(--text-muted);
-}
-
-/* Grid Layout */
-.grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: var(--spacing);
-    margin-top: calc(var(--spacing) * 2);
-}
-
-/* Card Component */
-.card {
-    background: var(--panel-surface, var(--surface-color));
-    border: 1px solid var(--panel-border, var(--border-color));
-    border-radius: var(--radius);
-    padding: calc(var(--spacing) * 1.5);
-    box-shadow: var(--panel-shadow, var(--shadow));
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--panel-shadow-lg, var(--shadow-lg));
-}
-
-.card h3 {
-    margin-bottom: 0.5rem;
-}
-
-.card p {
-    color: var(--text-muted);
-    margin-bottom: var(--spacing);
-}
-
-/* Buttons */
-.btn {
-    display: inline-block;
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    padding: 0.625rem 1.25rem;
-    border: 1px solid var(--border-color);
-    border-radius: 999px;
-    font-size: 1rem;
-    font-weight: 500;
-    font-family: inherit;
-    line-height: 1.1;
-    text-decoration: none;
-    cursor: pointer;
-    box-shadow: var(--shadow);
-    transition: transform 0.2s, box-shadow 0.2s, filter 0.2s, background-color 0.2s;
-}
-
-.btn:hover {
-    box-shadow: var(--shadow-lg);
-    transform: translateY(-1px);
-}
-
-.btn:active {
-    transform: translateY(0);
-    filter: brightness(0.98);
-}
-
-.btn:focus-visible {
-    outline: 2px solid var(--nav-active-border);
-    outline-offset: 2px;
-}
-
-.btn[disabled],
-.btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: var(--shadow);
-}
-
-.btn-primary {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.06)), var(--primary-color);
-    color: white;
-    border-color: rgba(255, 255, 255, 0.18);
-}
-
-.btn-primary:hover {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.08)), var(--primary-hover);
-}
-
-.btn-secondary {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04)), var(--surface-color);
-    color: var(--text-color);
-    border-color: var(--nav-active-border);
-    box-shadow: var(--shadow), var(--nav-active-shadow);
-    backdrop-filter: blur(10px);
-}
-
-.btn-secondary:hover {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.20), rgba(255, 255, 255, 0.06)), var(--surface-color);
-    border-color: var(--primary-color);
-}
-
-.btn-success {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.06)), var(--success-color);
-    color: white;
-    border-color: rgba(255, 255, 255, 0.16);
-}
-
-.btn-success:hover {
-    filter: brightness(1.05);
-}
-
-.btn-danger {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.06)), var(--danger-color);
-    color: white;
-    border-color: rgba(255, 255, 255, 0.16);
-}
-
-.btn-danger:hover {
-    filter: brightness(1.05);
-}
-
-.btn-sm {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.875rem;
-}
-
-/* Match the visual size of top-nav pills and select dropdowns */
-.btn-menu {
-    padding: 0.35rem 0.6rem;
-    font-size: 1rem;
-}
-
-/* Navigation buttons that should match select dropdown styling */
-.btn-nav {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.875rem;
-    border-radius: 999px;
-}
-
-/* EPG List */
 .epg-list {
     display: flex;
     flex-direction: column;
@@ -848,7 +359,6 @@ main {
     line-height: 1.2;
 }
 
-/* Align time range baseline with the show title. */
 .epg-time {
     padding-top: 0.25rem;
 }
@@ -875,85 +385,106 @@ main {
     font-size: 1.05rem;
 }
 
-    /* Watch TV (snapshot + remote) */
-    .watchtv-toolbar {
+@media (min-width: 769px) {
+    body:not(.event-popup) .epg-time time {
+        /* Reserve a full time range in the theme's actual time font. */
+        width: 12ch;
+        white-space: nowrap;
+    }
+
+    .epg-content {
+        min-width: 0;
+    }
+}
+
+.watchtv-toolbar {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: calc(var(--spacing) * 0.75);
         flex-wrap: wrap;
-    }
+}
 
-    .watchtv-controls {
+.watchtv-controls {
         display: flex;
         align-items: center;
         gap: 0.5rem;
         flex-wrap: wrap;
-    }
+}
 
-    .watchtv-label {
+.watchtv-label {
         font-size: 0.85rem;
         color: var(--text-muted);
-    }
+}
 
-    .watchtv-select {
+.watchtv-select {
         height: 2.25rem;
         padding: 0.35rem 0.6rem;
         border-radius: 0.65rem;
         border: 1px solid var(--border-color);
         background: var(--surface-color);
         color: var(--text-color);
-    }
+}
 
-    .watchtv-grid {
+/* Chroma retains the native select inside its wrapper, not its classes on the trigger. */
+.custom-select-container:has(> select.watchtv-select) .custom-select-trigger {
+        height: 2.25rem;
+        padding: 0.35rem 0.6rem;
+        border-radius: 0.65rem;
+        border: 1px solid var(--border-color);
+        background: var(--surface-color);
+        color: var(--text-color);
+}
+
+.watchtv-grid {
         display: grid;
         grid-template-columns: minmax(0, 1fr) 300px 300px;
         align-items: stretch;
         gap: var(--spacing);
-    }
+}
 
-    .watchtv-screen {
+.watchtv-screen {
         min-width: 0;
-    }
+}
 
-    .watchtv-remote,
-    .watchtv-channels {
+.watchtv-remote,
+.watchtv-channels {
         align-items: stretch;
-    }
+}
 
-    .watchtv-screen,
-    .watchtv-remote,
-    .watchtv-channels {
+.watchtv-screen,
+.watchtv-remote,
+.watchtv-channels {
         box-sizing: border-box;
-    }
+}
 
-    /* Keep screen/remote/channels same height on wide layouts */
-    @media (min-width: 1101px) {
-        .watchtv-grid {
+@media (min-width: 1101px) {
+.watchtv-grid {
             --watchtv-panel-height: min(74vh, 760px);
-        }
+}
 
-        .watchtv-screen-inner,
-        .remote-panel,
-        .watchtv-channels-panel {
+.watchtv-screen-inner,
+.remote-panel,
+.watchtv-channels-panel {
             height: var(--watchtv-panel-height);
-        }
-    }
+}
+}
 
-    @media (max-width: 1100px) {
-        .watchtv-grid {
+@media (max-width: 1100px) {
+.watchtv-grid {
             grid-template-columns: 1fr;
-        }
+}
 
-        .watchtv-screen,
-        .watchtv-remote,
-        .watchtv-channels {
+.watchtv-screen,
+.watchtv-remote,
+.watchtv-channels {
             min-width: 0;
-        }
-    }
+}
+}
 
-    .watchtv-screen-inner {
+.watchtv-screen-inner {
         width: 100%;
+        max-width: 100%;
         margin: 0 auto;
         padding: calc(var(--spacing) * 0.75);
         border-radius: var(--radius);
@@ -962,18 +493,18 @@ main {
         box-shadow: var(--shadow);
         position: relative;
         overflow: hidden;
-    }
+}
 
-    .watchtv-overlay {
+.watchtv-overlay {
         position: absolute;
         inset: calc(var(--spacing) * 0.75);
         display: grid;
         place-items: center;
         text-align: center;
         pointer-events: none;
-    }
+}
 
-    .watchtv-overlay-card {
+.watchtv-overlay-card {
         width: min(520px, 100%);
         border-radius: calc(var(--radius) - 0.25rem);
         border: 1px solid var(--border-color);
@@ -982,24 +513,24 @@ main {
         padding: calc(var(--spacing) * 0.75);
         display: grid;
         gap: 0.35rem;
-    }
+}
 
-    .watchtv-overlay-title {
+.watchtv-overlay-title {
         font-family: var(--font-display);
         font-weight: 700;
-    }
+}
 
-    .watchtv-overlay-body {
+.watchtv-overlay-body {
         color: var(--text-muted);
         word-break: break-word;
-    }
+}
 
-    .watchtv-overlay-hint {
+.watchtv-overlay-hint {
         font-size: 0.9rem;
         color: var(--text-muted);
-    }
+}
 
-    .watchtv-image {
+.watchtv-image {
         display: block;
         width: 100%;
         height: 100%;
@@ -1007,9 +538,9 @@ main {
         border-radius: calc(var(--radius) - 0.25rem);
         border: 1px solid var(--border-color);
         background: rgba(0, 0, 0, 0.04);
-    }
+}
 
-    .watchtv-video {
+.watchtv-video {
         display: block;
         width: 100%;
         height: 100%;
@@ -1017,110 +548,110 @@ main {
         border-radius: calc(var(--radius) - 0.25rem);
         border: 1px solid var(--border-color);
         background: rgba(0, 0, 0, 0.04);
-    }
+}
 
-    .watchtv-now {
+.watchtv-now {
         width: 100%;
         margin-top: calc(var(--spacing) * 1.35);
-    }
+}
 
-    .watchtv-now-description {
+.watchtv-now-description {
         color: var(--text-muted);
         display: block;
         overflow: visible;
         word-break: break-word;
-    }
+}
 
-    .watchtv-channels-panel,
-    .remote-panel {
+.watchtv-channels-panel,
+.remote-panel {
         border-radius: var(--radius);
         border: 1px solid var(--border-color);
         background: var(--surface-color);
         box-shadow: var(--shadow);
         padding: calc(var(--spacing) * 0.75);
-    }
+}
 
-    .watchtv-channels-title {
+.watchtv-channels-title {
         font-family: var(--font-display);
         font-weight: 600;
         margin-bottom: 0.5rem;
-    }
+}
 
-    .watchtv-channel-list {
+.watchtv-channel-list {
         width: 100%;
         border-radius: 0.65rem;
         border: 1px solid var(--border-color);
         background: var(--surface-color);
         color: var(--text-color);
         padding: 0.25rem;
-    }
+}
 
-    .watchtv-channels-panel {
+.watchtv-channels-panel {
         display: flex;
         flex-direction: column;
-    }
+}
 
-    .watchtv-channel-list {
+.watchtv-channel-list {
         flex: 1 1 auto;
         min-height: 0;
-    }
+}
 
-    .remote-panel {
+.remote-panel {
         display: flex;
         flex-direction: column;
         width: 100%;
         box-sizing: border-box;
         padding: calc(var(--spacing) * 1.25) calc(var(--spacing) * 1.45) calc(var(--spacing) * 1.6);
-    }
+}
 
-    .remote-row {
+.remote-row {
         display: flex;
         gap: 0.5rem;
         margin-bottom: 0.5rem;
         width: calc(100% - 2.6rem);
         margin-left: auto;
         margin-right: auto;
-    }
+}
 
-    .remote-row-right {
+.remote-row-right {
         justify-content: flex-end;
-    }
+}
 
-    .remote-grid {
+.remote-grid {
         display: grid;
         gap: 0.45rem;
         margin-bottom: 0.65rem;
         width: calc(100% - 2.6rem);
         margin-left: auto;
         margin-right: auto;
-    }
+}
 
-    .remote-grid-nums {
+.remote-grid-nums {
         grid-template-columns: repeat(3, 1fr);
-    }
+}
 
-    .remote-grid-top {
+.remote-grid-top {
         grid-template-columns: 1fr 0.4fr 1fr;
-    }
+}
 
-    .remote-grid-colors {
+.remote-grid-colors {
         grid-template-columns: repeat(4, 1fr);
-    }
+}
 
-    .remote-grid-nav {
+.remote-grid-nav {
         grid-template-columns: repeat(3, 1fr);
-    }
+}
 
-    .remote-grid-transport {
+.remote-grid-transport {
         grid-template-columns: repeat(3, 1fr);
-    }
+}
 
-    .remote-grid-volume {
+.remote-grid-volume {
         grid-template-columns: repeat(3, 1fr);
         margin-bottom: 1rem;
-    }
+}
 
-    .remote-btn {
+.remote-btn {
         height: 2.1rem;
         border-radius: 0.7rem;
         border: 1px solid var(--border-color);
@@ -1134,41 +665,52 @@ main {
         font-weight: 600;
         cursor: pointer;
         user-select: none;
-    }
+}
 
-    .remote-btn:hover {
+.remote-btn:hover {
         background: linear-gradient(
             180deg,
             rgba(255, 255, 255, 0.30),
             rgba(255, 255, 255, 0.10)
         );
-    }
+}
 
-    .remote-btn:active {
+.remote-btn:active {
         transform: translateY(1px);
-    }
+}
 
-    .remote-btn-ok {
+.remote-btn-ok {
         background: var(--nav-active-bg);
         border-color: var(--nav-active-border);
         box-shadow: var(--nav-active-shadow);
-    }
+}
 
-    .remote-btn-power {
+.remote-btn-power {
         min-width: 5.25rem;
-    }
+}
 
-    .remote-btn-red,
-    .remote-btn-green,
-    .remote-btn-yellow,
-    .remote-btn-blue {
+.remote-btn-red,
+.remote-btn-green,
+.remote-btn-yellow,
+.remote-btn-blue {
         height: 1.5rem;
-    }
+}
 
-    .remote-btn-red { background: linear-gradient(180deg, rgba(239, 68, 68, 0.55), rgba(239, 68, 68, 0.18)); }
-    .remote-btn-green { background: linear-gradient(180deg, rgba(16, 185, 129, 0.55), rgba(16, 185, 129, 0.18)); }
-    .remote-btn-yellow { background: linear-gradient(180deg, rgba(245, 158, 11, 0.55), rgba(245, 158, 11, 0.18)); }
-    .remote-btn-blue { background: linear-gradient(180deg, rgba(14, 165, 233, 0.55), rgba(14, 165, 233, 0.18)); }
+.remote-btn-red {
+ background: linear-gradient(180deg, rgba(239, 68, 68, 0.55), rgba(239, 68, 68, 0.18));
+}
+
+.remote-btn-green {
+ background: linear-gradient(180deg, rgba(16, 185, 129, 0.55), rgba(16, 185, 129, 0.18));
+}
+
+.remote-btn-yellow {
+ background: linear-gradient(180deg, rgba(245, 158, 11, 0.55), rgba(245, 158, 11, 0.18));
+}
+
+.remote-btn-blue {
+ background: linear-gradient(180deg, rgba(14, 165, 233, 0.55), rgba(14, 165, 233, 0.18));
+}
 
 .channels-title {
     font-size: 1.05rem;
@@ -1183,10 +725,6 @@ main {
     font-weight: 600;
 }
 
-.inline-form {
-    display: inline;
-}
-
 .epg-channel {
     color: var(--primary-color);
     font-weight: 500;
@@ -1195,6 +733,7 @@ main {
 
 .epg-subtitle {
     color: var(--text-muted);
+    font-size: inherit;
     font-style: italic;
     margin-bottom: 0.5rem;
 }
@@ -1208,7 +747,6 @@ main {
     overflow: hidden;
 }
 
-/* Event popup: show full description text */
 .event-popup .epg-description {
     display: block;
     line-clamp: unset;
@@ -1259,14 +797,12 @@ main {
     align-items: flex-start;
 }
 
-/* Timer List */
 .timer-list {
     display: flex;
     flex-direction: column;
     gap: var(--spacing);
 }
 
-/* Timer Timeline */
 .timer-timeline {
     display: grid;
     grid-template-columns: 180px 1fr;
@@ -1409,7 +945,6 @@ main {
     align-items: flex-start;
 }
 
-/* Recording List */
 .recording-list {
     display: flex;
     flex-direction: column;
@@ -1452,56 +987,6 @@ main {
     align-items: flex-start;
 }
 
-/* Archive progress */
-.progress {
-    position: relative;
-    height: 14px;
-    border-radius: 999px;
-    border: 1px solid var(--border-color);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.02)), var(--surface-color);
-    box-shadow: var(--shadow);
-    overflow: hidden;
-}
-
-.progress-bar {
-    height: 100%;
-    width: 0%;
-    border-radius: 999px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.30), rgba(255, 255, 255, 0.08)), var(--primary-color);
-    transition: width 0.25s ease;
-}
-
-.progress-indeterminate::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: -40%;
-    height: 100%;
-    width: 40%;
-    background: linear-gradient(90deg, transparent, rgba(124, 58, 237, 0.35), transparent);
-    animation: progress-sweep 1.2s infinite;
-}
-
-@keyframes progress-sweep {
-    0% { left: -40%; }
-    100% { left: 100%; }
-}
-
-.log-panel {
-    margin-top: 0.75rem;
-    padding: 0.75rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius);
-    background: var(--surface-color);
-    box-shadow: var(--shadow);
-    max-height: 240px;
-    overflow: auto;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-    font-size: 0.82rem;
-    color: var(--text-muted);
-    white-space: pre-wrap;
-}
-
 .archive-target-label {
     color: var(--text-muted);
     font-weight: 400;
@@ -1527,73 +1012,6 @@ main {
 
 .archive-target-item:last-child {
     margin-bottom: 0;
-}
-
-/* Search Form */
-.search-form {
-    display: flex;
-    gap: var(--spacing);
-    margin-bottom: calc(var(--spacing) * 2);
-}
-
-.search-input {
-    flex: 1;
-    padding: 0.625rem 1rem;
-    border: 2px solid var(--border-color);
-    border-radius: var(--radius);
-    font-size: 1rem;
-    transition: border-color 0.2s;
-    background: var(--surface-color);
-    color: var(--text-color);
-}
-
-.search-input:focus {
-    outline: none;
-    border-color: var(--primary-color);
-}
-
-.toggle-chips {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-
-.toggle-chips-label {
-    font-size: 0.875rem;
-    color: var(--text-muted);
-    padding-left: 0.15rem;
-}
-
-.toggle-chip-input {
-    /* Visually hidden but still interactive via <label for="..."> */
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    clip-path: inset(50%);
-    white-space: nowrap;
-    border: 0;
-    opacity: 0;
-    appearance: none;
-    -webkit-appearance: none;
-}
-
-.toggle-chip {
-    user-select: none;
-}
-
-.toggle-chip-input:checked + .toggle-chip {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.06)), var(--primary-color);
-    color: white;
-    border-color: rgba(255, 255, 255, 0.18);
-}
-
-.toggle-chip-input:checked + .toggle-chip:hover {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.08)), var(--primary-hover);
 }
 
 .recordings-toolbar {
@@ -1642,16 +1060,6 @@ main {
     gap: 0.6rem;
 }
 
-/* Toolbar */
-.toolbar {
-    background: var(--surface-color);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius);
-    padding: var(--spacing);
-    margin-bottom: var(--spacing);
-    box-shadow: var(--shadow);
-}
-
 .config-panel {
     background: var(--surface-color);
     border: 1px solid var(--border-color);
@@ -1661,54 +1069,11 @@ main {
     box-shadow: var(--shadow);
 }
 
-.toolbar:focus-within,
 .recordings-search-box:focus-within {
     position: relative;
     z-index: 40;
 }
 
-/* Data Table (used for EPG Search list) */
-.data-table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-}
-
-.data-table th,
-.data-table td {
-    padding: 0.625rem 0.75rem;
-    border-bottom: 1px solid var(--border-color);
-    vertical-align: top;
-}
-
-.data-table th {
-    text-align: left;
-    font-weight: 600;
-    color: var(--text-muted);
-}
-
-.data-table tbody tr:hover {
-    background: var(--surface-hover);
-}
-
-.data-table tbody tr.is-selected {
-    background: rgba(124, 58, 237, 0.12);
-}
-
-.data-table td.actions {
-    white-space: nowrap;
-    vertical-align: middle;
-}
-
-.data-table td.actions .btn {
-    vertical-align: middle;
-}
-
-.data-table tr:last-child td {
-    border-bottom: none;
-}
-
-/* Configuration form */
 .config-grid {
     display: grid;
     grid-template-columns: 220px 1fr;
@@ -1739,11 +1104,6 @@ main {
     color: var(--text-color);
 }
 
-/*
-  Configuration multi-selects (e.g., Available/Wanted channels):
-  keep selected option backgrounds consistent with the theme instead of the
-  browser/OS default grey selection highlight.
-*/
 .config-grid select[multiple] option {
     background-color: var(--surface-color);
     color: var(--text-color);
@@ -1787,22 +1147,60 @@ main {
 }
 
 @media (max-width: 768px) {
-    .config-grid {
+.config-grid {
         grid-template-columns: 1fr;
-    }
 }
-
-.sort-options {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
 }
 
 .config-grid .profile-management-actions {
     justify-content: flex-start !important;
 }
 
-.sort-options select {
+.archive-job-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+@media (max-width: 768px) {
+.epg-item,
+.timer-item,
+.recording-item {
+        grid-template-columns: 1fr;
+}
+
+.epg-time {
+        flex-direction: row;
+        justify-content: space-between;
+        width: 100%;
+        padding-top: 0;
+}
+}
+
+.nav-channel-form .custom-select-trigger {
+    appearance: none;
+    -webkit-appearance: none;
+    padding: 0.5rem 2.25rem 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    font-size: 1rem;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.02)), var(--surface-color);
+    color: var(--text-color);
+    box-shadow: var(--shadow);
+    min-width: 140px;
+}
+
+.nav-channel-form .custom-select-trigger:hover,
+.nav-channel-form .custom-select-trigger.open {
+    border-color: var(--nav-active-border);
+}
+
+.nav-select::after {
+    display: none;
+}
+
+form:not(.nav-channel-form) .custom-select-trigger {
+    width: 100%;
     padding: 0.5rem;
     border: 2px solid var(--border-color);
     border-radius: var(--radius);
@@ -1811,162 +1209,29 @@ main {
     color: var(--text-color);
 }
 
-/* Empty State */
-.empty-state {
-    text-align: center;
-    padding: calc(var(--spacing) * 4);
-    color: var(--text-muted);
-}
-
-/* Footer */
-footer {
+.config-grid .custom-select-trigger {
+    width: 100%;
+    padding: 0.5rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: 1rem;
     background: var(--surface-color);
-    border-top: 1px solid var(--border-color);
-    padding: calc(var(--spacing) * 2) 0;
-    margin-top: calc(var(--spacing) * 4);
-    text-align: center;
-    color: var(--text-muted);
+    color: var(--text-color);
 }
 
-footer a {
-    color: var(--primary-color);
-    text-decoration: none;
+.ffmpeg-profile-control .custom-select-container,
+.ffmpeg-profile-control .custom-select-trigger {
+    display: grid;
+    width: 100%;
 }
 
-footer a:hover {
-    text-decoration: underline;
+/* Preserve VDR's phantom-sizing geometry, including its existing mobile overflow. */
+.custom-select-phantom {
+    padding: 0.5rem 2.25rem 0.5rem 0.75rem;
+    border: 1px solid transparent;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-    header nav {
-        flex-direction: row;
-        gap: var(--spacing);
-    }
-
-    .nav-right {
-        gap: 0.5rem;
-    }
-
-    .hero h2 {
-        font-size: 2rem;
-    }
-
-    .epg-item,
-    .timer-item,
-    .recording-item {
-        grid-template-columns: 1fr;
-    }
-
-    .epg-time {
-        flex-direction: row;
-        justify-content: space-between;
-        width: 100%;
-        padding-top: 0;
-    }
-
-    .search-form {
-        flex-direction: column;
-    }
-}
-
-/* htmx Loading States */
-.htmx-request {
-    opacity: 0.5;
-    pointer-events: none;
-}
-
-/* Spaceship HUD theme component styling (shared by spaceship* variants)
-   Each spaceship theme provides variables like:
-   - --primary-color, --primary-hover, --border-color, --text-color
-   - --primary-rgb, --primary-hover-rgb, --accent-rgb, --accent2-rgb
-*/
-
-/* Custom scrollbar glow */
-:root[data-theme^="spaceship"] {
-    /*
-      Selected spaceship background ("old" look): denser grid + subtle depth.
-      Keep theme-provided --bg-image intact for later background selection.
-    */
-    --bg-image-selected:
-        radial-gradient(circle at 20% 20%, rgba(var(--primary-rgb, 124, 58, 237), 0.20), transparent 55%),
-        radial-gradient(circle at 85% 15%, rgba(var(--accent-rgb, 236, 72, 153), 0.14), transparent 58%),
-        radial-gradient(circle at 15% 88%, rgba(var(--accent2-rgb, 14, 165, 233), 0.12), transparent 60%),
-        repeating-linear-gradient(
-            0deg,
-            rgba(var(--primary-rgb, 124, 58, 237), 0.045) 0px,
-            rgba(var(--primary-rgb, 124, 58, 237), 0.045) 1px,
-            transparent 1px,
-            transparent 10px
-        ),
-        repeating-linear-gradient(
-            90deg,
-            rgba(var(--primary-rgb, 124, 58, 237), 0.045) 0px,
-            rgba(var(--primary-rgb, 124, 58, 237), 0.045) 1px,
-            transparent 1px,
-            transparent 10px
-        ),
-        repeating-linear-gradient(
-            0deg,
-            rgba(var(--primary-rgb, 124, 58, 237), 0.08) 0px,
-            rgba(var(--primary-rgb, 124, 58, 237), 0.08) 1px,
-            transparent 1px,
-            transparent 52px
-        ),
-        repeating-linear-gradient(
-            90deg,
-            rgba(var(--primary-rgb, 124, 58, 237), 0.08) 0px,
-            rgba(var(--primary-rgb, 124, 58, 237), 0.08) 1px,
-            transparent 1px,
-            transparent 52px
-        ),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.35));
-
-    --panel-surface: linear-gradient(
-        135deg,
-        rgba(var(--primary-rgb), 0.08),
-        rgba(var(--accent-rgb), 0.05)
-    );
-    --panel-border: rgba(var(--primary-rgb), 0.35);
-    --panel-shadow: 0 0 2px rgba(var(--primary-rgb), 0.4),
-        0 0 8px rgba(var(--primary-rgb), 0.2),
-        0 4px 16px rgba(0, 0, 0, 0.6);
-    --panel-shadow-lg: 0 0 4px rgba(var(--primary-rgb), 0.6),
-        0 0 16px rgba(var(--primary-rgb), 0.3),
-        0 8px 32px rgba(0, 0, 0, 0.8);
-}
-
-:root[data-theme^="spaceship"] *::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-}
-
-:root[data-theme^="spaceship"] *::-webkit-scrollbar-track {
-    background: rgba(var(--primary-rgb), 0.05);
-    border: 1px solid rgba(var(--primary-rgb), 0.2);
-}
-
-:root[data-theme^="spaceship"] *::-webkit-scrollbar-thumb {
-    background: linear-gradient(
-        180deg,
-        rgba(var(--primary-rgb), 0.5),
-        rgba(var(--accent-rgb), 0.3)
-    );
-    border: 1px solid rgba(var(--primary-rgb), 0.6);
-    box-shadow: 0 0 8px rgba(var(--primary-rgb), 0.4);
-}
-
-:root[data-theme^="spaceship"] *::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(
-        180deg,
-        rgba(var(--primary-rgb), 0.7),
-        rgba(var(--accent-rgb), 0.5)
-    );
-    box-shadow: 0 0 12px rgba(var(--primary-rgb), 0.6);
-}
-
-/* Angular corner decorations for cards */
-:root[data-theme^="spaceship"] .card::before,
+/* Legacy domain hooks precede the selected theme so custom CSS can override them. */
 :root[data-theme^="spaceship"] .epg-item::before,
 :root[data-theme^="spaceship"] .timer-item::before,
 :root[data-theme^="spaceship"] .recording-item::before {
@@ -1982,7 +1247,6 @@ footer a:hover {
     opacity: 0.6;
 }
 
-:root[data-theme^="spaceship"] .card::after,
 :root[data-theme^="spaceship"] .epg-item::after,
 :root[data-theme^="spaceship"] .timer-item::after,
 :root[data-theme^="spaceship"] .recording-item::after {
@@ -1998,99 +1262,18 @@ footer a:hover {
     opacity: 0.6;
 }
 
-:root[data-theme^="spaceship"] .card,
 :root[data-theme^="spaceship"] .epg-item,
 :root[data-theme^="spaceship"] .timer-item,
 :root[data-theme^="spaceship"] .recording-item {
     position: relative;
 }
 
-/* Glowing text effect for headings */
-:root[data-theme^="spaceship"] h1,
-:root[data-theme^="spaceship"] h2,
-:root[data-theme^="spaceship"] h3,
-:root[data-theme^="spaceship"] .nav-brand h1 {
-    text-shadow:
-        0 0 10px rgba(var(--primary-rgb), 0.5),
-        0 0 20px rgba(var(--primary-rgb), 0.2);
-    letter-spacing: 0.05em;
-}
-
-/* Channels list titles: use the theme's sans font (Rajdhani) */
 :root[data-theme^="spaceship"] .channels-title {
     font-family: var(--font-sans);
     text-shadow:
         0 0 1px rgba(255, 255, 255, 0.35),
         0 0 10px rgba(var(--primary-rgb), 0.55),
         0 0 20px rgba(var(--primary-rgb), 0.25);
-}
-
-/* Edgy/square panels for Spaceship HUD look */
-/* Corner shape is controlled by the theme via --radius. */
-
-/* Enhanced button glow */
-:root[data-theme^="spaceship"] .btn-primary {
-    background: linear-gradient(
-        135deg,
-        rgba(var(--primary-rgb), 0.9),
-        rgba(var(--accent-rgb), 0.7)
-    );
-    border-color: rgba(var(--primary-rgb), 0.8);
-    box-shadow:
-        0 0 8px rgba(var(--primary-rgb), 0.6),
-        0 0 16px rgba(var(--primary-rgb), 0.3),
-        inset 0 0 8px rgba(255, 255, 255, 0.2);
-    text-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
-}
-
-:root[data-theme^="spaceship"] .btn-primary:hover {
-    background: linear-gradient(
-        135deg,
-        rgba(var(--primary-hover-rgb), 1),
-        rgba(var(--accent2-rgb), 0.9)
-    );
-    box-shadow:
-        0 0 12px rgba(var(--primary-rgb), 0.8),
-        0 0 24px rgba(var(--primary-rgb), 0.4),
-        inset 0 0 12px rgba(255, 255, 255, 0.3);
-}
-
-/* Header with HUD styling */
-:root[data-theme^="spaceship"] header {
-    border-bottom: 2px solid var(--primary-color);
-    box-shadow:
-        0 0 16px rgba(var(--primary-rgb), 0.4),
-        0 4px 24px rgba(0, 0, 0, 0.8);
-    backdrop-filter: blur(12px);
-}
-
-/* Navigation links with tech styling (keep burger menu typography consistent with base theme) */
-:root[data-theme^="spaceship"] .nav-links a {
-    border: 1px solid transparent;
-    transition: all 0.3s ease;
-}
-
-:root[data-theme^="spaceship"] .nav-links a:hover {
-    border-color: var(--primary-color);
-    box-shadow:
-        0 0 8px rgba(var(--primary-rgb), 0.4),
-        inset 0 0 8px rgba(var(--primary-rgb), 0.1);
-}
-
-/* Badge with HUD styling */
-:root[data-theme^="spaceship"] .badge {
-    background: linear-gradient(
-        135deg,
-        rgba(var(--primary-rgb), 0.8),
-        rgba(var(--accent-rgb), 0.6)
-    );
-    border: 1px solid var(--primary-color);
-    box-shadow:
-        0 0 8px rgba(var(--primary-rgb), 0.5),
-        inset 0 0 4px rgba(255, 255, 255, 0.2);
-    text-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
-    font-weight: 700;
-    letter-spacing: 0.05em;
 }
 
 :root[data-theme^="spaceship"] .epg-actions .btn-secondary:not([disabled]):not(:disabled) {
@@ -2109,49 +1292,6 @@ footer a:hover {
         inset 0 0 12px rgba(255, 255, 255, 0.24);
 }
 
-/* Input fields with tech styling */
-:root[data-theme^="spaceship"] input[type="text"],
-:root[data-theme^="spaceship"] input[type="number"],
-:root[data-theme^="spaceship"] input[type="password"],
-:root[data-theme^="spaceship"] input[type="time"],
-:root[data-theme^="spaceship"] select,
-:root[data-theme^="spaceship"] textarea {
-    box-shadow: inset 0 0 8px rgba(var(--primary-rgb), 0.1);
-}
-
-:root[data-theme^="spaceship"] input[type="text"]:focus,
-:root[data-theme^="spaceship"] input[type="number"]:focus,
-:root[data-theme^="spaceship"] input[type="password"]:focus,
-:root[data-theme^="spaceship"] input[type="time"]:focus,
-:root[data-theme^="spaceship"] select:focus,
-:root[data-theme^="spaceship"] textarea:focus {
-    border-color: var(--primary-color);
-    box-shadow:
-        0 0 8px rgba(var(--primary-rgb), 0.6),
-        inset 0 0 12px rgba(var(--primary-rgb), 0.15);
-    outline: none;
-}
-
-/* Progress bar with scanning effect */
-:root[data-theme^="spaceship"] .progress {
-    background: rgba(var(--primary-rgb), 0.1);
-    box-shadow: inset 0 0 8px rgba(var(--primary-rgb), 0.2);
-}
-
-:root[data-theme^="spaceship"] .progress-bar {
-    background: linear-gradient(
-        90deg,
-        rgba(var(--primary-rgb), 0.8),
-        rgba(var(--accent2-rgb), 0.8),
-        rgba(var(--primary-rgb), 0.8)
-    );
-    box-shadow:
-        0 0 12px rgba(var(--primary-rgb), 0.8),
-        0 0 24px rgba(var(--primary-rgb), 0.4);
-    animation: progress-scan 2s linear infinite;
-}
-
-/* Timer timeline with HUD styling */
 :root[data-theme^="spaceship"] .timeline-track {
     background: rgba(var(--primary-rgb), 0.08);
     box-shadow: inset 0 0 8px rgba(var(--primary-rgb), 0.15);
@@ -2164,22 +1304,6 @@ footer a:hover {
         inset 0 0 4px rgba(var(--primary-rgb), 0.3);
 }
 
-/* Data table with grid lines */
-:root[data-theme^="spaceship"] .data-table th {
-    background: rgba(var(--primary-rgb), 0.15);
-    border-bottom: 2px solid var(--primary-color);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-weight: 700;
-    font-size: 0.85rem;
-}
-
-:root[data-theme^="spaceship"] .data-table tbody tr:hover {
-    background: rgba(var(--primary-rgb), 0.1);
-    box-shadow: inset 0 0 16px rgba(var(--primary-rgb), 0.2);
-}
-
-/* Channels day header with strong accent */
 :root[data-theme^="spaceship"] .channels-day {
     background: linear-gradient(
         135deg,
@@ -2195,15 +1319,6 @@ footer a:hover {
     letter-spacing: 0.1em;
 }
 
-/* Footer with HUD styling */
-:root[data-theme^="spaceship"] footer {
-    border-top: 2px solid var(--primary-color);
-    box-shadow:
-        0 0 16px rgba(var(--primary-rgb), 0.3),
-        0 -4px 24px rgba(0, 0, 0, 0.8);
-}
-
-/* Watch TV remote buttons */
 :root[data-theme^="spaceship"] .remote-btn {
     box-shadow:
         0 0 4px rgba(var(--primary-rgb), 0.4),
@@ -2223,218 +1338,9 @@ footer a:hover {
         inset 0 0 8px rgba(var(--primary-rgb), 0.3);
 }
 
-/* Enhance burger menu for HUD look */
-:root[data-theme^="spaceship"] .nav-burger-menu {
-    border: 2px solid var(--primary-color);
-    box-shadow:
-        0 0 24px rgba(var(--primary-rgb), 0.6),
-        0 8px 48px rgba(0, 0, 0, 0.9);
-
-    /* Layer translucent surface over a solid base so the page grid doesn't show through */
-    background-color: var(--bg-color);
-    background-image: var(--surface-color);
-}
-
-/* EPG time display with tech font */
 :root[data-theme^="spaceship"] .epg-time time {
     font-family: var(--font-display);
     font-weight: 700;
     color: var(--primary-color);
     text-shadow: 0 0 8px rgba(var(--primary-rgb), 0.6);
-}
-
-/* Add subtle animation to active navigation */
-:root[data-theme^="spaceship"] .nav-links a.active,
-:root[data-theme^="spaceship"] .nav-links a[aria-current="page"],
-:root[data-theme^="spaceship"] .nav-burger-menu a.active,
-:root[data-theme^="spaceship"] .nav-burger-menu a[aria-current="page"] {
-    animation: pulse-glow 2s ease-in-out infinite;
-}
-
-@keyframes progress-scan {
-    0% {
-        filter: brightness(1);
-    }
-    50% {
-        filter: brightness(1.3);
-    }
-    100% {
-        filter: brightness(1);
-    }
-}
-
-@keyframes pulse-glow {
-    0%, 100% {
-        box-shadow:
-            0 0 8px rgba(var(--primary-rgb), 0.6),
-            0 0 16px rgba(var(--primary-rgb), 0.3),
-            inset 0 0 8px rgba(var(--primary-rgb), 0.2);
-    }
-    50% {
-        box-shadow:
-            0 0 12px rgba(var(--primary-rgb), 0.8),
-            0 0 24px rgba(var(--primary-rgb), 0.4),
-            inset 0 0 12px rgba(var(--primary-rgb), 0.3);
-    }
-}
-/* Custom Select Implementation */
-.custom-select-container {
-    position: relative;
-    display: inline-block;
-    min-width: max-content;
-}
-
-.custom-select-trigger {
-    cursor: pointer;
-    user-select: none;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-/* Match general nav form select rules */
-.nav-channel-form .custom-select-trigger {
-    appearance: none;
-    -webkit-appearance: none;
-    padding: 0.5rem 2.25rem 0.5rem 0.75rem;
-    border: 1px solid var(--border-color);
-    border-radius: 999px;
-    font-size: 1rem;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.02)), var(--surface-color);
-    color: var(--text-color);
-    box-shadow: var(--shadow);
-    min-width: 140px;
-}
-
-.nav-channel-form .custom-select-trigger:hover, 
-.nav-channel-form .custom-select-trigger.open {
-    border-color: var(--nav-active-border);
-}
-
-.custom-select-trigger::after {
-    content: '▾';
-    position: absolute;
-    right: 0.85rem;
-    color: var(--text-muted);
-    font-size: 0.9rem;
-}
-
-.custom-select-dropdown {
-    position: absolute;
-    top: calc(100% + 5px);
-    left: 0;
-    right: 0;
-    min-width: 100%;
-    z-index: 9999;
-    margin: 0;
-    padding: 0.25rem 0;
-    list-style: none;
-    background: var(--surface-color, var(--bg-color));
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-lg);
-    max-height: 50vh;
-    overflow-y: auto;
-    backdrop-filter: blur(15px);
-    display: none;
-}
-
-.custom-select-dropdown.open {
-    display: block;
-    animation: fadeIn 0.1s ease-out;
-}
-
-.custom-select-option {
-    padding: 0.5rem 1rem;
-    cursor: pointer;
-    font-size: 1rem;
-    transition: background 0.15s;
-    color: var(--text-color);
-}
-
-.custom-select-option:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
-
-.custom-select-option.selected {
-    background: var(--primary-color);
-    color: #fff; /* adjust for better contrast if needed */
-}
-
-/* Base override for default ::after to avoid double arrows */
-.nav-select::after {
-    display: none;
-}
-
-
-/* Generic fallback for custom select when not in nav */
-form:not(.nav-channel-form) .custom-select-trigger {
-    width: 100%;
-    padding: 0.5rem;
-    border: 2px solid var(--border-color);
-    border-radius: var(--radius);
-    font-size: 1rem;
-    background: var(--surface-color);
-    color: var(--text-color);
-}
-.config-grid .custom-select-trigger {
-    width: 100%;
-    padding: 0.5rem;
-    border: 2px solid var(--border-color);
-    border-radius: var(--radius);
-    font-size: 1rem;
-    background: var(--surface-color);
-    color: var(--text-color);
-}
-.sort-options .custom-select-trigger {
-    padding: 0.5rem;
-    border: 2px solid var(--border-color);
-    border-radius: var(--radius);
-    font-size: 1rem;
-    background: var(--surface-color);
-    color: var(--text-color);
-    min-width: 150px;
-}
-.custom-select-trigger {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.ffmpeg-profile-control .custom-select-container,
-.ffmpeg-profile-control .custom-select-trigger {
-    display: grid;
-    width: 100%;
-}
-.custom-select-option {
-    white-space: nowrap;
-}
-/* Make container a grid stack to use phantom sizing */
-.custom-select-container {
-    position: relative;
-    display: inline-grid;
-    grid-template-areas: "select";
-    align-items: center;
-    vertical-align: middle;
-}
-.custom-select-trigger, .custom-select-phantom {
-    grid-area: select;
-}
-.custom-select-phantom {
-    visibility: hidden;
-    pointer-events: none;
-    white-space: nowrap;
-    overflow: hidden;
-    /* padding, border and font-size need to match trigger constraints for perfect sizing */
-    padding: 0.5rem 2.25rem 0.5rem 0.75rem; 
-    border: 1px solid transparent; /* or 2px, depending on general form overrrides */
-}
-/* Ensure options inside dropdown list avoid wrapping if desired */
-.custom-select-option {
-    white-space: nowrap;
-}
-.custom-select-trigger {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }

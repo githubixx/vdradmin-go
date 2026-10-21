@@ -239,28 +239,7 @@ func (h *Handler) ServeTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get theme
-	theme, ok := h.themeManager.GetTheme(themeName)
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-
-	// Serve theme.css file
-	themeCSSPath := filepath.Join(theme.Path, "theme.css")
-	if _, err := os.Stat(themeCSSPath); os.IsNotExist(err) {
-		http.NotFound(w, r)
-		return
-	}
-
-	// Set content type
-	w.Header().Set("Content-Type", "text/css; charset=utf-8")
-	// Theme CSS is small and may be edited while the server is running.
-	// Avoid long-lived client caching so changes show up on reload.
-	w.Header().Set("Cache-Control", "no-cache")
-
-	// Serve file
-	http.ServeFile(w, r, themeCSSPath)
+	h.themeManager.Handler(h.logger).ServeHTTP(w, r)
 }
 
 // Home renders the home page
@@ -5242,7 +5221,16 @@ func (h *Handler) renderTemplate(w http.ResponseWriter, r *http.Request, name st
 		m["Year"] = time.Now().Year()
 		m["Path"] = r.URL.Path
 		m["ThemeDefault"] = h.uiThemeDefault
-		m["ThemeMode"] = themeFromRequest(r, h.uiThemeDefault)
+		themeMode := themeFromRequest(r, h.uiThemeDefault)
+		m["ThemeMode"] = themeMode
+		m["ThemeSource"] = "custom"
+		if themeMode == "system" {
+			m["ThemeSource"] = "system"
+		} else if h.themeManager != nil {
+			if selected, ok := h.themeManager.GetTheme(themeMode); ok && selected.Bundled {
+				m["ThemeSource"] = "bundled"
+			}
+		}
 		m["BrandHref"] = h.landingPath()
 		m["PageName"] = pageNameForPath(r.URL.Path)
 	}

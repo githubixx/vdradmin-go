@@ -1,141 +1,142 @@
 package theme
 
 import (
+	"errors"
 	"fmt"
+	"log/slog"
+	"net/http"
 	"os"
-	"path/filepath"
-	"sort"
 	"sync"
 
-	"gopkg.in/yaml.v3"
+	chromaui "github.com/githubixx/chroma-ui"
 )
 
-// Theme represents a UI theme with metadata.
-type Theme struct {
-	Name        string `yaml:"name"`
-	Author      string `yaml:"author"`
-	Description string `yaml:"description"`
-	Version     string `yaml:"version"`
-	Path        string `yaml:"-"` // Directory path
-}
+// Theme is Chroma's copy-safe display metadata.
+type Theme = chromaui.Theme
 
-// Manager handles theme discovery and loading.
+// Manager adapts Chroma's catalog to the application's theme selection API.
+// Once opened, the override directory is pinned until Close; edits within that
+// directory remain live, but replacing the directory requires a new Manager.
 type Manager struct {
-	mu     sync.RWMutex
-	themes map[string]*Theme
-	dir    string // themes directory path
+	mu      sync.RWMutex
+	catalog *chromaui.Catalog
+	root    *os.Root
+	dir     string
+	closed  bool
 }
 
-// NewManager creates a new theme manager.
-func NewManager(themesDir string) *Manager {
-	return &Manager{
-		themes: make(map[string]*Theme),
-		dir:    themesDir,
-	}
+// NewManager creates a manager; call Discover before serving theme assets.
+func NewManager(dir string) *Manager {
+	return &Manager{dir: dir}
 }
 
-// Discover scans the themes directory and loads all available themes.
+// Discover merges bundled themes with optional whole-theme directory overrides.
+// Missing directories are optional; every other discovery error is fatal.
+// A failed discovery preserves the previous metadata and source selection.
 func (m *Manager) Discover() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Reset themes map
-	m.themes = make(map[string]*Theme)
-
-	// Check if themes directory exists
-	if _, err := os.Stat(m.dir); os.IsNotExist(err) {
-		return fmt.Errorf("themes directory does not exist: %s", m.dir)
+	if m.closed {
+		return os.ErrClosed
+	}
+	if m.root != nil {
+		return m.catalog.Reload()
 	}
 
-	// Read theme directories
-	entries, err := os.ReadDir(m.dir)
+	root, err := os.OpenRoot(m.dir)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("open theme overrides %q: %w", m.dir, err)
+	}
+
+	var catalog *chromaui.Catalog
+	if root == nil {
+		catalog, err = chromaui.NewCatalog(nil)
+	} else {
+		catalog, err = chromaui.NewCatalog(root.FS())
+	}
 	if err != nil {
-		return fmt.Errorf("failed to read themes directory: %w", err)
-	}
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
+		if root != nil {
+			err = errors.Join(err, root.Close())
 		}
-
-		themeName := entry.Name()
-		themePath := filepath.Join(m.dir, themeName)
-
-		// Load theme metadata
-		theme, err := m.loadTheme(themePath)
-		if err != nil {
-			// Log warning but continue with other themes
-			fmt.Printf("Warning: failed to load theme %q: %v\n", themeName, err)
-			continue
-		}
-
-		m.themes[themeName] = theme
+		return err
 	}
-
+	m.catalog, m.root = catalog, root
 	return nil
 }
 
-// loadTheme loads theme metadata from theme.yaml file.
-func (m *Manager) loadTheme(path string) (*Theme, error) {
-	metadataPath := filepath.Join(path, "theme.yaml")
+// Reload revalidates all sources. An initially missing directory is retried.
+func (m *Manager) Reload() error { return m.Discover() }
 
-	// Check if theme.yaml exists
-	if _, err := os.Stat(metadataPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("theme.yaml not found")
-	}
-
-	// Read metadata file
-	data, err := os.ReadFile(metadataPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read theme.yaml: %w", err)
-	}
-
-	// Parse YAML
-	var theme Theme
-	if err := yaml.Unmarshal(data, &theme); err != nil {
-		return nil, fmt.Errorf("failed to parse theme.yaml: %w", err)
-	}
-
-	theme.Path = path
-	return &theme, nil
-}
-
-// GetTheme returns a theme by name.
-func (m *Manager) GetTheme(name string) (*Theme, bool) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	theme, ok := m.themes[name]
-	return theme, ok
-}
-
-// GetAvailableThemes returns a list of all available theme names.
+// GetAvailableThemes returns independent theme IDs sorted lexicographically.
 func (m *Manager) GetAvailableThemes() []string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-
-	names := make([]string, 0, len(m.themes))
-	for name := range m.themes {
-		names = append(names, name)
+	ids := make([]string, 0)
+	if m.catalog != nil {
+		for _, theme := range m.catalog.Themes() {
+			ids = append(ids, theme.ID)
+		}
 	}
-	sort.Strings(names)
-	return names
+	return ids
 }
 
-// IsValidTheme checks if a theme name is valid (exists or is "system").
-func (m *Manager) IsValidTheme(name string) bool {
-	if name == "system" {
-		return true
-	}
-
+// GetTheme returns a copy of the metadata for an exact theme ID.
+func (m *Manager) GetTheme(id string) (*Theme, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if m.catalog == nil {
+		return nil, false
+	}
+	theme, ok := m.catalog.Theme(id)
+	if !ok {
+		return nil, false
+	}
+	return &theme, true
+}
 
-	_, ok := m.themes[name]
+// IsValidTheme accepts discovered themes and the application's system mode.
+func (m *Manager) IsValidTheme(id string) bool {
+	if id == "system" {
+		return true
+	}
+	_, ok := m.GetTheme(id)
 	return ok
 }
 
-// Reload re-discovers all themes (useful for hot-reload).
-func (m *Manager) Reload() error {
-	return m.Discover()
+// Handler forwards Chroma's /css, /js, and /themes path space unchanged.
+// Mount with http.StripPrefix when using an application-specific URL prefix.
+func (m *Manager) Handler(logger *slog.Logger) http.Handler {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		m.mu.RLock()
+		defer m.mu.RUnlock()
+		if m.catalog == nil {
+			logger.Error("theme catalog unavailable", "path", r.URL.Path)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		m.catalog.Handler(logger).ServeHTTP(w, r)
+	})
+}
+
+// Close waits for in-flight requests and releases the override directory.
+// It is idempotent and terminal: subsequent discovery returns os.ErrClosed,
+// metadata lookups are empty, and asset requests fail explicitly.
+func (m *Manager) Close() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closed {
+		return nil
+	}
+	m.closed = true
+	m.catalog = nil
+	if m.root == nil {
+		return nil
+	}
+	err := m.root.Close()
+	m.root = nil
+	return err
 }

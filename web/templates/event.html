@@ -1,13 +1,17 @@
 {{define "event.html"}}
 <!DOCTYPE html>
-<html lang="en" {{if ne .ThemeMode "system"}}data-theme="{{.ThemeMode}}"{{end}} data-theme-default="{{.ThemeDefault}}">
+<html lang="en" {{if ne .ThemeMode "system"}}data-theme="{{.ThemeMode}}"{{end}} data-theme-default="{{.ThemeDefault}}" data-theme-source="{{.ThemeSource}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VDRAdmin-go - Information</title>
-    <link rel="stylesheet" href="/static/css/base.css?v=20260212-Z">
+    <link rel="stylesheet" href="/ui/css/base.css?v=20261017-chroma">
+    <link rel="stylesheet" href="/static/css/base.css?v=20261017-chroma">
     {{if and .ThemeMode (ne .ThemeMode "system")}}<link rel="stylesheet" href="/themes/{{.ThemeMode}}/theme.css?v=20260212-Z">{{end}}
-    <script src="/static/js/theme.js?v=20260212-Z" defer></script>
+    <link rel="stylesheet" href="/static/css/theme-compat.css?v=20261017-chroma">
+    <script src="/ui/js/theme.js?v=20261017-chroma" defer></script>
+    <script src="/ui/js/menu.js?v=20261017-chroma" defer></script>
+    <script src="/ui/js/select.js?v=20261017-chroma" defer></script>
 </head>
 <body class="event-popup">
     <main class="container" aria-label="Information">
@@ -19,7 +23,7 @@
 
         {{with .Event}}
         <div class="epg-list">
-            <div class="epg-item">
+            <div class="epg-item ui-item">
                 <div class="epg-time">
                     <time datetime="{{.Start.Format "2006-01-02T15:04"}}">{{.Start.Format "2006-01-02 15:04"}}</time>
                     <span class="epg-duration">to {{.Stop.Format "15:04"}}</span>
@@ -30,13 +34,13 @@
                         <span class="epg-channel">{{.ChannelName}}</span>
                     </div>
                     {{if .Subtitle}}
-                    <p class="epg-subtitle">{{.Subtitle}}</p>
+                    <p class="epg-subtitle ui-item-subtitle">{{.Subtitle}}</p>
                     {{end}}
                     {{if .Description}}
                     <p class="epg-description">{{.Description}}</p>
                     {{end}}
                 </div>
-                <div class="epg-actions">
+                <div class="epg-actions ui-item-actions">
                     <button type="button" class="btn btn-sm btn-secondary" onclick="window.close();">Close</button>
                 </div>
             </div>

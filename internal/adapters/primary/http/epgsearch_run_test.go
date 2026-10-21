@@ -81,7 +81,7 @@ func TestEPGSearchNew_RunRendersMatchesAndRecordPrefillLink(t *testing.T) {
 	EPG := services.NewEPGService(mock, 0)
 	Timers := services.NewTimerService(mock)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "epgsearch_edit.html"),
 	))
@@ -168,7 +168,7 @@ func TestEPGSearchNew_RunMarksMidnightMatchAsScheduledWithNumericChannelTimer(t 
 	EPG := services.NewEPGService(mock, 0)
 	Timers := services.NewTimerService(mock)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "epgsearch_edit.html"),
 	))
@@ -238,7 +238,7 @@ func TestEPGSearchEdit_RunRendersMatches(t *testing.T) {
 	EPG := services.NewEPGService(mock, 0)
 	Timers := services.NewTimerService(mock)
 
-	parsed := template.Must(template.ParseFiles(
+	parsed := template.Must(ParsePageTemplates(
 		filepath.Join(repoRoot(t), "web", "templates", "_nav.html"),
 		filepath.Join(repoRoot(t), "web", "templates", "epgsearch_edit.html"),
 	))

@@ -148,10 +148,21 @@ func SetupRoutes(handler *Handler, authCfg *config.AuthConfig, logger *slog.Logg
 
 	// Static files
 	fs := http.FileServer(http.Dir(filepath.Clean(staticDir)))
-	mux.Handle("GET /static/", http.StripPrefix("/static/", fs))
+	static := http.StripPrefix("/static/", fs)
+	mux.Handle("GET /static/", static)
+	mux.Handle("GET /static/img/themes/{id}/{file...}", handler.legacyThemeImage(staticDir, static))
+	mux.HandleFunc("GET /static/js/theme.js", handler.sharedAsset("/js/theme.js"))
+	mux.HandleFunc("GET /static/js/custom-select.js", handler.sharedAsset("/js/select.js"))
+
+	ui := http.StripPrefix("/ui", http.HandlerFunc(handler.serveUI))
+	mux.Handle("GET /ui/css/", ui)
+	mux.Handle("GET /ui/js/", ui)
+	mux.Handle("GET /ui/themes/", chain(ui.ServeHTTP, commonMiddleware...))
 
 	// Theme files
+	mux.Handle("GET /themes/", chain(handler.serveUI, commonMiddleware...))
 	mux.Handle("GET /themes/{name}/theme.css", chain(handler.ServeTheme, commonMiddleware...))
+	mux.Handle("GET /themes/{name}/assets/{file...}", chain(handler.serveUI, commonMiddleware...))
 
 	return mux
 }

@@ -1,13 +1,17 @@
 {{define "recordings.html"}}
 <!DOCTYPE html>
-<html lang="en" {{if ne .ThemeMode "system"}}data-theme="{{.ThemeMode}}"{{end}} data-theme-default="{{.ThemeDefault}}">
+<html lang="en" {{if ne .ThemeMode "system"}}data-theme="{{.ThemeMode}}"{{end}} data-theme-default="{{.ThemeDefault}}" data-theme-source="{{.ThemeSource}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VDRAdmin-go - Recordings</title>
-    <link rel="stylesheet" href="/static/css/base.css?v=20260212-AE">
+    <link rel="stylesheet" href="/ui/css/base.css?v=20261017-chroma">
+    <link rel="stylesheet" href="/static/css/base.css?v=20261017-chroma">
     {{if and .ThemeMode (ne .ThemeMode "system")}}<link rel="stylesheet" href="/themes/{{.ThemeMode}}/theme.css?v=20260212-AE">{{end}}
-    <script src="/static/js/theme.js?v=20260212-AE" defer></script>
+    <link rel="stylesheet" href="/static/css/theme-compat.css?v=20261017-chroma">
+    <script src="/ui/js/theme.js?v=20261017-chroma" defer></script>
+    <script src="/ui/js/menu.js?v=20261017-chroma" defer></script>
+    <script src="/ui/js/select.js?v=20261017-chroma" defer></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
 <body>
@@ -114,11 +118,11 @@
 
         <div class="recording-list">
             {{range .Recordings}}
-            <div class="recording-item">
-                <div class="recording-info">
+            <div class="recording-item ui-item">
+                <div class="recording-info ui-item-info">
                     <h3>{{.Title}}</h3>
                     {{if .Subtitle}}
-                    <p class="recording-subtitle">{{.Subtitle}}</p>
+                    <p class="recording-subtitle ui-item-subtitle">{{.Subtitle}}</p>
                     {{end}}
                     <div class="recording-meta">
                         <span class="recording-date">{{.Date.Format "2006-01-02 15:04"}}</span>
@@ -129,7 +133,7 @@
                     </div>
                 </div>
                 {{if eq $.Role "admin"}}
-                <div class="recording-actions">
+                <div class="recording-actions ui-item-actions">
                     {{$jobID := ""}}
                     {{if $.ActiveArchiveJobs}}
                         {{$jobID = index $.ActiveArchiveJobs .Path}}

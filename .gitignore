@@ -47,6 +47,12 @@ build/
 # Screenshots
 original_screenshots
 
+# Browser test dependencies, resource cache, and reports
+node_modules/
+.cache/
+playwright-report/
+test-results/
+
 docs/LESSONS.md
 docs/TODO.md
 plan/*

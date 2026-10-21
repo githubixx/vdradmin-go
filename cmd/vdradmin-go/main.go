@@ -77,11 +77,20 @@ func main() {
 	autoTimerService := services.NewAutoTimerService(vdrClient, timerService, epgService)
 
 	themeManager := theme.NewManager(themesDir)
+	defer func() {
+		if err := themeManager.Close(); err != nil {
+			logger.Error("close theme overrides", "error", err)
+		}
+	}()
 	if err := themeManager.Discover(); err != nil {
 		logger.Error("failed to discover themes", slog.Any("error", err))
 		os.Exit(1)
 	}
 	logger.Info("themes discovered", slog.Any("themes", themeManager.GetAvailableThemes()))
+	if !themeManager.IsValidTheme(cfg.UI.Theme) {
+		logger.Error("unknown configured UI theme", "theme", cfg.UI.Theme)
+		os.Exit(1)
+	}
 
 	templates, err := loadTemplates(templatesDir)
 	if err != nil {
@@ -128,7 +137,7 @@ func main() {
 
 func assetDirectories(assetsDir string) (templatesDir, staticDir, themesDir string, err error) {
 	assetsDir = filepath.Clean(assetsDir)
-	for _, name := range []string{"templates", "static", "themes"} {
+	for _, name := range []string{"templates", "static"} {
 		path := filepath.Join(assetsDir, name)
 		info, statErr := os.Stat(path)
 		if statErr != nil {
@@ -146,7 +155,7 @@ func loadTemplates(templatesDir string) (map[string]*template.Template, error) {
 	templates := make(map[string]*template.Template, len(pages))
 	navigationTemplate := filepath.Join(templatesDir, "_nav.html")
 	for _, page := range pages {
-		tmpl, err := template.ParseFiles(navigationTemplate, filepath.Join(templatesDir, page))
+		tmpl, err := httpAdapter.ParsePageTemplates(navigationTemplate, filepath.Join(templatesDir, page))
 		if err != nil {
 			return nil, err
 		}

@@ -1,13 +1,17 @@
 {{define "epgsearch_results.html"}}
 <!DOCTYPE html>
-<html lang="en" {{if ne .ThemeMode "system"}}data-theme="{{.ThemeMode}}"{{end}} data-theme-default="{{.ThemeDefault}}">
+<html lang="en" {{if ne .ThemeMode "system"}}data-theme="{{.ThemeMode}}"{{end}} data-theme-default="{{.ThemeDefault}}" data-theme-source="{{.ThemeSource}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VDRAdmin-go - EPG Search Results</title>
-    <link rel="stylesheet" href="/static/css/base.css?v=20260212-Z">
+    <link rel="stylesheet" href="/ui/css/base.css?v=20261017-chroma">
+    <link rel="stylesheet" href="/static/css/base.css?v=20261017-chroma">
     {{if and .ThemeMode (ne .ThemeMode "system")}}<link rel="stylesheet" href="/themes/{{.ThemeMode}}/theme.css?v=20260212-Z">{{end}}
-    <script src="/static/js/theme.js?v=20260212-Z" defer></script>
+    <link rel="stylesheet" href="/static/css/theme-compat.css?v=20261017-chroma">
+    <script src="/ui/js/theme.js?v=20261017-chroma" defer></script>
+    <script src="/ui/js/menu.js?v=20261017-chroma" defer></script>
+    <script src="/ui/js/select.js?v=20261017-chroma" defer></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
 <body>
@@ -44,7 +48,7 @@
                         </td>
                         <td>
                             <div style="font-weight: 600;">{{if gt .EventID 0}}<a href="/event?channel={{.ChannelID}}&id={{.EventID}}" onclick="window.open(this.href,'vdradmin_moreinfo','width=560,height=420,scrollbars=yes,resizable=yes'); return false;">{{.Title}}</a>{{else}}{{.Title}}{{end}}</div>
-                            {{if .Subtitle}}<div class="epg-subtitle">{{.Subtitle}}</div>{{end}}
+                            {{if .Subtitle}}<div class="epg-subtitle ui-item-subtitle">{{.Subtitle}}</div>{{end}}
                         </td>
                         <td>{{.ChannelName}}</td>
                         <td>{{.TimerLabel}}</td>

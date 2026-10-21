@@ -13,6 +13,7 @@ PREFIX ?= /usr
 BINDIR ?= $(PREFIX)/bin
 DATADIR ?= $(PREFIX)/share/vdradmin-go
 DESTDIR ?=
+CHROMA_UI_DIR ?=
 
 ## help: Show this help message
 help:
@@ -42,12 +43,13 @@ run:
 	@echo "Running..."
 	@go run ${CMD_DIR}
 
-## install: Install the binary and web assets (honors DESTDIR)
+## install: Install binaries and required VDR assets, preserving theme overrides (honors DESTDIR)
 install: build
+	@test -d web/templates && test -d web/static
 	@install -Dm755 ${BUILD_DIR}/${BINARY_NAME} ${DESTDIR}${BINDIR}/${BINARY_NAME}
 	@install -Dm755 ${BUILD_DIR}/${MCP_BINARY_NAME} ${DESTDIR}${BINDIR}/${MCP_BINARY_NAME}
-	@mkdir -p ${DESTDIR}${DATADIR}
-	@cp -a web ${DESTDIR}${DATADIR}/
+	@mkdir -p ${DESTDIR}${DATADIR}/web
+	@cp -a web/templates web/static ${DESTDIR}${DATADIR}/web/
 
 ## run-mcp: Run the MCP server over stdio
 run-mcp:
@@ -84,10 +86,10 @@ clean:
 	@rm -rf ${BUILD_DIR}
 	@rm -f coverage.out coverage.html
 
-## docker: Build Docker image
+## docker: Build Docker image (optional CHROMA_UI_DIR local named context)
 docker:
 	@echo "Building Docker image..."
-	@docker build -t vdradmin-go:latest -f deployments/Dockerfile .
+	@docker build $(if $(CHROMA_UI_DIR),--build-arg APP_BUILDER=builder-workspace --build-context "chroma-ui=$(CHROMA_UI_DIR)") -t vdradmin-go:latest -f deployments/Dockerfile .
 
 ## deps: Download dependencies
 deps:

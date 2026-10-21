@@ -1,13 +1,17 @@
 {{define "recording_archive_job.html"}}
 <!DOCTYPE html>
-<html lang="en" {{if ne .ThemeMode "system"}}data-theme="{{.ThemeMode}}"{{end}} data-theme-default="{{.ThemeDefault}}">
+<html lang="en" {{if ne .ThemeMode "system"}}data-theme="{{.ThemeMode}}"{{end}} data-theme-default="{{.ThemeDefault}}" data-theme-source="{{.ThemeSource}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VDRAdmin-go - Archive Job</title>
-    <link rel="stylesheet" href="/static/css/base.css?v=20260212-Z">
+    <link rel="stylesheet" href="/ui/css/base.css?v=20261017-chroma">
+    <link rel="stylesheet" href="/static/css/base.css?v=20261017-chroma">
     {{if and .ThemeMode (ne .ThemeMode "system")}}<link rel="stylesheet" href="/themes/{{.ThemeMode}}/theme.css?v=20260212-Z">{{end}}
-    <script src="/static/js/theme.js?v=20260212-Z" defer></script>
+    <link rel="stylesheet" href="/static/css/theme-compat.css?v=20261017-chroma">
+    <script src="/ui/js/theme.js?v=20261017-chroma" defer></script>
+    <script src="/ui/js/menu.js?v=20261017-chroma" defer></script>
+    <script src="/ui/js/select.js?v=20261017-chroma" defer></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
 <body>
@@ -62,7 +66,7 @@
                 <div id="job-error">{{if .Job.Error}}{{.Job.Error}}{{else}}—{{end}}</div>
 
                 <label>Actions</label>
-                <div>
+                <div class="archive-job-actions">
                     <a class="btn btn-sm btn-secondary" href="/recordings/archive/jobs">Jobs</a>
                     {{if or (eq .Job.Status "queued") (eq .Job.Status "running")}}
                     <button id="job-cancel" class="btn btn-sm btn-danger"
