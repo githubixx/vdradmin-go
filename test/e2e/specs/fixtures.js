@@ -133,6 +133,7 @@ export async function assertWatchLayout(page) {
     expect(panel.left, 'Watch TV panels must stay inside the grid').toBeGreaterThanOrEqual(layout.grid.left - 1);
     expect(panel.right, 'Watch TV panels must stay inside the grid').toBeLessThanOrEqual(layout.grid.right + 1);
   }
+
   if (layout.wide) {
     expect(layout.screen.right, 'Screen must not cover the remote').toBeLessThanOrEqual(layout.remote.left);
     expect(layout.remote.right, 'Remote must not cover the channel list').toBeLessThanOrEqual(layout.channels.left);
@@ -149,6 +150,114 @@ export async function assertWatchLayout(page) {
   expect(Math.abs(layout.programme.width - layout.grid.width)).toBeLessThanOrEqual(1);
 }
 
+export const guideURL = '/playing?day=2026-10-17&start=18:00&end=21:00&view=guide';
+
+export async function prepareGuide(request, scenario = 'many') {
+  const response = await request.post('/__test/guide', { data: { scenario } });
+  expect(response.ok(), await response.text()).toBeTruthy();
+}
+
+export async function choosePlayingOption(page, id, label) {
+  const wrapper = page.locator(`#${id}`).locator('..');
+  await wrapper.locator('.custom-select-trigger').click();
+  await wrapper.getByRole('option', { name: label, exact: true }).click();
+}
+
+export async function assertGuideLayout(page) {
+  await expect(page.locator('.playing-pager')).toBeVisible();
+  await expect(page.locator('.playing-pager')).toHaveClass(/\bui-pager\b/);
+  await expect(page.locator('.playing-pager')).toHaveCSS('display', 'flex');
+  await expect(page.locator('.playing-pager')).toHaveCSS('justify-content', 'center');
+  await expect(page.locator('.playing-guide')).toHaveClass(/guide-timeline-ready/);
+  await expect.poll(() => page.locator('.playing-group:visible').evaluateAll(groups =>
+    new Set(groups.map(group => Math.round(group.getBoundingClientRect().top))).size),
+  { message: 'Responsive pagination must settle to one row of channel columns' }).toBe(1);
+  const layout = await page.evaluate(() => {
+    const grid = document.querySelector('.playing-groups');
+    const visible = [...grid.querySelectorAll('.playing-group:not([hidden])')];
+    const rect = element => {
+      const { left, right, top, bottom, width } = element.getBoundingClientRect();
+      return { left, right, top, bottom, width };
+    };
+    return {
+      viewport: innerWidth,
+      documentWidth: document.documentElement.scrollWidth,
+      grid: rect(grid),
+      columns: visible.map(rect),
+      timelines: visible.map(group => {
+        const list = group.querySelector('.epg-list');
+        const box = rect(list);
+        return {
+          ...box,
+          slots: [...list.querySelectorAll('.guide-slot')].map(slot => ({
+            ...rect(slot),
+            offset: Number(slot.dataset.guideOffset),
+            duration: Number(slot.dataset.guideDuration),
+          })),
+        };
+      }),
+      duration: Number(grid.dataset.guideDuration),
+      cards: visible.flatMap(group => [...group.querySelectorAll('.epg-item')].map(card => ({
+        box: rect(card), scrollWidth: card.scrollWidth, clientWidth: card.clientWidth,
+        scrollHeight: card.scrollHeight, clientHeight: card.clientHeight,
+        time: rect(card.querySelector('.epg-time')),
+        content: rect(card.querySelector('.epg-content')),
+        actions: [...card.querySelectorAll('.epg-actions .btn')].map(rect),
+      }))),
+      toolbar: [...document.querySelectorAll('.playing-toolbar .custom-select-trigger, .playing-toolbar .btn, .playing-toolbar input[type="time"]')].map(rect),
+    };
+  });
+  expect(layout.documentWidth, 'Guide must not overflow horizontally').toBeLessThanOrEqual(layout.viewport);
+  expect(layout.columns.length).toBeGreaterThan(0);
+  for (let i = 0; i < layout.columns.length; i++) {
+    const column = layout.columns[i];
+    expect(column.left).toBeGreaterThanOrEqual(layout.grid.left - 1);
+    expect(column.right).toBeLessThanOrEqual(layout.grid.right + 1);
+    if (i) expect(column.left).toBeGreaterThanOrEqual(layout.columns[i - 1].right);
+    expect(Math.abs(column.top - layout.columns[0].top)).toBeLessThanOrEqual(1);
+  }
+  const boundaries = [];
+  for (const timeline of layout.timelines) {
+    expect(Math.abs(timeline.top - layout.timelines[0].top), 'All channels must start at the same time').toBeLessThanOrEqual(1);
+    expect(Math.abs(timeline.bottom - layout.timelines[0].bottom), 'All channels must end at the same time').toBeLessThanOrEqual(1);
+    boundaries.push({ time: 0, position: 0 }, { time: layout.duration, position: timeline.bottom - timeline.top });
+    for (const slot of timeline.slots) {
+      boundaries.push(
+        { time: slot.offset, position: slot.top - timeline.top },
+        { time: slot.offset + slot.duration, position: slot.bottom - timeline.top },
+      );
+      expect(slot.top).toBeGreaterThanOrEqual(timeline.top - 1);
+      expect(slot.bottom).toBeLessThanOrEqual(timeline.bottom + 1);
+      for (const later of timeline.slots.filter(later => later.offset >= slot.offset + slot.duration)) {
+        expect(slot.bottom, 'Chronological slots must not overlap').toBeLessThanOrEqual(later.top + 1);
+      }
+    }
+    boundaries.sort((a, b) => a.time - b.time);
+    for (let i = 1; i < boundaries.length; i++) {
+      const previous = boundaries[i - 1], current = boundaries[i];
+      if (current.time === previous.time) {
+        expect(Math.abs(current.position - previous.position), 'Matching times must align across channels').toBeLessThanOrEqual(1);
+      } else {
+        expect(current.position, 'The shared time axis must remain chronological').toBeGreaterThanOrEqual(previous.position - 1);
+      }
+    }
+    expect(Math.abs(Math.max(...timeline.slots.map(slot => slot.bottom)) - timeline.bottom), 'Every channel must fill the selected window').toBeLessThanOrEqual(1);
+  }
+  for (const card of layout.cards) {
+    expect(card.scrollWidth).toBeLessThanOrEqual(card.clientWidth + 1);
+    expect(card.scrollHeight, 'Short programme cards must remain readable without internal scrolling').toBeLessThanOrEqual(card.clientHeight + 1);
+    expect(card.content.top, 'Content must follow the time').toBeGreaterThanOrEqual(card.time.bottom - 1);
+    for (const action of card.actions) {
+      expect(action.left).toBeGreaterThanOrEqual(card.box.left - 1);
+      expect(action.right).toBeLessThanOrEqual(card.box.right + 1);
+      expect(action.top, 'Actions must follow programme content').toBeGreaterThanOrEqual(card.content.bottom - 1);
+    }
+  }
+  for (const control of layout.toolbar) {
+    expect(control.left).toBeGreaterThanOrEqual(0);
+    expect(control.right).toBeLessThanOrEqual(layout.viewport + 1);
+  }
+}
 export async function screenshot(page, name) {
   expect(process.env.E2E_SCREENSHOT_RUNTIME, 'Generate and compare screenshots through scripts/test-e2e.sh')
     .toBe('playwright-1.64.1-noble');

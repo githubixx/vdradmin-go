@@ -43,6 +43,11 @@
 5. **Document Results**: Add review section to `tasks/todo.md`
 6. **Capture Lessons**: Update `docs/LESSONS.md` after corrections
 
+## UI Component Ownership
+- Reuse existing Chroma UI components before adding new UI components.
+- Add new components to Chroma UI when they can be shared across applications and are not specific to vdradmin-go. Keep their reusable styling, markup contracts, documentation, and component tests in Chroma UI rather than duplicating them here.
+- Keep vdradmin-go-specific layouts, programme/channel behavior, routes, permissions, and application state in this repository. Applications own the labels and behavior of shared components.
+
 ## Core Principles
 - **Simplicity First**: Make every change as simple as possible. Impact minimal code.
 - **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.

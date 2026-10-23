@@ -247,6 +247,22 @@ func (f *fixtureServer) serveControl(w http.ResponseWriter, r *http.Request) {
 		f.epg.InvalidateAllCaches()
 		f.recordings.InvalidateCache()
 		f.writeJSON(w, f.metadata())
+	case "/__test/guide":
+		if r.Method != http.MethodPost {
+			controlMethodError(w, http.MethodPost)
+			return
+		}
+		scenario, err := controlField(w, r, "scenario")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := f.vdr.setGuideScenario(scenario); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		f.epg.InvalidateAllCaches()
+		f.writeJSON(w, map[string]any{"ok": true, "scenario": scenario})
 	case "/__test/watch":
 		if r.Method != http.MethodPost {
 			controlMethodError(w, http.MethodPost)

@@ -5,7 +5,7 @@ go 1.26.0
 require go.yaml.in/yaml/v4 v4.0.0-rc.4
 
 require (
-	github.com/githubixx/chroma-ui v0.1.0
+	github.com/githubixx/chroma-ui v0.2.0
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/testcontainers/testcontainers-go v0.44.0
 )

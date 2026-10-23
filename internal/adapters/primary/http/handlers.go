@@ -806,7 +806,13 @@ type channelsDayOption struct {
 
 type playingEventView struct {
 	domain.EPGEvent
-	TimerActive bool
+	TimerActive   bool
+	GuideOffset   float64
+	GuideDuration float64
+	GuideLane     int
+	GuideLanes    int
+	GuideGap      bool
+	GuideLast     bool
 }
 
 type playingChannelGroup struct {
@@ -1696,6 +1702,15 @@ func (h *Handler) applyRuntimeConfig(updated *config.Config) error {
 // PlayingToday shows what each channel plays for a single day.
 // It is a replacement for the old /epg list which could be too large.
 func (h *Handler) PlayingToday(w http.ResponseWriter, r *http.Request) {
+	view := r.URL.Query().Get("view")
+	if view == "" {
+		view = "list"
+	}
+	if view != "list" && view != "guide" {
+		h.logger.Warn("invalid playing view", slog.String("view", view))
+		http.Error(w, "Invalid view (expected list or guide)", http.StatusBadRequest)
+		return
+	}
 	loc := time.Now().Location()
 	localNow := time.Now().In(loc)
 
@@ -1708,11 +1723,38 @@ func (h *Handler) PlayingToday(w http.ResponseWriter, r *http.Request) {
 
 	// Parse start and end time parameters
 	startTimeStr, endTimeStr, startTime, endTime, timeErr := parsePlayingTimeParams(r, dayStart, localNow)
+	if view == "guide" {
+		// List View includes the final minute; the guide ends at the chosen instant.
+		endTime, err = time.ParseInLocation("2006-01-02 15:04", dayStart.Format("2006-01-02")+" "+endTimeStr, loc)
+		if err != nil {
+			h.handleError(w, r, fmt.Errorf("parse guide end time: %w", err))
+			return
+		}
+		if !endTime.After(startTime) {
+			endTime = endTime.AddDate(0, 0, 1)
+		}
+	}
 
 	data := map[string]any{}
+	data["PlayingView"] = view
+	data["GuideDuration"] = endTime.Sub(startTime).Seconds()
+	data["SelectedChannel"] = r.URL.Query().Get("channel-jump")
+	data["UnavailableChannel"] = r.URL.Query().Get("channel-jump") != ""
 	data["Day"] = dayStart
-	data["PrevDay"] = dayStart.Add(-24 * time.Hour).Format("2006-01-02")
-	data["NextDay"] = dayStart.Add(24 * time.Hour).Format("2006-01-02")
+	dayURL := func(day time.Time) string {
+		query := url.Values{
+			"day":   {day.Format("2006-01-02")},
+			"start": {startTimeStr},
+			"end":   {endTimeStr},
+			"view":  {view},
+		}
+		if channel := r.URL.Query().Get("channel-jump"); channel != "" {
+			query.Set("channel-jump", channel)
+		}
+		return "/playing?" + query.Encode()
+	}
+	data["PrevDayURL"] = dayURL(dayStart.AddDate(0, 0, -1))
+	data["NextDayURL"] = dayURL(dayStart.AddDate(0, 0, 1))
 	data["StartTime"] = startTimeStr
 	data["EndTime"] = endTimeStr
 	if timeErr != nil {
@@ -1811,6 +1853,10 @@ func (h *Handler) PlayingToday(w http.ResponseWriter, r *http.Request) {
 
 	eventsByChannel := make(map[string][]domain.EPGEvent)
 	for i := range allEvents {
+		if view == "guide" && !allEvents[i].Stop.After(allEvents[i].Start) {
+			h.logger.Warn("invalid guide EPG interval", slog.String("channel", allEvents[i].ChannelID), slog.Int("event_id", allEvents[i].EventID))
+			continue
+		}
 		// Keep events that overlap with or are near the selected time range.
 		// Include events that:
 		// - Are still running at startTime (started before but end after startTime)
@@ -1832,7 +1878,7 @@ func (h *Handler) PlayingToday(w http.ResponseWriter, r *http.Request) {
 	jump := make([]playingChannelJumpOption, 0, len(channels))
 	for _, ch := range channels {
 		ev := eventsByChannel[ch.ID]
-		if len(ev) == 0 {
+		if len(ev) == 0 && (view != "guide" || len(eventsByChannel) == 0) {
 			continue
 		}
 
@@ -1862,8 +1908,14 @@ func (h *Handler) PlayingToday(w http.ResponseWriter, r *http.Request) {
 			}
 			views = append(views, playingEventView{EPGEvent: e, TimerActive: hasOverlappingActiveTimer(e)})
 		}
+		if view == "guide" {
+			views = playingGuideEvents(views, startTime, endTime)
+		}
 		groups = append(groups, playingChannelGroup{Channel: ch, Anchor: anchor, Events: views})
 		jump = append(jump, playingChannelJumpOption{Anchor: anchor, Label: ch.Name})
+		if anchor == data["SelectedChannel"] {
+			data["UnavailableChannel"] = false
+		}
 	}
 
 	data["ChannelGroups"] = groups

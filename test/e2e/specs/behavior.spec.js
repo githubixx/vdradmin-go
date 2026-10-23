@@ -1,4 +1,4 @@
-import { test, expect, themes, selectTheme, openPage, screenshot, routeResources, assertWatchLayout } from './fixtures.js';
+import { test, expect, themes, selectTheme, openPage, screenshot, routeResources, assertWatchLayout, guideURL, prepareGuide, choosePlayingOption, assertGuideLayout } from './fixtures.js';
 
 test.beforeEach(async ({ request }) => {
   await selectTheme(request, 'metal-1');
@@ -117,6 +117,291 @@ test('mobile menu remains usable', async ({ page }) => {
   await expect(page).toHaveURL(/\/recordings$/);
   await expect(page.locator('.recording-item').first()).toBeVisible();
 });
+
+test('TV Guide switches layouts and preserves filters and channel through day navigation', async ({ page, request }) => {
+  await prepareGuide(request);
+  await openPage(page, guideURL.replace('&view=guide', ''));
+  await expect(page.locator('#playing-view')).toHaveValue('list');
+  await expect(page.locator('.playing-pager')).toBeHidden();
+  await choosePlayingOption(page, 'playing-view', 'TV Guide');
+  await expect(page.locator('.playing-guide')).toBeVisible();
+  await expect(page.locator('#playing-start')).toHaveValue('18:00');
+  await choosePlayingOption(page, 'channel-jump', 'Guide Channel 9');
+  await expect(page.locator('#ch-9')).toBeFocused();
+  await page.getByLabel('Start time (HH:MM)', { exact: true }).fill('19:00');
+  await page.getByLabel('End time (HH:MM)', { exact: true }).focus();
+  await expect(page).toHaveURL(/start=19%3A00/);
+  await expect(page.locator('#channel-jump')).toHaveValue('ch-9');
+  await page.getByRole('link', { name: 'Next day', exact: true }).click();
+  const url = new URL(page.url());
+  expect(url.searchParams.get('day')).toBe('2026-10-18');
+  expect(url.searchParams.get('view')).toBe('guide');
+  expect(url.searchParams.get('start')).toBe('19:00');
+  expect(url.searchParams.get('end')).toBe('21:00');
+  expect(url.searchParams.get('channel-jump')).toBe('ch-9');
+  await expect(page.locator('#channel-jump')).toHaveValue('ch-9');
+  await page.getByRole('link', { name: 'Previous day', exact: true }).click();
+  await expect(page.locator('#ch-9')).toBeVisible();
+  await choosePlayingOption(page, 'playing-view', 'List View');
+  await expect(page.locator('.playing-pager')).toBeHidden();
+  await expect(page.locator('.playing-group:visible')).toHaveCount(8);
+});
+
+test('TV Guide pages channels, restores history and adapts to viewport changes', async ({ page, request }) => {
+  await prepareGuide(request);
+  await openPage(page, guideURL);
+  const previous = page.getByRole('button', { name: 'Previous channels', exact: true });
+  const next = page.getByRole('button', { name: 'Next channels', exact: true });
+  await expect(previous).toBeDisabled();
+  const count = await page.locator('.playing-group:visible').count();
+  const initialHeight = await page.locator('.playing-groups').evaluate(grid => grid.style.getPropertyValue('--guide-timeline-height'));
+  expect(count).toBeGreaterThan(1);
+  expect(count).toBeLessThan(9);
+  await next.click();
+  expect(await page.locator('.playing-groups').evaluate(grid => grid.style.getPropertyValue('--guide-timeline-height'))).toBe(initialHeight);
+  await expect(page.locator(`#ch-${count + 1}`)).toBeFocused();
+  const secondPage = page.url();
+  await next.click();
+  await page.goBack();
+  await expect(page).toHaveURL(secondPage);
+  await expect(page.locator(`#ch-${count + 1}`)).toBeVisible();
+  await page.goForward();
+  await choosePlayingOption(page, 'channel-jump', 'Guide Channel 9');
+  await expect(next).toBeDisabled();
+  await expect(page.locator('#ch-9')).toBeFocused();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('.playing-group:visible')).toHaveCount(1);
+  await expect(page.locator('#ch-9')).toBeVisible();
+  await assertGuideLayout(page);
+  await page.reload();
+  await expect(page.locator('#ch-9')).toBeVisible();
+  await expect(page.locator('#channel-jump').locator('..').getByRole('combobox')).toHaveText('Guide Channel 9');
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect(page.locator('#ch-9')).toBeVisible();
+  await expect(next).toBeDisabled();
+  await previous.click();
+  await expect(next).toBeEnabled();
+});
+
+test('TV Guide aligns two, three and one programmes within the same hour and fills missing data', async ({ page, request }) => {
+  await prepareGuide(request);
+  await openPage(page, guideURL.replace('end=21:00', 'end=19:00'));
+  await assertGuideLayout(page);
+  for (const [channel, count] of [[1, 2], [2, 3], [3, 1]]) {
+    const group = page.locator(`.playing-group[aria-labelledby="ch-${channel}"]`);
+    await expect(group.locator('.guide-slot')).toHaveCount(count);
+    const durations = await group.locator('.guide-slot').evaluateAll(slots => slots.map(slot => Number(slot.dataset.guideDuration)));
+    expect(durations).toEqual(Array(count).fill(3600 / count));
+  }
+  await expect(page.locator('.playing-group[aria-labelledby="ch-3"] time')).toHaveText('17:00-22:00');
+  await expect(page.locator('.playing-group[aria-labelledby="ch-1"]')).not.toContainText('Late Night Culture');
+  await choosePlayingOption(page, 'channel-jump', 'Guide Channel 5');
+  const missing = page.locator('.playing-group[aria-labelledby="ch-5"]');
+  await expect(missing.locator('.guide-gap')).toHaveCount(1);
+  await expect(missing).toContainText('No programme information');
+  await expect(missing.getByRole('button', { name: 'Record', exact: true })).toHaveCount(0);
+  await expect(missing.locator('.guide-slot')).toHaveAttribute('data-guide-duration', '3600');
+  await assertGuideLayout(page);
+});
+
+test('TV Guide keeps clipped short programmes readable on a shared scale', async ({ page, request }) => {
+  await prepareGuide(request);
+  await openPage(page, guideURL.replace('start=18:00', 'start=18:19').replace('end=21:00', 'end=18:21'));
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    await choosePlayingOption(page, 'channel-jump', 'ZDF HD');
+    const group = page.locator('.playing-group[aria-labelledby="ch-2"]');
+    await expect(group.locator('.guide-slot')).toHaveCount(2);
+    for (const slot of await group.locator('.guide-slot').all()) {
+      await expect(slot).toHaveAttribute('data-guide-duration', '60');
+    }
+    await assertGuideLayout(page);
+  }
+});
+
+test('TV Guide keeps the first row compact with dense off-page programmes and preserves global alignment', async ({ page, request }) => {
+  for (const theme of ['metal-1', 'spaceship-cyan-dark']) {
+    await selectTheme(request, theme);
+    await prepareGuide(request, 'dense');
+    await openPage(page, '/playing?day=2026-10-17&start=09:50&end=11:00&view=guide');
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await choosePlayingOption(page, 'channel-jump', 'Das Erste HD');
+      await assertGuideLayout(page);
+      const first = page.locator('.playing-group[aria-labelledby="ch-1"] .guide-slot').first();
+      const height = await first.evaluate(slot => slot.getBoundingClientRect().height);
+      expect(height, 'Full subtitles must remain readable without restoring oversized first-row spacing').toBeLessThanOrEqual(400);
+      await expect(first.locator('.channels-title')).toHaveText('Morning panorama with regional views');
+      await expect(first.locator('.epg-subtitle')).toBeVisible();
+      await expect(first.locator('.epg-subtitle')).toHaveText("Regional stories, landscapes and interviews with detailed background information about today's morning programme");
+      const timelineHeight = await page.locator('.playing-groups').evaluate(grid =>
+        parseFloat(grid.style.getPropertyValue('--guide-timeline-height')));
+      await choosePlayingOption(page, 'channel-jump', 'Guide Channel 9');
+      await assertGuideLayout(page);
+      const boundary = await page.locator('.playing-group[aria-labelledby="ch-9"]').evaluate(group =>
+        group.querySelectorAll('.guide-slot')[1].getBoundingClientRect().bottom -
+        group.querySelector('.epg-list').getBoundingClientRect().top);
+      expect(Math.abs(boundary - height), '10:00 must stay aligned across channel pages').toBeLessThanOrEqual(1);
+      expect(await page.locator('.playing-groups').evaluate(grid =>
+        parseFloat(grid.style.getPropertyValue('--guide-timeline-height')))).toBe(timelineHeight);
+    }
+  }
+});
+
+test('TV Guide keeps a full-day morning window compact despite an off-page one-minute programme', async ({ page, request }) => {
+  for (const theme of ['metal-1', 'spaceship-cyan-dark']) {
+    await selectTheme(request, theme);
+    await prepareGuide(request, 'morning');
+    await openPage(page, '/playing?day=2026-10-17&start=07:09&end=23:59&view=guide');
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await choosePlayingOption(page, 'channel-jump', 'arte HD');
+      await assertGuideLayout(page);
+      const morning = page.locator('.playing-group[aria-labelledby="ch-3"] .guide-slot').first();
+      await expect(morning).toContainText('ARD-Morgenmagazin');
+      await expect(morning.locator('time')).toHaveText('05:30-09:00');
+      const height = await morning.evaluate(slot => slot.getBoundingClientRect().height);
+      expect(height, 'The 09:00 programme must be reachable without a giant morning card').toBeLessThanOrEqual(700);
+      const timelineHeight = await page.locator('.playing-groups').evaluate(grid =>
+        parseFloat(grid.style.getPropertyValue('--guide-timeline-height')));
+      expect(timelineHeight, 'A clipped minute must not magnify the entire day').toBeLessThanOrEqual(2500);
+      await choosePlayingOption(page, 'channel-jump', 'Guide Channel 9');
+      await expect(page.locator('.playing-group[aria-labelledby="ch-9"] .guide-slot').first())
+        .toHaveAttribute('data-guide-duration', '60');
+      await assertGuideLayout(page);
+      const boundary = await page.locator('.playing-group[aria-labelledby="ch-9"]').evaluate(group =>
+        group.querySelectorAll('.guide-slot')[1].getBoundingClientRect().bottom -
+        group.querySelector('.epg-list').getBoundingClientRect().top);
+      expect(Math.abs(boundary - height), '09:00 must keep the same position on another channel page').toBeLessThanOrEqual(1);
+      expect(await page.locator('.playing-groups').evaluate(grid =>
+        parseFloat(grid.style.getPropertyValue('--guide-timeline-height')))).toBe(timelineHeight);
+    }
+  }
+});
+
+test('TV Guide preserves overlapping programme entries without covering their actions', async ({ page, request }) => {
+  for (const theme of ['metal-1', 'spaceship-2']) {
+    await selectTheme(request, theme);
+    await prepareGuide(request, 'overlap');
+    await openPage(page, guideURL.replace('end=21:00', 'end=19:00'));
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 844 });
+      await assertGuideLayout(page);
+      const group = page.locator('.playing-group[aria-labelledby="ch-1"]');
+      await expect(group.locator('.guide-slot')).toHaveCount(3);
+      const slots = await group.locator('.guide-slot').evaluateAll(slots => slots.map(slot => {
+        const { left, right, top, bottom } = slot.getBoundingClientRect();
+        return { left, right, top, bottom };
+      }));
+      for (let i = 0; i < slots.length; i++) {
+        for (let j = i + 1; j < slots.length; j++) {
+          const a = slots[i], b = slots[j];
+          expect(a.right <= b.left + 1 || b.right <= a.left + 1 || a.bottom <= b.top + 1 || b.bottom <= a.top + 1,
+            'Overlapping EPG entries must occupy separate lanes').toBeTruthy();
+        }
+      }
+    }
+  }
+});
+
+test('TV Guide supports keyboard selection, programme information and real recording actions', async ({ page, request }) => {
+  await prepareGuide(request);
+  await openPage(page, guideURL);
+  const trigger = page.locator('#channel-jump').locator('..').getByRole('combobox');
+  await trigger.focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#ch-9')).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await choosePlayingOption(page, 'channel-jump', 'Das Erste HD');
+  const first = page.locator('.playing-group:visible').first();
+  await expect(first.getByRole('button', { name: 'Scheduled', exact: true })).toBeDisabled();
+  const popupEvent = page.waitForEvent('popup');
+  await first.getByRole('link', { name: 'Information', exact: true }).first().click();
+  const popup = await popupEvent;
+  await expect(popup.locator('.event-popup')).toBeVisible();
+  await expect(popup.locator('.epg-subtitle')).toHaveText("A longer subtitle with details about this evening's programme");
+  await popup.close();
+  await first.getByRole('button', { name: 'Record', exact: true }).first().click();
+  await expect(page).toHaveURL(/\/timers$/);
+  await page.goBack();
+  await page.reload();
+  await expect(page.locator('.playing-group:visible').first().getByRole('button', { name: 'Scheduled', exact: true })).toHaveCount(2);
+});
+
+test('TV Guide handles empty schedules, invalid views and unrecognised channel anchors', async ({ page, request }) => {
+  await prepareGuide(request, 'empty');
+  await openPage(page, guideURL);
+  await expect(page.getByText('No programs found', { exact: true })).toBeVisible();
+  await expect(page.locator('.playing-pager')).toBeHidden();
+  const invalid = await request.get('/playing?view=bogus');
+  expect(invalid.status()).toBe(400);
+  await selectTheme(request, 'metal-1');
+  await prepareGuide(request);
+  await openPage(page, `${guideURL}&channel-jump=missing#%ZZ`);
+  await expect(page.locator('#ch-1')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Previous channels', exact: true })).toBeDisabled();
+});
+
+test('TV Guide remains readable without JavaScript and hides recording actions from viewers', async ({ browser, request }) => {
+  await prepareGuide(request);
+  const response = await request.get(guideURL, {
+    headers: { Authorization: `Basic ${Buffer.from('viewer:test-password').toString('base64')}` },
+  });
+  expect(response.ok()).toBeTruthy();
+  const html = await response.text();
+  expect(html).toContain('Information');
+  expect(html).not.toContain('action="/timers/create"');
+  const context = await browser.newContext({
+    javaScriptEnabled: false,
+    httpCredentials: { username: 'admin', password: 'test-password' },
+    baseURL: 'http://127.0.0.1:18763',
+  });
+  try {
+    const page = await context.newPage();
+    await routeResources(page, []);
+    await page.goto(guideURL);
+    await expect(page.locator('.playing-group:visible')).toHaveCount(9);
+    await page.locator('#playing-view').selectOption('list');
+    await page.getByRole('button', { name: 'Apply', exact: true }).click();
+    await expect(page.locator('.playing-guide')).toHaveCount(0);
+  } finally {
+    await context.close();
+  }
+});
+
+for (const colorScheme of ['light', 'dark']) {
+  test(`system ${colorScheme} TV Guide follows browser preference`, async ({ page, request }) => {
+    await selectTheme(request, 'system');
+    await prepareGuide(request);
+    await page.emulateMedia({ colorScheme });
+    await openPage(page, guideURL);
+    await expect(page.locator('html')).not.toHaveAttribute('data-theme');
+    await assertGuideLayout(page);
+    const before = await page.locator('body').evaluate(body => getComputedStyle(body).backgroundColor);
+    await page.emulateMedia({ colorScheme: colorScheme === 'light' ? 'dark' : 'light' });
+    await expect.poll(() => page.locator('body').evaluate(body => getComputedStyle(body).backgroundColor)).not.toBe(before);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await assertGuideLayout(page);
+  });
+}
+
+for (const theme of themes) {
+  test(`${theme} TV Guide fits desktop, intermediate and mobile widths`, async ({ page, request }) => {
+    await selectTheme(request, theme);
+    await prepareGuide(request);
+    await openPage(page, guideURL);
+    for (const width of [1440, 769, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await assertGuideLayout(page);
+      await choosePlayingOption(page, 'channel-jump', 'Guide Channel 9');
+      await expect(page.locator('#ch-9')).toBeFocused();
+      await assertGuideLayout(page);
+      await choosePlayingOption(page, 'channel-jump', 'Das Erste HD');
+    }
+  });
+}
 
 test('timer fixtures expose recording, inactive and conflict states', async ({ page }) => {
   await openPage(page, '/timers?day=2026-10-17');
