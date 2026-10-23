@@ -17,7 +17,7 @@ CHROMA_UI_DIR= bash scripts/test-e2e.sh
 The default fixture builder uses the Chroma revision pinned in `go.mod`, not a
 local checkout. It and UI CI first run the non-publishing standalone dependency
 preflight with workspaces disabled. The current pin is the published Chroma UI
-release `v0.1.0`; a separate Chroma checkout is not required.
+release `v0.2.0`; a separate Chroma checkout is not required.
 
 For coordinated local changes, optionally run:
 
@@ -85,6 +85,57 @@ collisions and red critical conflicts on timer cards and timeline blocks while
 retaining metallic buttons and recording styling.
 An additional Chromium/Firefox check verifies Aurora's centered navigation
 badge/menu and aligned archive-job actions, bringing the suite to 195 tests.
+
+### Playing Today TV Guide
+
+Guide tests opt into `/__test/guide` after resetting the isolated fixture server.
+The `many` scenario provides nine channels with different programme counts and
+durations, a long title/subtitle, clipped programmes, internal/leading gaps, a
+channel without EPG data, and an inactive scheduled timer. `empty` supplies an
+empty schedule; `overlap` adds overlapping programme entries. `morning` includes
+a 05:30–09:00 programme and an off-page programme clipped to one minute in a
+07:09–23:59 window. `dense` provides long subtitles and two off-page five-minute
+programmes before 10:00, while the first three channels each have one programme
+ending at 10:00. These scenarios
+do not change the existing reference-page fixtures.
+
+Chromium and Firefox cover layout selection, channel paging and boundaries,
+keyboard channel selection, history/reload/resize, day/time state preservation
+(including navigation through an empty day), Information popups, real timer
+creation, viewer permissions, invalid view input, unknown anchors and the
+JavaScript-disabled fallback. Geometry checks cover all 37 themes at 1440px,
+769px and 390px, including the last channel page. They assert no horizontal
+document overflow, one row of channel columns, stacked programme content/actions
+and contained controls, including the shared Chroma UI `ui-pager` layout.
+They also verify equal timeline endpoints, matching
+time boundaries, chronological ordering, full window coverage, and no vertical
+card overflow. Explicit cases cover two/three/one programmes within the same
+hour, one-minute clipped slots, stable scale across channel pages, and overlapping
+entries with separately accessible actions. Go tests cover boundary exclusions,
+gap generation, retained original programme times, overlap lanes, overnight
+windows and equal start/end times. A full-day compactness regression checks
+Metal and Spaceship Cyan Dark at desktop/mobile widths: the morning programme's
+visible slot must be at most 700px tall, and the entire guide at most 2500px,
+despite the off-page one-minute slot. It also checks that 09:00 retains its
+position across channel pages. The dense-schedule regression limits the first
+programme row to 400px including full subtitles at desktop/mobile widths in
+those same two themes and verifies that the 10:00 boundary and total timeline height remain unchanged
+when paging. It also checks full title and inline subtitle visibility, while
+Information and List View retain their existing subtitle paragraphs.
+System mode exercises both OS color schemes.
+
+Representative themes have new desktop/mobile guide references, including the
+open view dropdown. These are additional baselines, not replacements for the
+existing reference pages; all existing comparison thresholds remain unchanged.
+The guide adds 98 browser behavior checks and 16 visual cases with 32 new
+images, bringing the complete suite to 309 tests and 248 reference images.
+Generate only these new references with:
+
+```sh
+CHROMA_UI_DIR= bash scripts/test-e2e.sh --project=chromium \
+  --grep 'TV Guide reference' --update-snapshots
+CHROMA_UI_DIR= bash scripts/test-e2e.sh
+```
 
 Reports, actual/expected/diff images, and failure traces are written to ignored
 `test-results/` and `playwright-report/` directories. CI runs comparisons, never

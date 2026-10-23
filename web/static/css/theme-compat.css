@@ -111,16 +111,16 @@
 
 /* The shared demo's small-screen improvements must not reflow VDR pages. */
 @media (max-width: 768px) {
-    :root:where([data-theme-source="bundled"])[data-theme="spaceship-2"] header nav {
+    :root:where([data-theme-source="bundled"])[data-theme="spaceship-2"] body:not(.page-playing-guide) header nav {
         flex-wrap: nowrap;
     }
 
-    :root:where([data-theme-source="bundled"])[data-theme="spaceship-2"] .nav-brand {
+    :root:where([data-theme-source="bundled"])[data-theme="spaceship-2"] body:not(.page-playing-guide) .nav-brand {
         min-width: auto;
         max-width: none;
     }
 
-    :root:where([data-theme-source="bundled"])[data-theme="spaceship-2"] .nav-brand h1 {
+    :root:where([data-theme-source="bundled"])[data-theme="spaceship-2"] body:not(.page-playing-guide) .nav-brand h1 {
         overflow-wrap: normal;
     }
 
@@ -1311,4 +1311,14 @@
 
 :root:where([data-theme-source="bundled"])[data-theme="spaceship-2"] .page-now .epg-actions {
     margin-top: 0 !important;
+}
+
+/* Guide cards stack their actions even when a theme supplies list columns. */
+.page-playing.playing-guide .playing-group .epg-item {
+    grid-template-columns: minmax(0, 1fr) !important;
+}
+
+main.page-playing .toolbar.playing-toolbar {
+    position: relative;
+    z-index: 21;
 }

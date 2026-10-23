@@ -91,6 +91,29 @@ recording treatment remain separate from these problem indicators.
 Desktop programme lists reserve a consistent font-relative width for time
 ranges, so titles and subtitles align across cards and channel groups.
 Mobile stacking and Information-popup date layouts are unchanged.
+Playing Today's TV Guide reuses the themed channel headings, `ui-item` programme
+cards, enhanced selects and buttons. Its channel pager uses Chroma UI's
+`ui-pager` composition; channel ranges, selection and navigation remain
+application-owned. Guide-only layout rules stack time,
+programme content and actions within each card, and responsive channel paging
+keeps the grid within the available width without nested scrolling. Compact
+guide-only card padding, row gaps and slot separation reduce the minimum heights
+that drive the global timeline. Full titles and subtitle paragraphs remain
+visible in guide cards; subtitles use compact margins and line spacing without
+clipping or line clamping. List View and Information keep their existing layout.
+Programme
+positions and heights follow the same clipped time window in every channel.
+Shared chronological boundary positions are measured from all channels,
+including off-page ones. Each card imposes its own minimum readable height;
+quiet intervals are compressed instead of letting a short clipped programme
+set the scale for the whole day. Heights are therefore adaptive, not strictly
+proportional to duration, and paging does not change boundary positions. Channel
+headings share a measured height; themed gaps preserve times with missing data.
+Overlapping EPG entries use parallel lanes within their channel.
+The filter toolbar stays above the pager so
+open dropdowns remain clickable, including in themes with stacked glass panels.
+Bundled Spaceship 2 retains its shared responsive header wrapping on the guide;
+the existing List View and other pages keep their compatibility layout.
 Editing local CSS takes effect on
 refresh; adding themes or changing metadata requires rediscovery/restart.
 

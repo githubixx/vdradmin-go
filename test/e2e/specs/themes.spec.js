@@ -1,9 +1,27 @@
-import { test, expect, themes, representatives, selectTheme, openPage, screenshot, assertWatchLayout } from './fixtures.js';
+import { test, expect, themes, representatives, selectTheme, openPage, screenshot, assertWatchLayout, guideURL, prepareGuide, assertGuideLayout } from './fixtures.js';
 
 const sizes = {
   desktop: { width: 1440, height: 1000 },
   mobile: { width: 390, height: 844 },
 };
+
+for (const theme of representatives) {
+  for (const [size, viewport] of Object.entries(sizes)) {
+    test(`${theme} ${size} TV Guide reference`, async ({ page, request }) => {
+      await selectTheme(request, theme);
+      await prepareGuide(request);
+      await page.setViewportSize(viewport);
+      await openPage(page, guideURL);
+      await assertGuideLayout(page);
+      await screenshot(page, `${theme}-${size}-playing-guide`);
+      const trigger = page.locator('#playing-view').locator('..').getByRole('combobox');
+      await trigger.click();
+      await expect(page.getByRole('option', { name: 'TV Guide', exact: true })).toBeVisible();
+      await expect(page.locator('#playing-view').locator('..').locator('.custom-select-dropdown'))
+        .toHaveScreenshot(`${theme}-${size}-playing-guide-dropdown.png`);
+    });
+  }
+}
 
 test('theme inventory is preserved', async ({ request }) => {
   const response = await request.get('/__test/ready');

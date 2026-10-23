@@ -68,6 +68,81 @@ func requireStatus(t *testing.T, res *httptest.ResponseRecorder, want int) {
 	}
 }
 
+func TestGuideScenarios(t *testing.T) {
+	f, _ := testFixture(t)
+	requireStatus(t, request(f, "GET", "/__test/guide", "", "", ""), http.StatusMethodNotAllowed)
+	requireStatus(t, request(f, "POST", "/__test/guide", "", "application/json", `{"scenario":"invalid"}`), http.StatusBadRequest)
+	requireStatus(t, request(f, "POST", "/__test/guide", "", "application/json", `{"scenario":"many"}`), http.StatusOK)
+	channels, err := f.vdr.GetChannels(context.Background())
+	if err != nil || len(channels) != 9 {
+		t.Fatalf("guide channels = %d, error = %v", len(channels), err)
+	}
+	res := request(f, "GET", "/playing?day="+fixtureDate+"&view=guide&start=18:00&end=23:59", "admin", "", "")
+	requireStatus(t, res, http.StatusOK)
+	if got := strings.Count(res.Body.String(), `class="playing-group"`); got != 9 {
+		t.Fatalf("guide groups = %d, want 9", got)
+	}
+	if got := strings.Count(res.Body.String(), `disabled>Scheduled</button>`); got != 1 {
+		t.Fatalf("scheduled buttons = %d, want 1", got)
+	}
+	requireStatus(t, request(f, "POST", "/__test/guide", "", "application/json", `{"scenario":"empty"}`), http.StatusOK)
+	res = request(f, "GET", "/playing?day="+fixtureDate+"&view=guide", "admin", "", "")
+	requireStatus(t, res, http.StatusOK)
+	if !strings.Contains(res.Body.String(), "No programs found") {
+		t.Fatal("empty guide has no empty state")
+	}
+	requireStatus(t, request(f, "POST", "/__test/guide", "", "application/json", `{"scenario":"many"}`), http.StatusOK)
+	requireStatus(t, request(f, "POST", "/__test/guide", "", "application/json", `{"scenario":"morning"}`), http.StatusOK)
+	res = request(f, "GET", "/playing?day="+fixtureDate+"&view=guide&start=07:09&end=23:59", "admin", "", "")
+	requireStatus(t, res, http.StatusOK)
+	if !strings.Contains(res.Body.String(), "ARD-Morgenmagazin") ||
+		!strings.Contains(res.Body.String(), `data-guide-duration="60"`) {
+		t.Fatal("morning fixture must include the long programme and clipped one-minute slot")
+	}
+	requireStatus(t, request(f, "POST", "/__test/guide", "", "application/json", `{"scenario":"dense"}`), http.StatusOK)
+	res = request(f, "GET", "/playing?day="+fixtureDate+"&view=guide&start=09:50&end=11:00", "admin", "", "")
+	requireStatus(t, res, http.StatusOK)
+	if !strings.Contains(res.Body.String(), "Morning panorama with regional views") ||
+		strings.Count(res.Body.String(), `data-guide-duration="300"`) != 2 {
+		t.Fatal("dense fixture must include the first morning row and two off-page five-minute programmes")
+	}
+	if !strings.Contains(res.Body.String(), `<p class="epg-subtitle ui-item-subtitle">Regional stories`) {
+		t.Fatal("compact guide must retain full programme subtitle paragraphs")
+	}
+	res = request(f, "GET", "/playing?day="+fixtureDate+"&view=list&start=09:50&end=11:00", "admin", "", "")
+	requireStatus(t, res, http.StatusOK)
+	if !strings.Contains(res.Body.String(), `<p class="epg-subtitle ui-item-subtitle">Regional stories`) {
+		t.Fatal("List View must retain programme subtitle paragraphs")
+	}
+	requireStatus(t, request(f, "POST", "/__test/reset", "", "", ""), http.StatusOK)
+	channels, err = f.vdr.GetChannels(context.Background())
+	if err != nil || len(channels) != 4 {
+		t.Fatalf("reset channels = %d, error = %v", len(channels), err)
+	}
+}
+
+func TestGuideWindowBoundaries(t *testing.T) {
+	f, _ := testFixture(t)
+	requireStatus(t, request(f, "POST", "/__test/guide", "", "application/json", `{"scenario":"many"}`), http.StatusOK)
+	for _, tc := range []struct {
+		query, duration string
+	}{
+		{"start=18:00&end=19:00", "3600"},
+		{"start=18:00&end=21:00", "10800"},
+		{"start=22:00&end=02:00", "14400"},
+		{"start=18:00&end=18:00", "86400"},
+	} {
+		res := request(f, "GET", "/playing?day="+fixtureDate+"&view=guide&"+tc.query, "admin", "", "")
+		requireStatus(t, res, http.StatusOK)
+		if !strings.Contains(res.Body.String(), `class="playing-groups" data-guide-duration="`+tc.duration+`"`) {
+			t.Fatalf("window %s has incorrect duration", tc.query)
+		}
+		if tc.duration == "3600" && strings.Contains(res.Body.String(), "Late Night Culture") {
+			t.Fatal("programme outside the selected hour was included")
+		}
+	}
+}
+
 func TestEmbeddedThemesWithoutThemeDirectory(t *testing.T) {
 	project, err := projectRoot()
 	if err != nil {

@@ -5,33 +5,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VDRAdmin-go - Playing Today</title>
-    <link rel="stylesheet" href="/ui/css/base.css?v=20261017-chroma">
-    <link rel="stylesheet" href="/static/css/base.css?v=20261017-chroma">
+    <link rel="stylesheet" href="/ui/css/base.css?v=20261023-chroma-v0.2.0">
+    <link rel="stylesheet" href="/static/css/base.css?v=20261023-shared-pager">
     {{if and .ThemeMode (ne .ThemeMode "system")}}<link rel="stylesheet" href="/themes/{{.ThemeMode}}/theme.css?v=20260328-B">{{end}}
-    <link rel="stylesheet" href="/static/css/theme-compat.css?v=20261017-chroma">
+    <link rel="stylesheet" href="/static/css/theme-compat.css?v=20261022-timeline">
     <script src="/ui/js/theme.js?v=20261017-chroma" defer></script>
     <script src="/ui/js/menu.js?v=20261017-chroma" defer></script>
     <script src="/ui/js/select.js?v=20261017-chroma" defer></script>
+    <script src="/static/js/playing.js?v=20261023-compact-guide" defer></script>
 </head>
-<body>
+<body{{if eq .PlayingView "guide"}} class="page-playing-guide"{{end}}>
     {{template "nav_header" .}}
 
-    <main class="container">
-        <div class="toolbar">
+    <main class="container page-playing{{if eq .PlayingView "guide"}} playing-guide{{end}}">
+        <div class="toolbar playing-toolbar">
             <form action="/playing" method="get" class="nav-channel-form" id="playing-form">
                 <strong>{{.Day.Format "Mon 2006-01-02"}}</strong>
 
                 <input type="hidden" name="day" value="{{.Day.Format "2006-01-02"}}" />
 
                 <div class="nav-select">
-                    <select id="channel-jump" name="channel-jump" onchange="if (this.value) { location.hash = this.value; }">
+                    <select id="playing-view" name="view" aria-label="Playing Today view">
+                        <option value="list"{{if eq .PlayingView "list"}} selected{{end}}>List View</option>
+                        <option value="guide"{{if eq .PlayingView "guide"}} selected{{end}}>TV Guide</option>
+                    </select>
+                </div>
+
+                <div class="nav-select">
+                    <select id="channel-jump" name="channel-jump" aria-label="Select channel">
                         <option value="">Select channel...</option>
+                        {{if .UnavailableChannel}}<option value="{{.SelectedChannel}}" selected>Selected channel unavailable</option>{{end}}
                         {{range .ChannelJump}}
-                        <option value="{{.Anchor}}">{{.Label}}</option>
+                        <option value="{{.Anchor}}"{{if eq $.SelectedChannel .Anchor}} selected{{end}}>{{.Label}}</option>
                         {{end}}
                     </select>
                 </div>
 
+                <label class="playing-time-filter">
                 <span class="nav-channel-label">from</span>
 
                 <input
@@ -44,7 +54,9 @@
                     step="60"
                     pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$"
                     aria-label="Start time (HH:MM)" />
+                </label>
 
+                <label class="playing-time-filter">
                 <span class="nav-channel-label">to</span>
 
                 <input
@@ -57,11 +69,19 @@
                     step="60"
                     pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$"
                     aria-label="End time (HH:MM)" />
+                </label>
 
-                <a class="btn btn-secondary btn-nav" href="/playing?day={{.PrevDay}}">Previous day</a>
-                <a class="btn btn-secondary btn-nav" href="/playing?day={{.NextDay}}">Next day</a>
+                <a class="btn btn-secondary btn-nav" data-playing-day href="{{.PrevDayURL}}">Previous day</a>
+                <a class="btn btn-secondary btn-nav" data-playing-day href="{{.NextDayURL}}">Next day</a>
+                <noscript><button class="btn btn-secondary" type="submit">Apply</button></noscript>
             </form>
         </div>
+
+        <nav class="playing-pager ui-pager toolbar" aria-label="TV Guide channel pages" hidden>
+            <button type="button" class="btn btn-secondary btn-nav" id="guide-previous" aria-label="Previous channels">&lt;</button>
+            <span id="guide-range" role="status" aria-live="polite" aria-atomic="true"></span>
+            <button type="button" class="btn btn-secondary btn-nav" id="guide-next" aria-label="Next channels">&gt;</button>
+        </nav>
 
         {{if .TimeError}}
         <div class="toolbar">
@@ -75,10 +95,21 @@
         </div>
         {{end}}
 
+        <div class="playing-groups" data-guide-duration="{{.GuideDuration}}">
         {{range .ChannelGroups}}
-        <div class="channels-day" id="{{.Anchor}}">{{.Channel.Name}}</div>
+        <section class="playing-group" aria-labelledby="{{.Anchor}}">
+        <h2 class="channels-day" id="{{.Anchor}}" tabindex="-1">{{.Channel.Name}}</h2>
         <div class="epg-list">
             {{range .Events}}
+            {{if eq $.PlayingView "guide"}}<div class="guide-slot" data-guide-offset="{{.GuideOffset}}" data-guide-duration="{{.GuideDuration}}" data-guide-lane="{{.GuideLane}}" data-guide-lanes="{{.GuideLanes}}" data-guide-last="{{.GuideLast}}">{{end}}
+            {{if .GuideGap}}
+            <div class="epg-item ui-item guide-gap">
+                <div class="epg-time">
+                    <time datetime="{{.Start.Format "2006-01-02T15:04"}}">{{.Start.Format "15:04"}}-{{.Stop.Format "15:04"}}</time>
+                </div>
+                <div class="epg-content"><p>No programme information</p></div>
+            </div>
+            {{else}}
             <div class="epg-item ui-item">
                 <div class="epg-time">
                     <time datetime="{{.Start.Format "2006-01-02T15:04"}}">{{.Start.Format "15:04"}}-{{.Stop.Format "15:04"}}</time>
@@ -109,10 +140,14 @@
                 </div>
             </div>
             {{end}}
+            {{if eq $.PlayingView "guide"}}</div>{{end}}
+            {{end}}
         </div>
+        </section>
         {{else}}
         <p class="empty-state">No programs found</p>
         {{end}}
+        </div>
     </main>
 
     <footer>
@@ -121,15 +156,6 @@
         </div>
     </footer>
 
-    <script>
-        // Auto-submit form when time inputs change
-        document.getElementById('playing-start').addEventListener('change', function() {
-            document.getElementById('playing-form').submit();
-        });
-        document.getElementById('playing-end').addEventListener('change', function() {
-            document.getElementById('playing-form').submit();
-        });
-    </script>
 </body>
 </html>
 {{end}}

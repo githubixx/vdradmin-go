@@ -115,7 +115,8 @@ vdradmin-go/
 
 Shared themes and components come from
 [Chroma UI](https://github.com/githubixx/chroma-ui). This checkout pins the
-published release `v0.1.0`. Normal builds fetch that exact version;
+published release `v0.2.0`, including the shared TV Guide pager layout.
+Normal builds fetch that exact version;
 no sibling checkout or local workspace is required.
 
 For coordinated local changes to both projects, optionally create a workspace
@@ -162,7 +163,7 @@ sh scripts/check-release-readiness.sh
 It always disables workspaces, requires a versioned Chroma UI dependency
 without a replacement, checks `go mod tidy -diff`, and verifies module
 integrity. It never edits dependency manifests or publishes anything.
-The current dependency is pinned to the published Chroma UI release `v0.1.0`.
+The current dependency is pinned to the published Chroma UI release `v0.2.0`.
 
 Go/UI CI, GoReleaser's pre-build hooks, and default Docker builders enforce
 this gate rather than silently resolving an arbitrary library revision.
