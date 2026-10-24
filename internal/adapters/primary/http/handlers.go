@@ -1723,17 +1723,6 @@ func (h *Handler) PlayingToday(w http.ResponseWriter, r *http.Request) {
 
 	// Parse start and end time parameters
 	startTimeStr, endTimeStr, startTime, endTime, timeErr := parsePlayingTimeParams(r, dayStart, localNow)
-	if view == "guide" {
-		// List View includes the final minute; the guide ends at the chosen instant.
-		endTime, err = time.ParseInLocation("2006-01-02 15:04", dayStart.Format("2006-01-02")+" "+endTimeStr, loc)
-		if err != nil {
-			h.handleError(w, r, fmt.Errorf("parse guide end time: %w", err))
-			return
-		}
-		if !endTime.After(startTime) {
-			endTime = endTime.AddDate(0, 0, 1)
-		}
-	}
 
 	data := map[string]any{}
 	data["PlayingView"] = view
@@ -1757,6 +1746,11 @@ func (h *Handler) PlayingToday(w http.ResponseWriter, r *http.Request) {
 	data["NextDayURL"] = dayURL(dayStart.AddDate(0, 0, 1))
 	data["StartTime"] = startTimeStr
 	data["EndTime"] = endTimeStr
+	hours := make([]string, 25)
+	for hour := range hours {
+		hours[hour] = fmt.Sprintf("%02d:00", hour)
+	}
+	data["PlayingHours"] = hours
 	if timeErr != nil {
 		data["TimeError"] = timeErr.Error()
 	}
@@ -1927,57 +1921,50 @@ func (h *Handler) PlayingToday(w http.ResponseWriter, r *http.Request) {
 // Returns the string values and parsed time.Time values along with any error.
 func parsePlayingTimeParams(r *http.Request, dayStart time.Time, localNow time.Time) (startTimeStr, endTimeStr string, startTime, endTime time.Time, err error) {
 	loc := dayStart.Location()
-
-	// Get query parameters
 	startTimeStr = strings.TrimSpace(r.URL.Query().Get("start"))
 	endTimeStr = strings.TrimSpace(r.URL.Query().Get("end"))
 
-	// Default start time: current time (rounded to current minute)
-	defaultStart := localNow
-	if !isSameDay(defaultStart, dayStart) {
-		// If viewing a different day, default to day start
-		defaultStart = dayStart
+	startHour, endHour := 0, 24
+	if isSameDay(localNow, dayStart) {
+		startHour = localNow.Hour()
 	}
-
-	// Default end time: midnight (end of selected day)
-	defaultEnd := time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), 23, 59, 59, 0, loc)
-
-	// Parse start time
-	if startTimeStr == "" {
-		startTimeStr = defaultStart.Format("15:04")
-		startTime = time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), defaultStart.Hour(), defaultStart.Minute(), 0, 0, loc)
-	} else {
+	if startTimeStr != "" {
 		parsed, parseErr := time.Parse("15:04", startTimeStr)
 		if parseErr != nil {
 			err = fmt.Errorf("invalid start time (expected HH:MM)")
-			startTimeStr = defaultStart.Format("15:04")
-			startTime = time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), defaultStart.Hour(), defaultStart.Minute(), 0, 0, loc)
 		} else {
-			startTime = time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), parsed.Hour(), parsed.Minute(), 0, 0, loc)
+			startHour = parsed.Hour()
+			if parsed.Minute() != 0 {
+				err = fmt.Errorf("times must use whole hours; range rounded outward")
+			}
 		}
 	}
-
-	// Parse end time
-	if endTimeStr == "" {
-		endTimeStr = "23:59"
-		endTime = defaultEnd
-	} else {
+	if endTimeStr != "" && endTimeStr != "24:00" {
 		parsed, parseErr := time.Parse("15:04", endTimeStr)
 		if parseErr != nil {
 			if err == nil {
 				err = fmt.Errorf("invalid end time (expected HH:MM)")
 			}
-			endTimeStr = "23:59"
-			endTime = defaultEnd
 		} else {
-			endTime = time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), parsed.Hour(), parsed.Minute(), 59, 0, loc)
-			// If end time is before start time, assume it's the next day
-			if endTime.Before(startTime) {
-				endTime = endTime.Add(24 * time.Hour)
+			endHour = parsed.Hour()
+			if parsed.Minute() != 0 {
+				endHour++
+				if err == nil {
+					err = fmt.Errorf("times must use whole hours; range rounded outward")
+				}
 			}
 		}
 	}
-
+	if endHour <= startHour {
+		endHour = startHour + 1
+		if err == nil {
+			err = fmt.Errorf("end time must be at least one hour after start time")
+		}
+	}
+	startTimeStr = fmt.Sprintf("%02d:00", startHour)
+	endTimeStr = fmt.Sprintf("%02d:00", endHour)
+	startTime = time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), startHour, 0, 0, 0, loc)
+	endTime = time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), endHour, 0, 0, 0, loc)
 	return startTimeStr, endTimeStr, startTime, endTime, err
 }
 

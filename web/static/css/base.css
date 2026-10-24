@@ -346,6 +346,37 @@ main {
     gap: 0.5rem;
 }
 
+.page-playing .playing-toolbar .nav-channel-form select,
+.page-playing .playing-toolbar .custom-select-trigger,
+.page-playing .playing-toolbar .btn-nav {
+    height: 2.75rem;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.02)), var(--surface-color);
+    color: var(--text-color);
+    box-shadow: var(--shadow);
+}
+
+.page-playing .playing-toolbar .btn-nav {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 0.75rem;
+    white-space: nowrap;
+}
+
+.page-playing .playing-time-filter .custom-select-trigger {
+    min-width: 6.5rem;
+}
+
+.page-playing .playing-time-filter option:disabled {
+    color: var(--text-muted);
+}
+
 .page-playing .channels-day {
     font-size: 1rem;
 }

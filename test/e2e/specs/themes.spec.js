@@ -13,6 +13,14 @@ for (const theme of representatives) {
       await page.setViewportSize(viewport);
       await openPage(page, guideURL);
       await assertGuideLayout(page);
+      if (theme === 'light' && size === 'mobile') {
+        const record = page.locator('.playing-group:visible').getByRole('button', { name: 'Record', exact: true }).first();
+        await expect(record).toBeVisible();
+        await expect(record).toBeEnabled();
+        await expect(record).toHaveCSS('background-color', 'rgb(124, 58, 237)');
+        await expect(record).toHaveCSS('color', 'rgb(255, 255, 255)');
+        await expect(record).toHaveCSS('border-radius', '999px');
+      }
       await screenshot(page, `${theme}-${size}-playing-guide`);
       const trigger = page.locator('#playing-view').locator('..').getByRole('combobox');
       await trigger.click();

@@ -4,6 +4,8 @@
     const grid = main.querySelector('.playing-groups');
     const groups = Array.from(grid.querySelectorAll('.playing-group'));
     const channel = document.getElementById('channel-jump');
+    const start = document.getElementById('playing-start');
+    const end = document.getElementById('playing-end');
     const guide = main.classList.contains('playing-guide');
     const pager = main.querySelector('.playing-pager');
     const previous = document.getElementById('guide-previous');
@@ -127,9 +129,23 @@
     });
     previous.addEventListener('click', () => navigate(Math.max(0, Math.floor(selected / pageSize) * pageSize - pageSize)));
     next.addEventListener('click', () => navigate(Math.floor(selected / pageSize) * pageSize + pageSize));
-    ['playing-start', 'playing-end', 'playing-view'].forEach(id => {
+    function syncTimeOptions() {
+        for (const option of end.options) {
+            option.disabled = option.value <= start.value;
+        }
+        if (end.value <= start.value) {
+            end.value = Array.from(end.options).find(option => !option.disabled).value;
+        }
+    }
+
+    start.addEventListener('change', () => {
+        syncTimeOptions();
+        form.requestSubmit();
+    });
+    ['playing-end', 'playing-view'].forEach(id => {
         document.getElementById(id).addEventListener('change', () => form.requestSubmit());
     });
+    syncTimeOptions();
     window.addEventListener('popstate', restore);
     window.addEventListener('hashchange', restore);
     if (guide) {

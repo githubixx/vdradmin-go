@@ -12,6 +12,7 @@ export const screenshotComparisonOptions = Object.freeze({
   'spaceship-grey-light-desktop-watch': { maxDiffPixels: 12 },
   'crt-starfield-1-mobile-configurations': { maxDiffPixels: 3600 },
   'spaceship-grey-light-mobile-recordings': { threshold: 0.02, maxDiffPixels: 450 },
+  'light-mobile-playing-guide': { maxDiffPixels: 40 },
 });
 
 export const test = base.extend({

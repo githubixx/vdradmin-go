@@ -6,13 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VDRAdmin-go - Playing Today</title>
     <link rel="stylesheet" href="/ui/css/base.css?v=20261023-chroma-v0.2.0">
-    <link rel="stylesheet" href="/static/css/base.css?v=20261023-shared-pager">
+    <link rel="stylesheet" href="/static/css/base.css?v=20261023-hourly-controls">
     {{if and .ThemeMode (ne .ThemeMode "system")}}<link rel="stylesheet" href="/themes/{{.ThemeMode}}/theme.css?v=20260328-B">{{end}}
-    <link rel="stylesheet" href="/static/css/theme-compat.css?v=20261022-timeline">
+    <link rel="stylesheet" href="/static/css/theme-compat.css?v=20261023-hourly-controls">
     <script src="/ui/js/theme.js?v=20261017-chroma" defer></script>
     <script src="/ui/js/menu.js?v=20261017-chroma" defer></script>
     <script src="/ui/js/select.js?v=20261017-chroma" defer></script>
-    <script src="/static/js/playing.js?v=20261023-compact-guide" defer></script>
+    <script src="/static/js/playing.js?v=20261023-hourly-controls" defer></script>
 </head>
 <body{{if eq .PlayingView "guide"}} class="page-playing-guide"{{end}}>
     {{template "nav_header" .}}
@@ -41,35 +41,29 @@
                     </select>
                 </div>
 
-                <label class="playing-time-filter">
-                <span class="nav-channel-label">from</span>
+                <div class="playing-time-filter">
+                <label class="nav-channel-label" for="playing-start">from</label>
 
-                <input
-                    id="playing-start"
-                    class="nav-time"
-                    type="time"
-                    name="start"
-                    value="{{.StartTime}}"
-                    required
-                    step="60"
-                    pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$"
-                    aria-label="Start time (HH:MM)" />
-                </label>
+                <span class="nav-select">
+                    <select id="playing-start" name="start" required aria-label="Start time (HH:MM)">
+                        {{range .PlayingHours}}{{if ne . "24:00"}}
+                        <option value="{{.}}"{{if eq . $.StartTime}} selected{{end}}>{{.}}</option>
+                        {{end}}{{end}}
+                    </select>
+                </span>
+                </div>
 
-                <label class="playing-time-filter">
-                <span class="nav-channel-label">to</span>
+                <div class="playing-time-filter">
+                <label class="nav-channel-label" for="playing-end">to</label>
 
-                <input
-                    id="playing-end"
-                    class="nav-time"
-                    type="time"
-                    name="end"
-                    value="{{.EndTime}}"
-                    required
-                    step="60"
-                    pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$"
-                    aria-label="End time (HH:MM)" />
-                </label>
+                <span class="nav-select">
+                    <select id="playing-end" name="end" required aria-label="End time (HH:MM)">
+                        {{range .PlayingHours}}
+                        <option value="{{.}}"{{if eq . $.EndTime}} selected{{end}}{{if le . $.StartTime}} disabled{{end}}>{{.}}</option>
+                        {{end}}
+                    </select>
+                </span>
+                </div>
 
                 <a class="btn btn-secondary btn-nav" data-playing-day href="{{.PrevDayURL}}">Previous day</a>
                 <a class="btn btn-secondary btn-nav" data-playing-day href="{{.NextDayURL}}">Next day</a>
