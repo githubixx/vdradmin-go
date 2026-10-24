@@ -1,4 +1,4 @@
-import { test, expect, themes, selectTheme, openPage, screenshot, routeResources, assertWatchLayout, guideURL, prepareGuide, choosePlayingOption, assertGuideLayout } from './fixtures.js';
+import { test, expect, themes, selectTheme, openPage, waitForPageResources, screenshot, routeResources, assertWatchLayout, guideURL, prepareGuide, choosePlayingOption, assertGuideLayout } from './fixtures.js';
 
 test.beforeEach(async ({ request }) => {
   await selectTheme(request, 'metal-1');
@@ -182,6 +182,7 @@ test('Playing Today hourly dropdowns advance invalid ends, preserve later ends a
     await expect(page.locator('#playing-end')).toHaveValue('24:00');
     expect(new URL(page.url()).searchParams.get('view')).toBe(view);
     await page.reload();
+    await waitForPageResources(page);
     await expect(page.locator('#playing-start')).toHaveValue('23:00');
     await expect(page.locator('#playing-end')).toHaveValue('24:00');
   }

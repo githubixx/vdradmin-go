@@ -45,6 +45,55 @@ for (const theme of themes) {
       await page.setViewportSize(viewport);
       await openPage(page, '/channels?day=2026-10-17');
       await expect(page.locator('.epg-item').first()).toBeVisible();
+      if (theme === 'spaceship-blue-light' && size === 'mobile') {
+        const cards = page.locator('.epg-item');
+        await expect(cards).toHaveCount(3);
+        for (const card of await cards.all()) {
+          const information = card.getByRole('link', { name: 'Information', exact: true });
+          await expect(information).toBeVisible();
+          await expect(information).toHaveAttribute('href', /^\/event\?channel=.+&id=\d+$/);
+          await expect(information).toHaveCSS('color', 'rgb(239, 246, 255)');
+          await expect(information).toHaveCSS('border-color', 'rgba(96, 165, 250, 0.8)');
+          await expect(information).toHaveCSS('border-radius', '999px');
+          await expect(information).toHaveCSS('box-shadow', /rgba\(96, 165, 250, 0\.6\)/);
+          const geometry = await card.evaluate(item => {
+            const box = item.getBoundingClientRect();
+            const information = item.querySelector('.epg-actions > a').getBoundingClientRect();
+            const record = item.querySelector('.epg-actions button').getBoundingClientRect();
+            return {
+              leftInset: information.left - box.left,
+              rightInset: box.right - record.right,
+              bottomInset: box.bottom - information.bottom,
+              gap: record.left - information.right,
+              topDifference: information.top - record.top,
+              heightDifference: information.height - record.height,
+            };
+          });
+          expect(geometry.leftInset).toBeGreaterThanOrEqual(0);
+          expect(geometry.rightInset).toBeGreaterThanOrEqual(0);
+          expect(geometry.bottomInset).toBeGreaterThanOrEqual(0);
+          expect(geometry.gap).toBeGreaterThanOrEqual(0);
+          expect(geometry.topDifference).toBeCloseTo(0, 1);
+          expect(geometry.heightDifference).toBeCloseTo(0, 1);
+        }
+        await expect(page.getByLabel('Menu', { exact: true })).toBeVisible();
+        const icon = await page.locator('.nav-burger-button .burger-icon').evaluate(element => {
+          const style = getComputedStyle(element);
+          return {
+            width: style.width, height: style.height,
+            middle: style.backgroundImage, middleSize: style.backgroundSize,
+            edges: ['::before', '::after'].map(pseudo => {
+              const edge = getComputedStyle(element, pseudo);
+              return { height: edge.height, color: edge.backgroundColor };
+            }),
+          };
+        });
+        expect(icon.width).toBe('18px');
+        expect(icon.height).toBe('12px');
+        expect(icon.middle).toContain('rgb(239, 246, 255)');
+        expect(icon.middleSize).toBe('100% 2px');
+        expect(icon.edges).toEqual(Array(2).fill({ height: '2px', color: 'rgb(239, 246, 255)' }));
+      }
       await screenshot(page, `${theme}-${size}-channels`);
       await openPage(page, '/timers?day=2026-10-17');
       await expect(page.locator('.timer-item').first()).toBeVisible();

@@ -32,7 +32,7 @@ verifying the pinned dependency through the standalone builder.
 
 The runner builds an isolated fixture server and uses the pinned Playwright
 1.64.1 Ubuntu amd64 image, including its pinned browser binaries and system fonts.
-Chromium uses **exact pixel comparisons**, with the seven exceptions documented
+Chromium uses **exact pixel comparisons**, with the eight exceptions documented
 below; Firefox runs
 behavior tests. Do not generate authoritative screenshots on the host OS:
 font rendering can differ.
@@ -74,7 +74,17 @@ Record button's label, visibility, enabled state, purple background, white text
 and rounded corners, in addition to the guide's existing containment assertions.
 
 The first six exceptions retain their original reference images; the seventh
-uses the reviewed hourly-toolbar guide reference. Dimension changes still fail.
+uses the reviewed hourly-toolbar guide reference.
+
+An eighth user-approved exception, `spaceship-blue-light-mobile-channels.png`,
+uses threshold `0.02` and at most 1,050 differing pixels. The exact image from
+CI run 40092427470 differs by 7,851 pixels at zero threshold and 1,020 at `0.02`,
+concentrated in Information-button glow and a few burger-menu pixels. Its
+original reference is retained. Independent assertions check all three
+Information links, text/border/glow colors, rounded corners, action alignment
+and containment, plus the burger icon's line dimensions and colors.
+
+Dimension changes still fail.
 Every other screenshot retains zero color threshold and zero
 differing pixels. Do not broaden these exceptions to accommodate application
 changes. Local passes alone do not prove identical rendering on another CI
@@ -84,6 +94,9 @@ All 37 themes cover channels and timers at desktop and mobile widths.
 Representative themes additionally cover recordings, configuration, the Watch
 TV shell, and event details. Interaction tests cover menus, theme options,
 htmx refresh, explicit theme selection, mobile navigation, and native controls.
+Reload checks await the shared font/image readiness helper before teardown,
+preventing Firefox from cancelling outstanding font requests; request-failure
+reporting remains strict.
 The suite also covers both OS color schemes in system mode. The completed
 integration and follow-up fixes were verified with 193 browser tests:
 programme-column alignment checks exercise all 37 themes on Channels and
@@ -145,6 +158,8 @@ images, bringing the complete suite to 311 tests and 248 reference images.
 The hourly-filter change refreshes only those 32 guide references. Apart from
 the specifically approved Light mobile guide exception above, comparison
 thresholds and the other reference images are unchanged.
+The subsequent run 40092427470 CI follow-up adds only the approved Blue Light
+mobile Channels policy described above; it changes no reference images.
 Generate only these new references with:
 
 ```sh
