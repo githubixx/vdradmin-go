@@ -43,6 +43,8 @@ func TestPlayingToday_Views(t *testing.T) {
 		{name: "default", role: "admin", status: 200},
 		{name: "list", query: "&view=list", role: "admin", status: 200},
 		{name: "guide", query: "&view=guide", role: "admin", status: 200},
+		{name: "midnight list", query: "&start=23:00&end=24:00", empty: true, status: 200},
+		{name: "midnight guide", query: "&view=guide&start=23:00&end=24:00", empty: true, status: 200},
 		{name: "viewer guide", query: "&view=guide", role: "viewer", status: 200},
 		{name: "filtered", query: "&view=guide&start=11:00", role: "admin", status: 200},
 		{name: "empty", query: "&view=guide", empty: true, status: 200},
@@ -83,6 +85,27 @@ func TestPlayingToday_Views(t *testing.T) {
 			}
 			if !strings.Contains(body, `class="playing-pager ui-pager toolbar"`) {
 				t.Fatal("missing shared Chroma UI pager composition")
+			}
+			for _, id := range []string{"playing-start", "playing-end"} {
+				control := regexp.MustCompile(`(?s)<select id="` + id + `".*?</select>`).FindString(body)
+				if control == "" {
+					t.Fatalf("missing hourly select %s", id)
+				}
+				wantCount := 24
+				if id == "playing-end" {
+					wantCount = 25
+					if !strings.Contains(control, `value="00:00" disabled`) {
+						t.Fatal("end before the earliest start is not disabled")
+					}
+					if strings.Contains(tc.query, "start=23:00") &&
+						(!strings.Contains(control, `value="23:00" disabled`) ||
+							!strings.Contains(control, `value="24:00" selected`)) {
+						t.Fatal("23:00 start must select midnight and disable earlier end options")
+					}
+				}
+				if got := strings.Count(control, "<option "); got != wantCount {
+					t.Fatalf("%s options = %d, want %d", id, got, wantCount)
+				}
 			}
 			if tc.failure {
 				if !strings.Contains(body, "fixture EPG unavailable") {
@@ -135,7 +158,7 @@ func TestPlayingToday_Views(t *testing.T) {
 					wantStart = "11:00"
 				}
 				if query.Get("day") != wantDay || query.Get("view") != wantView ||
-					query.Get("start") != wantStart || query.Get("end") != "23:59" ||
+					query.Get("start") != wantStart || query.Get("end") != "24:00" ||
 					query.Get("channel-jump") != "ch-1" {
 					t.Fatalf("navigation lost state: %s", u)
 				}

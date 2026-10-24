@@ -93,14 +93,14 @@ func TestGuideScenarios(t *testing.T) {
 	}
 	requireStatus(t, request(f, "POST", "/__test/guide", "", "application/json", `{"scenario":"many"}`), http.StatusOK)
 	requireStatus(t, request(f, "POST", "/__test/guide", "", "application/json", `{"scenario":"morning"}`), http.StatusOK)
-	res = request(f, "GET", "/playing?day="+fixtureDate+"&view=guide&start=07:09&end=23:59", "admin", "", "")
+	res = request(f, "GET", "/playing?day="+fixtureDate+"&view=guide&start=07:00&end=24:00", "admin", "", "")
 	requireStatus(t, res, http.StatusOK)
 	if !strings.Contains(res.Body.String(), "ARD-Morgenmagazin") ||
 		!strings.Contains(res.Body.String(), `data-guide-duration="60"`) {
 		t.Fatal("morning fixture must include the long programme and clipped one-minute slot")
 	}
 	requireStatus(t, request(f, "POST", "/__test/guide", "", "application/json", `{"scenario":"dense"}`), http.StatusOK)
-	res = request(f, "GET", "/playing?day="+fixtureDate+"&view=guide&start=09:50&end=11:00", "admin", "", "")
+	res = request(f, "GET", "/playing?day="+fixtureDate+"&view=guide&start=09:00&end=11:00", "admin", "", "")
 	requireStatus(t, res, http.StatusOK)
 	if !strings.Contains(res.Body.String(), "Morning panorama with regional views") ||
 		strings.Count(res.Body.String(), `data-guide-duration="300"`) != 2 {
@@ -109,7 +109,7 @@ func TestGuideScenarios(t *testing.T) {
 	if !strings.Contains(res.Body.String(), `<p class="epg-subtitle ui-item-subtitle">Regional stories`) {
 		t.Fatal("compact guide must retain full programme subtitle paragraphs")
 	}
-	res = request(f, "GET", "/playing?day="+fixtureDate+"&view=list&start=09:50&end=11:00", "admin", "", "")
+	res = request(f, "GET", "/playing?day="+fixtureDate+"&view=list&start=09:00&end=11:00", "admin", "", "")
 	requireStatus(t, res, http.StatusOK)
 	if !strings.Contains(res.Body.String(), `<p class="epg-subtitle ui-item-subtitle">Regional stories`) {
 		t.Fatal("List View must retain programme subtitle paragraphs")
@@ -129,15 +129,17 @@ func TestGuideWindowBoundaries(t *testing.T) {
 	}{
 		{"start=18:00&end=19:00", "3600"},
 		{"start=18:00&end=21:00", "10800"},
-		{"start=22:00&end=02:00", "14400"},
-		{"start=18:00&end=18:00", "86400"},
+		{"start=22:00&end=02:00", "3600"},
+		{"start=18:00&end=18:00", "3600"},
+		{"start=23:00&end=24:00", "3600"},
+		{"start=00:00&end=24:00", "86400"},
 	} {
 		res := request(f, "GET", "/playing?day="+fixtureDate+"&view=guide&"+tc.query, "admin", "", "")
 		requireStatus(t, res, http.StatusOK)
 		if !strings.Contains(res.Body.String(), `class="playing-groups" data-guide-duration="`+tc.duration+`"`) {
 			t.Fatalf("window %s has incorrect duration", tc.query)
 		}
-		if tc.duration == "3600" && strings.Contains(res.Body.String(), "Late Night Culture") {
+		if strings.HasPrefix(tc.query, "start=18:00") && tc.duration == "3600" && strings.Contains(res.Body.String(), "Late Night Culture") {
 			t.Fatal("programme outside the selected hour was included")
 		}
 	}

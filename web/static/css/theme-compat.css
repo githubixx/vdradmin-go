@@ -1318,6 +1318,13 @@
     grid-template-columns: minmax(0, 1fr) !important;
 }
 
+/* Theme button metrics must not split the Playing toolbar's control sizes. */
+:root main.page-playing .playing-toolbar :is(select, .custom-select-trigger, .btn-nav) {
+    height: 2.75rem !important;
+    padding-block: 0.5rem !important;
+    border-radius: 999px !important;
+}
+
 main.page-playing .toolbar.playing-toolbar {
     position: relative;
     z-index: 21;

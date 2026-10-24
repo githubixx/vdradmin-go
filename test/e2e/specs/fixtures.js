@@ -12,6 +12,8 @@ export const screenshotComparisonOptions = Object.freeze({
   'spaceship-grey-light-desktop-watch': { maxDiffPixels: 12 },
   'crt-starfield-1-mobile-configurations': { maxDiffPixels: 3600 },
   'spaceship-grey-light-mobile-recordings': { threshold: 0.02, maxDiffPixels: 450 },
+  'light-mobile-playing-guide': { maxDiffPixels: 40 },
+  'spaceship-blue-light-mobile-channels': { threshold: 0.02, maxDiffPixels: 1050 },
 });
 
 export const test = base.extend({
@@ -91,6 +93,10 @@ export async function openPage(page, url) {
     for (const result of await watchRequests) expect(result.ok()).toBeTruthy();
   }
   await expect(page.locator('main')).toBeVisible();
+  await waitForPageResources(page);
+}
+
+export async function waitForPageResources(page) {
   await page.evaluate(async () => {
     await document.fonts.ready;
     await Promise.all(Array.from(document.images, async image => {

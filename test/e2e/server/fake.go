@@ -223,7 +223,7 @@ func (f *fixtureVDR) setGuideScenario(scenario string) error {
 			if channel.Number == 3 {
 				windows = [][2]int{{5*60 + 30, 9 * 60}, {9 * 60, 10 * 60}, {10 * 60, 24 * 60}}
 			} else if channel.Number == 9 {
-				windows = [][2]int{{7 * 60, 7*60 + 10}, {7*60 + 10, 9 * 60}, {9 * 60, 24 * 60}}
+				windows = [][2]int{{6 * 60, 7*60 + 1}, {7*60 + 1, 9 * 60}, {9 * 60, 24 * 60}}
 			}
 			if scenario == "dense" {
 				windows = [][2]int{{9 * 60, 10 * 60}, {10 * 60, 11 * 60}}
@@ -239,6 +239,10 @@ func (f *fixtureVDR) setGuideScenario(scenario string) error {
 				}
 			}
 			for i, window := range windows {
+				if scenario == "dense" {
+					window[0] -= 50
+					window[1] -= 50
+				}
 				start, stop := day.Add(time.Duration(window[0])*time.Minute), day.Add(time.Duration(window[1])*time.Minute)
 				title := fmt.Sprintf("Morning programme %d", i+1)
 				subtitle := "A morning fixture programme"

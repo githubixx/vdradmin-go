@@ -32,7 +32,7 @@ verifying the pinned dependency through the standalone builder.
 
 The runner builds an isolated fixture server and uses the pinned Playwright
 1.64.1 Ubuntu amd64 image, including its pinned browser binaries and system fonts.
-Chromium uses **exact pixel comparisons**, with the six exceptions documented
+Chromium uses **exact pixel comparisons**, with the eight exceptions documented
 below; Firefox runs
 behavior tests. Do not generate authoritative screenshots on the host OS:
 font rendering can differ.
@@ -66,8 +66,26 @@ image-specific threshold is one tenth of Playwright's default `0.2`; it is not
 a percentage of pixels. The case independently verifies all three cards'
 Delete/Archive labels, visibility, alignment and containment.
 
-All six exceptions retain the original reference images; dimension changes
-still fail. Every other screenshot retains zero color threshold and zero
+A seventh user-approved exception permits at most 40 differing pixels at zero
+color threshold in `light-mobile-playing-guide.png`. After the hourly toolbar
+change, repeated captures differed by 13–39 pixels at the rounded Record-button
+edge; geometry and contents were unchanged. This case independently checks the
+Record button's label, visibility, enabled state, purple background, white text
+and rounded corners, in addition to the guide's existing containment assertions.
+
+The first six exceptions retain their original reference images; the seventh
+uses the reviewed hourly-toolbar guide reference.
+
+An eighth user-approved exception, `spaceship-blue-light-mobile-channels.png`,
+uses threshold `0.02` and at most 1,050 differing pixels. The exact image from
+CI run 40092427470 differs by 7,851 pixels at zero threshold and 1,020 at `0.02`,
+concentrated in Information-button glow and a few burger-menu pixels. Its
+original reference is retained. Independent assertions check all three
+Information links, text/border/glow colors, rounded corners, action alignment
+and containment, plus the burger icon's line dimensions and colors.
+
+Dimension changes still fail.
+Every other screenshot retains zero color threshold and zero
 differing pixels. Do not broaden these exceptions to accommodate application
 changes. Local passes alone do not prove identical rendering on another CI
 host; review failed CI images before attributing differences to rendering noise.
@@ -76,6 +94,9 @@ All 37 themes cover channels and timers at desktop and mobile widths.
 Representative themes additionally cover recordings, configuration, the Watch
 TV shell, and event details. Interaction tests cover menus, theme options,
 htmx refresh, explicit theme selection, mobile navigation, and native controls.
+Reload checks await the shared font/image readiness helper before teardown,
+preventing Firefox from cancelling outstanding font requests; request-failure
+reporting remains strict.
 The suite also covers both OS color schemes in system mode. The completed
 integration and follow-up fixes were verified with 193 browser tests:
 programme-column alignment checks exercise all 37 themes on Channels and
@@ -94,9 +115,9 @@ durations, a long title/subtitle, clipped programmes, internal/leading gaps, a
 channel without EPG data, and an inactive scheduled timer. `empty` supplies an
 empty schedule; `overlap` adds overlapping programme entries. `morning` includes
 a 05:30–09:00 programme and an off-page programme clipped to one minute in a
-07:09–23:59 window. `dense` provides long subtitles and two off-page five-minute
-programmes before 10:00, while the first three channels each have one programme
-ending at 10:00. These scenarios
+07:00–24:00 window. `dense` provides long subtitles and two off-page five-minute
+programmes before 09:10, while the first three channels each have one programme
+ending at 09:10. These scenarios
 do not change the existing reference-page fixtures.
 
 Chromium and Firefox cover layout selection, channel paging and boundaries,
@@ -112,14 +133,19 @@ time boundaries, chronological ordering, full window coverage, and no vertical
 card overflow. Explicit cases cover two/three/one programmes within the same
 hour, one-minute clipped slots, stable scale across channel pages, and overlapping
 entries with separately accessible actions. Go tests cover boundary exclusions,
-gap generation, retained original programme times, overlap lanes, overnight
-windows and equal start/end times. A full-day compactness regression checks
+gap generation, retained original programme times, overlap lanes, 24:00,
+daylight-saving midnight boundaries and correction of reversed/equal times.
+Hourly dropdown checks verify automatic end advancement, retention of later
+ends, disabled-option styling and keyboard skipping in both views. All 37
+themes also assert equal toolbar control heights, typography, vertical padding
+and rounded corners at desktop/intermediate/mobile widths.
+A full-day compactness regression checks
 Metal and Spaceship Cyan Dark at desktop/mobile widths: the morning programme's
 visible slot must be at most 700px tall, and the entire guide at most 2500px,
 despite the off-page one-minute slot. It also checks that 09:00 retains its
 position across channel pages. The dense-schedule regression limits the first
 programme row to 400px including full subtitles at desktop/mobile widths in
-those same two themes and verifies that the 10:00 boundary and total timeline height remain unchanged
+those same two themes and verifies that the 09:10 boundary and total timeline height remain unchanged
 when paging. It also checks full title and inline subtitle visibility, while
 Information and List View retain their existing subtitle paragraphs.
 System mode exercises both OS color schemes.
@@ -127,8 +153,13 @@ System mode exercises both OS color schemes.
 Representative themes have new desktop/mobile guide references, including the
 open view dropdown. These are additional baselines, not replacements for the
 existing reference pages; all existing comparison thresholds remain unchanged.
-The guide adds 98 browser behavior checks and 16 visual cases with 32 new
-images, bringing the complete suite to 309 tests and 248 reference images.
+The guide includes 100 browser behavior checks and 16 visual cases with 32
+images, bringing the complete suite to 311 tests and 248 reference images.
+The hourly-filter change refreshes only those 32 guide references. Apart from
+the specifically approved Light mobile guide exception above, comparison
+thresholds and the other reference images are unchanged.
+The subsequent run 40092427470 CI follow-up adds only the approved Blue Light
+mobile Channels policy described above; it changes no reference images.
 Generate only these new references with:
 
 ```sh
