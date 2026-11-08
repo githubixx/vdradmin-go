@@ -1,4 +1,4 @@
-import { test, expect, themes, representatives, selectTheme, openPage, screenshot, assertWatchLayout, guideURL, prepareGuide, assertGuideLayout } from './fixtures.js';
+import { test, expect, themes, matrixThemes, representatives, selectTheme, openPage, screenshot, assertWatchLayout, guideURL, prepareGuide, assertGuideLayout } from './fixtures.js';
 
 const sizes = {
   desktop: { width: 1440, height: 1000 },
@@ -38,7 +38,7 @@ test('theme inventory is preserved', async ({ request }) => {
   expect(metadata.themes.slice().sort()).toEqual(themes.slice().sort());
 });
 
-for (const theme of themes) {
+for (const theme of matrixThemes) {
   for (const [size, viewport] of Object.entries(sizes)) {
     test(`${theme} ${size} reference pages`, async ({ page, request }) => {
       await selectTheme(request, theme);
@@ -130,29 +130,6 @@ for (const theme of representatives) {
       ]) {
         await openPage(page, url);
         if (name === 'watch') await assertWatchLayout(page);
-        if (theme === 'spaceship-grey-light' && size === 'mobile' && name === 'recordings') {
-          const cards = page.locator('.recording-item');
-          await expect(cards).toHaveCount(3);
-          for (const card of await cards.all()) {
-            await expect(card.getByRole('button', { name: 'Delete', exact: true })).toBeVisible();
-            await expect(card.getByRole('link', { name: 'Archive', exact: true })).toBeVisible();
-            const geometry = await card.evaluate(item => {
-              const box = item.getBoundingClientRect();
-              const [remove, archive] = Array.from(item.querySelectorAll('.recording-actions .btn'),
-                action => action.getBoundingClientRect());
-              return {
-                topOffset: remove.top - archive.top,
-                gap: archive.left - remove.right,
-                leftInset: remove.left - box.left,
-                rightInset: box.right - archive.right,
-              };
-            });
-            expect(geometry.topOffset, 'Recording actions must share a top edge').toBeCloseTo(0, 1);
-            expect(geometry.gap, 'Recording actions must not overlap').toBeGreaterThanOrEqual(0);
-            expect(geometry.leftInset, 'Delete must remain inside its card').toBeGreaterThanOrEqual(0);
-            expect(geometry.rightInset, 'Archive must remain inside its card').toBeGreaterThanOrEqual(0);
-          }
-        }
         if (theme === 'crt-starfield-1' && size === 'mobile' && name === 'configurations') {
           const geometry = await page.getByRole('link', { name: 'Manage ffmpeg profiles', exact: true }).evaluate(button => {
             const box = button.getBoundingClientRect();
@@ -183,6 +160,44 @@ for (const theme of representatives) {
       await screenshot(page, `${theme}-${size}-event`);
     });
   }
+}
+
+test('spaceship-grey-light mobile recording actions remain aligned', async ({ page, request }) => {
+  await selectTheme(request, 'spaceship-grey-light');
+  await page.setViewportSize(sizes.mobile);
+  await openPage(page, '/recordings');
+  const cards = page.locator('.recording-item');
+  await expect(cards).toHaveCount(3);
+  for (const card of await cards.all()) {
+    await expect(card.getByRole('button', { name: 'Delete', exact: true })).toBeVisible();
+    await expect(card.getByRole('link', { name: 'Archive', exact: true })).toBeVisible();
+    const geometry = await card.evaluate(item => {
+      const box = item.getBoundingClientRect();
+      const [remove, archive] = Array.from(item.querySelectorAll('.recording-actions .btn'),
+        action => action.getBoundingClientRect());
+      return {
+        topOffset: remove.top - archive.top,
+        gap: archive.left - remove.right,
+        leftInset: remove.left - box.left,
+        rightInset: box.right - archive.right,
+      };
+    });
+    expect(geometry.topOffset, 'Recording actions must share a top edge').toBeCloseTo(0, 1);
+    expect(geometry.gap, 'Recording actions must not overlap').toBeGreaterThanOrEqual(0);
+    expect(geometry.leftInset, 'Delete must remain inside its card').toBeGreaterThanOrEqual(0);
+    expect(geometry.rightInset, 'Archive must remain inside its card').toBeGreaterThanOrEqual(0);
+  }
+  await screenshot(page, 'spaceship-grey-light-mobile-recordings');
+});
+
+for (const theme of ['spaceship-grey-dark', 'spaceship-grey-light']) {
+  test(`${theme} desktop Watch layout`, async ({ page, request }) => {
+    await selectTheme(request, theme);
+    await page.setViewportSize(sizes.desktop);
+    await openPage(page, '/watch?interval=0');
+    await assertWatchLayout(page);
+    await screenshot(page, `${theme}-desktop-watch`);
+  });
 }
 
 for (const colorScheme of ['light', 'dark']) {

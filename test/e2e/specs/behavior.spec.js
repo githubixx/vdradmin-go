@@ -1,4 +1,4 @@
-import { test, expect, themes, selectTheme, openPage, waitForPageResources, screenshot, routeResources, assertWatchLayout, guideURL, prepareGuide, choosePlayingOption, assertGuideLayout } from './fixtures.js';
+import { test, expect, matrixThemes, selectTheme, openPage, waitForPageResources, screenshot, routeResources, assertWatchLayout, guideURL, prepareGuide, choosePlayingOption, assertGuideLayout } from './fixtures.js';
 
 test.beforeEach(async ({ request }) => {
   await selectTheme(request, 'metal-1');
@@ -470,7 +470,7 @@ for (const colorScheme of ['light', 'dark']) {
   });
 }
 
-for (const theme of themes) {
+for (const theme of matrixThemes) {
   test(`${theme} TV Guide fits desktop, intermediate and mobile widths`, async ({ page, request }) => {
     await selectTheme(request, theme);
     await prepareGuide(request);
@@ -509,8 +509,8 @@ test('timer fixtures expose recording, inactive and conflict states', async ({ p
   await expect(page.locator('.timer-item.conflict').first()).toBeVisible();
 });
 
-for (const theme of themes) {
-  test(`${theme} programme columns align across time ranges`, async ({ page, request }, testInfo) => {
+for (const theme of matrixThemes) {
+  test(`${theme} programme columns align across time ranges`, async ({ page, request }) => {
     await selectTheme(request, theme);
     const response = await request.get('/__test/ready');
     expect(response.ok()).toBeTruthy();
@@ -565,9 +565,6 @@ for (const theme of themes) {
           for (const row of rows) {
             expect(row.contentTop, 'Mobile content must remain below its time').toBeGreaterThanOrEqual(row.timeBottom);
           }
-        }
-        if (theme === 'spaceship-purple-dark') {
-          await page.screenshot({ path: testInfo.outputPath(`${route}-${width}-alignment.png`), fullPage: true });
         }
       }
     }

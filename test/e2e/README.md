@@ -107,22 +107,26 @@ differing pixels. Do not broaden these exceptions to accommodate application
 changes. Local passes alone do not prove identical rendering on another CI
 host; review failed CI images before attributing differences to rendering noise.
 
-All 39 themes cover channels and timers at desktop and mobile widths.
-Representative themes additionally cover recordings, configuration, the Watch
-TV shell, and event details. Interaction tests cover menus, theme options,
+The inventory check retains all 39 themes. The browser matrix covers the 19
+non-HUD themes, including `spaceship-2`, plus `spaceship-blue-light` as the
+representative for the 20 color variants. These 20 themes cover channels and
+timers at desktop and mobile widths. Selected themes additionally cover
+recordings, configuration, the Watch TV shell, and event details. The focused
+grey-light mobile recordings and grey dark/light desktop Watch checks remain
+separate; the cyan HUD guide regressions also remain. This reduces repeated
+layout and screenshot coverage, but does not visually verify every HUD palette.
+Interaction tests cover menus, theme options,
 htmx refresh, explicit theme selection, mobile navigation, and native controls.
 Reload checks await the shared font/image readiness helper before teardown,
 preventing Firefox from cancelling outstanding font requests; request-failure
 reporting remains strict.
-The suite also covers both OS color schemes in system mode. The completed
-integration and follow-up fixes were verified with 193 browser tests:
-programme-column alignment checks exercise all 39 themes on Channels and
+The suite also covers both OS color schemes in system mode.
+Programme-column alignment checks exercise the 20 matrix themes on Channels and
 Playing at 1440px, 769px, and 390px in Chromium and Firefox, including varied
 time digits and long-title wrapping. Metal-specific checks verify orange
 collisions and red critical conflicts on timer cards and timeline blocks while
-retaining metallic buttons and recording styling.
-An additional Chromium/Firefox check verifies Aurora's centered navigation
-badge/menu and aligned archive-job actions, bringing the suite to 195 tests.
+retaining metallic buttons and recording styling. A Chromium/Firefox check
+verifies Aurora's centered navigation badge/menu and aligned archive-job actions.
 
 ### Playing Today TV Guide
 
@@ -141,7 +145,7 @@ Chromium and Firefox cover layout selection, channel paging and boundaries,
 keyboard channel selection, history/reload/resize, day/time state preservation
 (including navigation through an empty day), Information popups, real timer
 creation, viewer permissions, invalid view input, unknown anchors and the
-JavaScript-disabled fallback. Geometry checks cover all 39 themes at 1440px,
+JavaScript-disabled fallback. Geometry checks cover all 20 matrix themes at 1440px,
 769px and 390px, including the last channel page. They assert no horizontal
 document overflow, one row of channel columns, stacked programme content/actions
 and contained controls, including the shared Chroma UI `ui-pager` layout.
@@ -153,7 +157,7 @@ entries with separately accessible actions. Go tests cover boundary exclusions,
 gap generation, retained original programme times, overlap lanes, 24:00,
 daylight-saving midnight boundaries and correction of reversed/equal times.
 Hourly dropdown checks verify automatic end advancement, retention of later
-ends, disabled-option styling and keyboard skipping in both views. All 37
+ends, disabled-option styling and keyboard skipping in both views. The 20 matrix
 themes also assert equal toolbar control heights, typography, vertical padding
 and rounded corners at desktop/intermediate/mobile widths.
 A full-day compactness regression checks
@@ -218,8 +222,9 @@ bash scripts/test-e2e.sh
 Review the changed PNG files before accepting them. A migration failure is not
 permission to replace the original expectations.
 
-The 216 reference images retain the original appearance except for these
-explicitly approved updates:
+The original 216 reference images retained their appearance except for these
+explicitly approved updates. Some are now retained for historical reference
+rather than exercised by the reduced HUD matrix:
 
 - `chromium/behavior.spec.js/metal-theme-dropdown-open.png`: opaque Metal
   dropdown, readable selected text, and scrolling the current selection into

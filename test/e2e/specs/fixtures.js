@@ -62,19 +62,23 @@ export async function routeResources(target, failures) {
 
 export { expect };
 
+const hudThemes = ['blue', 'cyan', 'green', 'grey', 'magenta', 'mono', 'orange', 'purple', 'red', 'yellow']
+  .flatMap(color => [`spaceship-${color}-dark`, `spaceship-${color}-light`]);
+
 export const themes = [
   'aurora-glass-1', 'cartoon-1', 'crt-starfield-1', 'dark', 'fitness',
   'glas-1', 'gold-1', 'golden-moon', 'leather-style-black-1',
   'leather-style-red-1', 'light', 'lighting-1', 'luxury-1',
   'mantle-1', 'metal-1', 'retro-arcade', 'solar-system-1', 'space-night-1',
   'spaceship-2',
-  ...['blue', 'cyan', 'green', 'grey', 'magenta', 'mono', 'orange', 'purple', 'red', 'yellow']
-    .flatMap(color => [`spaceship-${color}-dark`, `spaceship-${color}-light`]),
+  ...hudThemes,
 ];
 
+export const matrixThemes = themes.filter(theme => !hudThemes.includes(theme) || theme === 'spaceship-blue-light');
+
 export const representatives = [
-  'light', 'dark', 'cartoon-1', 'metal-1', 'spaceship-grey-dark',
-  'spaceship-grey-light', 'spaceship-2', 'crt-starfield-1',
+  'light', 'dark', 'cartoon-1', 'metal-1', 'spaceship-blue-light',
+  'spaceship-2', 'crt-starfield-1',
 ];
 
 export async function selectTheme(request, theme) {
