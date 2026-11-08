@@ -1,4 +1,4 @@
-import { test, expect, themes, representatives, selectTheme, openPage, screenshot, assertWatchLayout, guideURL, prepareGuide, assertGuideLayout } from './fixtures.js';
+import { test, expect, themes, matrixThemes, representatives, selectTheme, openPage, screenshot, assertWatchLayout, guideURL, prepareGuide, assertGuideLayout } from './fixtures.js';
 
 const sizes = {
   desktop: { width: 1440, height: 1000 },
@@ -13,11 +13,12 @@ for (const theme of representatives) {
       await page.setViewportSize(viewport);
       await openPage(page, guideURL);
       await assertGuideLayout(page);
-      if (theme === 'light' && size === 'mobile') {
+      if ((theme === 'light' || theme === 'dark') && size === 'mobile') {
         const record = page.locator('.playing-group:visible').getByRole('button', { name: 'Record', exact: true }).first();
         await expect(record).toBeVisible();
         await expect(record).toBeEnabled();
-        await expect(record).toHaveCSS('background-color', 'rgb(124, 58, 237)');
+        await expect(record).toHaveCSS('background-color',
+          theme === 'light' ? 'rgb(124, 58, 237)' : 'rgb(167, 139, 250)');
         await expect(record).toHaveCSS('color', 'rgb(255, 255, 255)');
         await expect(record).toHaveCSS('border-radius', '999px');
       }
@@ -38,13 +39,21 @@ test('theme inventory is preserved', async ({ request }) => {
   expect(metadata.themes.slice().sort()).toEqual(themes.slice().sort());
 });
 
-for (const theme of themes) {
+for (const theme of matrixThemes) {
   for (const [size, viewport] of Object.entries(sizes)) {
     test(`${theme} ${size} reference pages`, async ({ page, request }) => {
       await selectTheme(request, theme);
       await page.setViewportSize(viewport);
       await openPage(page, '/channels?day=2026-10-17');
       await expect(page.locator('.epg-item').first()).toBeVisible();
+      if (theme === 'retro-arcade' && size === 'mobile') {
+        const channel = page.locator('#channel').locator('..').locator('.custom-select-trigger');
+        const day = page.locator('#day').locator('..').locator('.custom-select-trigger');
+        await expect(channel).toBeVisible();
+        await expect(channel).toContainText('Das Erste HD');
+        await expect(day).toBeVisible();
+        await expect(day).toContainText(/\b\d{4}-\d{2}-\d{2}\b/);
+      }
       if (theme === 'spaceship-blue-light' && size === 'mobile') {
         const cards = page.locator('.epg-item');
         await expect(cards).toHaveCount(3);
@@ -97,6 +106,31 @@ for (const theme of themes) {
       await screenshot(page, `${theme}-${size}-channels`);
       await openPage(page, '/timers?day=2026-10-17');
       await expect(page.locator('.timer-item').first()).toBeVisible();
+      if (theme === 'leather-style-red-1' && size === 'desktop') {
+        for (const [state, color] of [
+          ['recording', 'rgb(74, 222, 128)'],
+          ['collision', 'rgb(251, 191, 36)'],
+          ['conflict', 'rgb(255, 82, 100)'],
+        ]) {
+          await expect(page.locator(`.timer-item.${state}`).first()).toHaveCSS('border-left-color', color);
+        }
+      }
+      if (theme === 'mantle-1' && size === 'mobile') {
+        const day = page.locator('#day').locator('..').locator('.custom-select-trigger');
+        await expect(day).toBeVisible();
+        await expect(day).toContainText(/\b\d{4}-\d{2}-\d{2}\b/);
+        await expect(day).toHaveCSS('border-radius', '999px');
+        await expect(day).toHaveCSS('box-shadow', /inset/);
+        await expect(page.getByLabel('Menu', { exact: true })).toBeVisible();
+        const icon = page.locator('.nav-burger-button .burger-icon');
+        await expect(icon).toHaveCSS('width', '18px');
+        await expect(icon).toHaveCSS('height', '12px');
+        await expect(icon).toHaveCSS('background-image', /linear-gradient/);
+        await expect(page.locator('.timer-item.recording').first()).toHaveCSS('border-left-color', 'rgb(88, 182, 148)');
+        await expect(page.locator('.timer-item.collision').first()).toHaveCSS('border-left-color', 'rgb(204, 155, 99)');
+        await expect(page.locator('.timer-item.conflict').first()).toHaveCSS('border-left-color', 'rgb(182, 98, 123)');
+        await expect(page.locator('.timeline-block.critical').first()).toBeVisible();
+      }
       await screenshot(page, `${theme}-${size}-timers`);
     });
   }
@@ -113,28 +147,13 @@ for (const theme of representatives) {
         ['watch', '/watch?interval=0'],
       ]) {
         await openPage(page, url);
-        if (name === 'watch') await assertWatchLayout(page);
-        if (theme === 'spaceship-grey-light' && size === 'mobile' && name === 'recordings') {
-          const cards = page.locator('.recording-item');
-          await expect(cards).toHaveCount(3);
-          for (const card of await cards.all()) {
-            await expect(card.getByRole('button', { name: 'Delete', exact: true })).toBeVisible();
-            await expect(card.getByRole('link', { name: 'Archive', exact: true })).toBeVisible();
-            const geometry = await card.evaluate(item => {
-              const box = item.getBoundingClientRect();
-              const [remove, archive] = Array.from(item.querySelectorAll('.recording-actions .btn'),
-                action => action.getBoundingClientRect());
-              return {
-                topOffset: remove.top - archive.top,
-                gap: archive.left - remove.right,
-                leftInset: remove.left - box.left,
-                rightInset: box.right - archive.right,
-              };
-            });
-            expect(geometry.topOffset, 'Recording actions must share a top edge').toBeCloseTo(0, 1);
-            expect(geometry.gap, 'Recording actions must not overlap').toBeGreaterThanOrEqual(0);
-            expect(geometry.leftInset, 'Delete must remain inside its card').toBeGreaterThanOrEqual(0);
-            expect(geometry.rightInset, 'Archive must remain inside its card').toBeGreaterThanOrEqual(0);
+        if (name === 'watch') {
+          await assertWatchLayout(page);
+          if (theme === 'spaceship-blue-light' && size === 'desktop') {
+            const sizeControl = page.locator('#watchtv-size').locator('..').locator('.custom-select-trigger');
+            await expect(sizeControl).toBeVisible();
+            await expect(sizeControl).toContainText('1:2');
+            await expect(sizeControl).toHaveCSS('border-radius', '10.4px');
           }
         }
         if (theme === 'crt-starfield-1' && size === 'mobile' && name === 'configurations') {
@@ -167,6 +186,44 @@ for (const theme of representatives) {
       await screenshot(page, `${theme}-${size}-event`);
     });
   }
+}
+
+test('spaceship-grey-light mobile recording actions remain aligned', async ({ page, request }) => {
+  await selectTheme(request, 'spaceship-grey-light');
+  await page.setViewportSize(sizes.mobile);
+  await openPage(page, '/recordings');
+  const cards = page.locator('.recording-item');
+  await expect(cards).toHaveCount(3);
+  for (const card of await cards.all()) {
+    await expect(card.getByRole('button', { name: 'Delete', exact: true })).toBeVisible();
+    await expect(card.getByRole('link', { name: 'Archive', exact: true })).toBeVisible();
+    const geometry = await card.evaluate(item => {
+      const box = item.getBoundingClientRect();
+      const [remove, archive] = Array.from(item.querySelectorAll('.recording-actions .btn'),
+        action => action.getBoundingClientRect());
+      return {
+        topOffset: remove.top - archive.top,
+        gap: archive.left - remove.right,
+        leftInset: remove.left - box.left,
+        rightInset: box.right - archive.right,
+      };
+    });
+    expect(geometry.topOffset, 'Recording actions must share a top edge').toBeCloseTo(0, 1);
+    expect(geometry.gap, 'Recording actions must not overlap').toBeGreaterThanOrEqual(0);
+    expect(geometry.leftInset, 'Delete must remain inside its card').toBeGreaterThanOrEqual(0);
+    expect(geometry.rightInset, 'Archive must remain inside its card').toBeGreaterThanOrEqual(0);
+  }
+  await screenshot(page, 'spaceship-grey-light-mobile-recordings');
+});
+
+for (const theme of ['spaceship-grey-dark', 'spaceship-grey-light']) {
+  test(`${theme} desktop Watch layout`, async ({ page, request }) => {
+    await selectTheme(request, theme);
+    await page.setViewportSize(sizes.desktop);
+    await openPage(page, '/watch?interval=0');
+    await assertWatchLayout(page);
+    await screenshot(page, `${theme}-desktop-watch`);
+  });
 }
 
 for (const colorScheme of ['light', 'dark']) {

@@ -134,53 +134,18 @@
 /* aurora-glass-1: VDR domain components. */
 /* The original themed frame overrode the base inactive marker. */
 :root:where([data-theme-source="bundled"])[data-theme="aurora-glass-1"] .timer-item.inactive {
-    border-left-color: rgba(143, 210, 255, 0.50);
+    border-left-color: rgba(143, 185, 255, 0.4);
 }
 
-:root:where([data-theme-source="bundled"])[data-theme="aurora-glass-1"] .epg-item,
-:root:where([data-theme-source="bundled"])[data-theme="aurora-glass-1"] .timer-item,
-:root:where([data-theme-source="bundled"])[data-theme="aurora-glass-1"] .recording-item,
 :root:where([data-theme-source="bundled"])[data-theme="aurora-glass-1"] .config-panel,
 :root:where([data-theme-source="bundled"])[data-theme="aurora-glass-1"] .watchtv-screen-inner,
 :root:where([data-theme-source="bundled"])[data-theme="aurora-glass-1"] .watchtv-channels-panel,
 :root:where([data-theme-source="bundled"])[data-theme="aurora-glass-1"] .remote-panel {
-    background-color: rgba(7, 15, 50, 0.78);
+    background-color: rgba(7, 15, 50, 0.55);
     background-image: var(--surface-color);
-    border-color: rgba(143, 210, 255, 0.50);
+    border-color: rgba(143, 185, 255, 0.4);
     box-shadow: var(--shadow);
-}
-
-:root:where([data-theme-source="bundled"])[data-theme="aurora-glass-1"] .epg-item,
-:root:where([data-theme-source="bundled"])[data-theme="aurora-glass-1"] .timer-item,
-:root:where([data-theme-source="bundled"])[data-theme="aurora-glass-1"] .recording-item {
-    position: relative;
-    overflow: hidden;
-}
-
-:root:where([data-theme-source="bundled"])[data-theme="aurora-glass-1"] .epg-item::before,
-:root:where([data-theme-source="bundled"])[data-theme="aurora-glass-1"] .timer-item::before,
-:root:where([data-theme-source="bundled"])[data-theme="aurora-glass-1"] .recording-item::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background-image: url('/themes/aurora-glass-1/assets/panel-gloss.svg');
-    background-repeat: no-repeat;
-    background-size: 100% 100%;
-    mix-blend-mode: screen;
-    opacity: 0.9;
-}
-
-:root:where([data-theme-source="bundled"])[data-theme="aurora-glass-1"] .epg-item::after,
-:root:where([data-theme-source="bundled"])[data-theme="aurora-glass-1"] .timer-item::after,
-:root:where([data-theme-source="bundled"])[data-theme="aurora-glass-1"] .recording-item::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    box-shadow: inset 0 0 0 1px rgba(231, 247, 255, 0.18), inset 0 -30px 34px rgba(0, 0, 25, 0.24);
-    pointer-events: none;
+    backdrop-filter: blur(18px) saturate(135%);
 }
 
 :root:where([data-theme-source="bundled"])[data-theme="aurora-glass-1"] .channels-day {
@@ -216,6 +181,12 @@
 :root:where([data-theme-source="bundled"])[data-theme="aurora-glass-1"] .timeline-block.critical {
     background: linear-gradient(135deg, #e11d48, #f43f5e);
     border-color: #fecdd3;
+}
+
+/* Channel headings are VDR-specific; leather accents are too light for white text. */
+:root:where([data-theme-source="bundled"]):is([data-theme="leather-style-black-1"], [data-theme="leather-style-red-1"]) .channels-day {
+    background-color: var(--nav-active-bg);
+    color: var(--text-color);
 }
 
 /* crt-starfield-1: VDR domain components. */

@@ -174,8 +174,8 @@ func TestEmbeddedThemesWithoutThemeDirectory(t *testing.T) {
 			t.Errorf("unexpected handler errors:\n%s", logs.String())
 		}
 	})
-	if ids := f.themes.GetAvailableThemes(); len(ids) != 37 {
-		t.Fatalf("embedded theme count = %d, want 37", len(ids))
+	if ids := f.themes.GetAvailableThemes(); len(ids) != 39 {
+		t.Fatalf("embedded theme count = %d, want 39", len(ids))
 	}
 	for _, id := range f.themes.GetAvailableThemes() {
 		requireStatus(t, request(f, "GET", "/themes/"+id+"/theme.css", "admin", "", ""), http.StatusOK)

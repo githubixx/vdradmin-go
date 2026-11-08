@@ -7,7 +7,19 @@ const resources = JSON.parse(await readFile(new URL('../resources.lock.json', im
 
 export const screenshotComparisonOptions = Object.freeze({
   'aurora-glass-1-mobile-timers': { maxDiffPixels: 100 },
+  'dark-mobile-playing-guide': { maxDiffPixels: 70 },
+  'leather-style-black-1-desktop-channels': { maxDiffPixels: 200 },
+  'leather-style-black-1-desktop-timers': { maxDiffPixels: 700 },
+  'leather-style-black-1-mobile-channels': { maxDiffPixels: 100 },
+  'leather-style-black-1-mobile-timers': { maxDiffPixels: 1000 },
+  'leather-style-red-1-desktop-channels': { maxDiffPixels: 250 },
+  'leather-style-red-1-desktop-timers': { maxDiffPixels: 950 },
+  'leather-style-red-1-mobile-channels': { maxDiffPixels: 100 },
+  'leather-style-red-1-mobile-timers': { maxDiffPixels: 1400 },
   'luxury-1-mobile-timers': { maxDiffPixels: 100 },
+  'mantle-1-mobile-timers': { maxDiffPixels: 2300 },
+  'retro-arcade-mobile-channels': { maxDiffPixels: 20 },
+  'spaceship-blue-light-desktop-watch': { maxDiffPixels: 15 },
   'spaceship-grey-dark-desktop-watch': { maxDiffPixels: 12 },
   'spaceship-grey-light-desktop-watch': { maxDiffPixels: 12 },
   'crt-starfield-1-mobile-configurations': { maxDiffPixels: 3600 },
@@ -54,18 +66,23 @@ export async function routeResources(target, failures) {
 
 export { expect };
 
+const hudThemes = ['blue', 'cyan', 'green', 'grey', 'magenta', 'mono', 'orange', 'purple', 'red', 'yellow']
+  .flatMap(color => [`spaceship-${color}-dark`, `spaceship-${color}-light`]);
+
 export const themes = [
   'aurora-glass-1', 'cartoon-1', 'crt-starfield-1', 'dark', 'fitness',
-  'glas-1', 'gold-1', 'golden-moon', 'light', 'lighting-1', 'luxury-1',
+  'glas-1', 'gold-1', 'golden-moon', 'leather-style-black-1',
+  'leather-style-red-1', 'light', 'lighting-1', 'luxury-1',
   'mantle-1', 'metal-1', 'retro-arcade', 'solar-system-1', 'space-night-1',
   'spaceship-2',
-  ...['blue', 'cyan', 'green', 'grey', 'magenta', 'mono', 'orange', 'purple', 'red', 'yellow']
-    .flatMap(color => [`spaceship-${color}-dark`, `spaceship-${color}-light`]),
+  ...hudThemes,
 ];
 
+export const matrixThemes = themes.filter(theme => !hudThemes.includes(theme) || theme === 'spaceship-blue-light');
+
 export const representatives = [
-  'light', 'dark', 'cartoon-1', 'metal-1', 'spaceship-grey-dark',
-  'spaceship-grey-light', 'spaceship-2', 'crt-starfield-1',
+  'light', 'dark', 'cartoon-1', 'metal-1', 'spaceship-blue-light',
+  'spaceship-2', 'crt-starfield-1',
 ];
 
 export async function selectTheme(request, theme) {

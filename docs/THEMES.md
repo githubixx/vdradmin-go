@@ -12,7 +12,7 @@ These are always available:
 
 ## Bundled Themes
 
-All 37 original themes are embedded by
+All 39 themes are embedded by
 [Chroma UI](https://github.com/githubixx/chroma-ui); an installed `themes/`
 directory is no longer required. VDR keeps its page layouts, domain-specific
 theme adjustments, menu contents, authorization, and configured selection.
@@ -43,6 +43,8 @@ Curated themes currently included:
 - `glas-1`
 - `gold-1`
 - `golden-moon`
+- `leather-style-black-1`
+- `leather-style-red-1`
 - `lighting-1`
 - `luxury-1`
 - `mantle-1`
