@@ -115,7 +115,7 @@ vdradmin-go/
 
 Shared themes and components come from
 [Chroma UI](https://github.com/githubixx/chroma-ui). This checkout pins the
-published release `v0.2.0`, including the shared TV Guide pager layout.
+published release `v0.3.0`, including the shared TV Guide pager layout.
 Normal builds fetch that exact version;
 no sibling checkout or local workspace is required.
 
@@ -163,7 +163,7 @@ sh scripts/check-release-readiness.sh
 It always disables workspaces, requires a versioned Chroma UI dependency
 without a replacement, checks `go mod tidy -diff`, and verifies module
 integrity. It never edits dependency manifests or publishes anything.
-The current dependency is pinned to the published Chroma UI release `v0.2.0`.
+The current dependency is pinned to the published Chroma UI release `v0.3.0`.
 
 Go/UI CI, GoReleaser's pre-build hooks, and default Docker builders enforce
 this gate rather than silently resolving an arbitrary library revision.
@@ -366,10 +366,10 @@ vdradmin-go includes a modular theme system for easy customization:
 - **System** (default): Automatically follows OS/browser dark/light mode preference
 - **Light**: Always use light theme
 - **Dark**: Always use dark theme
-- **Curated bundled themes**: `aurora-glass-1`, `cartoon-1`, `crt-starfield-1`, `fitness`, `glas-1`, `gold-1`, `golden-moon`, `lighting-1`, `luxury-1`, `mantle-1`, `metal-1`, `retro-arcade`, `solar-system-1`, `space-night-1`, `spaceship-2`
+- **Curated bundled themes**: `aurora-glass-1`, `cartoon-1`, `crt-starfield-1`, `fitness`, `glas-1`, `gold-1`, `golden-moon`, `leather-style-black-1`, `leather-style-red-1`, `lighting-1`, `luxury-1`, `mantle-1`, `metal-1`, `retro-arcade`, `solar-system-1`, `space-night-1`, `spaceship-2`
 - **Spaceship variants**: `spaceship-blue-(dark|light)`, `spaceship-cyan-(dark|light)`, `spaceship-green-(dark|light)`, `spaceship-grey-(dark|light)`, `spaceship-magenta-(dark|light)`, `spaceship-mono-(dark|light)`, `spaceship-orange-(dark|light)`, `spaceship-purple-(dark|light)`, `spaceship-red-(dark|light)`, `spaceship-yellow-(dark|light)`
 
-All 37 themes are embedded by Chroma UI. Optional subdirectories under
+All 39 themes are embedded by Chroma UI. Optional subdirectories under
 `web/themes/` add complete custom themes or replace embedded IDs. Each must
 contain valid `theme.yaml` and nonempty `theme.css`. The Configurations page
 shows `System (auto)` plus the merged catalog.

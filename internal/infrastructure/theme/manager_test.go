@@ -70,8 +70,22 @@ func TestEmbeddedAndLocalMerge(t *testing.T) {
 	dir := testDirectory(t)
 	m := discoveredManager(t, dir)
 	bundled := m.GetAvailableThemes()
-	if len(bundled) != 37 || !sort.StringsAreSorted(bundled) {
-		t.Fatalf("expected 37 sorted embedded themes, got %v", bundled)
+	if len(bundled) != 39 || !sort.StringsAreSorted(bundled) {
+		t.Fatalf("expected 39 sorted embedded themes, got %v", bundled)
+	}
+	for id, name := range map[string]string{
+		"leather-style-black-1": "Leather Style Black 1",
+		"leather-style-red-1":   "Leather Style Red 1",
+	} {
+		theme, ok := m.GetTheme(id)
+		if !ok || theme.Name != name || !m.IsValidTheme(id) {
+			t.Errorf("embedded theme %q = %+v, %v", id, theme, ok)
+		}
+		for _, path := range []string{"/themes/" + id + "/theme.css", "/themes/" + id + "/assets/editorial-desktop.webp", "/themes/" + id + "/assets/editorial-mobile.webp", "/themes/" + id + "/assets/panel-frame.webp"} {
+			if got := request(m.Handler(nil), http.MethodGet, path); got.Code != http.StatusOK || got.Body.Len() == 0 {
+				t.Errorf("embedded asset %q: status %d, length %d", path, got.Code, got.Body.Len())
+			}
+		}
 	}
 	writeTheme(t, dir, "light", "Local Light", ":root { color: red; }")
 	writeTheme(t, dir, "custom", "Custom", ":root { color: blue; }")
@@ -79,7 +93,7 @@ func TestEmbeddedAndLocalMerge(t *testing.T) {
 		t.Fatal(err)
 	}
 	ids := m.GetAvailableThemes()
-	if len(ids) != 38 || !sort.StringsAreSorted(ids) {
+	if len(ids) != 40 || !sort.StringsAreSorted(ids) {
 		t.Fatalf("expected merged sorted IDs, got %v", ids)
 	}
 	expectedIDs := append([]string(nil), ids...)
@@ -107,7 +121,7 @@ func TestMissingDirectoryCanAppearOnReload(t *testing.T) {
 	dir := filepath.Join(testDirectory(t), "later")
 	m := discoveredManager(t, dir)
 	handler := m.Handler(nil)
-	if len(m.GetAvailableThemes()) != 37 {
+	if len(m.GetAvailableThemes()) != 39 {
 		t.Fatal("missing optional directory did not use embedded themes")
 	}
 	if got := request(handler, http.MethodGet, "/themes/light/theme.css"); got.Code != http.StatusOK {

@@ -189,7 +189,7 @@ HTTP → Handler → TimerService → EPGService → VDRClient (interface) → S
 ### Shared UI boundary
 
 [Chroma UI](https://github.com/githubixx/chroma-ui) is a pinned Go module, not
-a separate service or runtime asset download. Its catalog embeds all 37 themes,
+a separate service or runtime asset download. Its catalog embeds all 39 themes,
 runtime artwork, shared component CSS, navigation templates, and optional
 JavaScript helpers. The infrastructure theme adapter delegates discovery,
 validation, reload, and asset serving to that catalog.

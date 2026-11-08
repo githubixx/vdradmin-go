@@ -7,6 +7,12 @@ const resources = JSON.parse(await readFile(new URL('../resources.lock.json', im
 
 export const screenshotComparisonOptions = Object.freeze({
   'aurora-glass-1-mobile-timers': { maxDiffPixels: 100 },
+  'leather-style-black-1-desktop-channels': { maxDiffPixels: 100 },
+  'leather-style-black-1-desktop-timers': { maxDiffPixels: 700 },
+  'leather-style-black-1-mobile-channels': { maxDiffPixels: 100 },
+  'leather-style-black-1-mobile-timers': { maxDiffPixels: 1000 },
+  'leather-style-red-1-desktop-channels': { maxDiffPixels: 100 },
+  'leather-style-red-1-mobile-channels': { maxDiffPixels: 100 },
   'luxury-1-mobile-timers': { maxDiffPixels: 100 },
   'spaceship-grey-dark-desktop-watch': { maxDiffPixels: 12 },
   'spaceship-grey-light-desktop-watch': { maxDiffPixels: 12 },
@@ -56,7 +62,8 @@ export { expect };
 
 export const themes = [
   'aurora-glass-1', 'cartoon-1', 'crt-starfield-1', 'dark', 'fitness',
-  'glas-1', 'gold-1', 'golden-moon', 'light', 'lighting-1', 'luxury-1',
+  'glas-1', 'gold-1', 'golden-moon', 'leather-style-black-1',
+  'leather-style-red-1', 'light', 'lighting-1', 'luxury-1',
   'mantle-1', 'metal-1', 'retro-arcade', 'solar-system-1', 'space-night-1',
   'spaceship-2',
   ...['blue', 'cyan', 'green', 'grey', 'magenta', 'mono', 'orange', 'purple', 'red', 'yellow']

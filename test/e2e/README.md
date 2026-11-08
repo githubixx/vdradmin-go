@@ -17,7 +17,7 @@ CHROMA_UI_DIR= bash scripts/test-e2e.sh
 The default fixture builder uses the Chroma revision pinned in `go.mod`, not a
 local checkout. It and UI CI first run the non-publishing standalone dependency
 preflight with workspaces disabled. The current pin is the published Chroma UI
-release `v0.2.0`; a separate Chroma checkout is not required.
+release `v0.3.0`; a separate Chroma checkout is not required.
 
 For coordinated local changes, optionally run:
 
@@ -32,7 +32,7 @@ verifying the pinned dependency through the standalone builder.
 
 The runner builds an isolated fixture server and uses the pinned Playwright
 1.64.1 Ubuntu amd64 image, including its pinned browser binaries and system fonts.
-Chromium uses **exact pixel comparisons**, with the eight exceptions documented
+Chromium uses **exact pixel comparisons**, with the exceptions documented
 below; Firefox runs
 behavior tests. Do not generate authoritative screenshots on the host OS:
 font rendering can differ.
@@ -43,6 +43,13 @@ variance. Two reviewed exceptions permit at most 100 differing pixels each in
 captures showed 52-97 and 25-52 changing backdrop-filter edge pixels,
 respectively, around translucent buttons. The limit is roughly 0.012% of the
 Aurora image. Color thresholds remain zero, and dimension changes still fail.
+The leather themes' raster frame edges can also vary during software rendering.
+Repeated captures showed up to 83 differing pixels in the affected channel
+screenshots and 882 in black mobile timers; black desktop timers differed by
+661 pixels. The corresponding limits are 100 pixels for black desktop/mobile
+channels and red desktop/mobile channels, 700 for black desktop timers, and
+1,000 for black mobile timers. These differences are confined to panel edges;
+color thresholds remain zero.
 Three further exceptions were approved after inspecting the actual GitHub CI
 images and repeating the affected cases four times locally:
 
@@ -90,7 +97,7 @@ differing pixels. Do not broaden these exceptions to accommodate application
 changes. Local passes alone do not prove identical rendering on another CI
 host; review failed CI images before attributing differences to rendering noise.
 
-All 37 themes cover channels and timers at desktop and mobile widths.
+All 39 themes cover channels and timers at desktop and mobile widths.
 Representative themes additionally cover recordings, configuration, the Watch
 TV shell, and event details. Interaction tests cover menus, theme options,
 htmx refresh, explicit theme selection, mobile navigation, and native controls.
@@ -99,7 +106,7 @@ preventing Firefox from cancelling outstanding font requests; request-failure
 reporting remains strict.
 The suite also covers both OS color schemes in system mode. The completed
 integration and follow-up fixes were verified with 193 browser tests:
-programme-column alignment checks exercise all 37 themes on Channels and
+programme-column alignment checks exercise all 39 themes on Channels and
 Playing at 1440px, 769px, and 390px in Chromium and Firefox, including varied
 time digits and long-title wrapping. Metal-specific checks verify orange
 collisions and red critical conflicts on timer cards and timeline blocks while
@@ -124,7 +131,7 @@ Chromium and Firefox cover layout selection, channel paging and boundaries,
 keyboard channel selection, history/reload/resize, day/time state preservation
 (including navigation through an empty day), Information popups, real timer
 creation, viewer permissions, invalid view input, unknown anchors and the
-JavaScript-disabled fallback. Geometry checks cover all 37 themes at 1440px,
+JavaScript-disabled fallback. Geometry checks cover all 39 themes at 1440px,
 769px and 390px, including the last channel page. They assert no horizontal
 document overflow, one row of channel columns, stacked programme content/actions
 and contained controls, including the shared Chroma UI `ui-pager` layout.

@@ -41,6 +41,46 @@ test('Aurora Glass aligns shared navigation and archive-job actions', async ({ p
   expect(layout.actionTopDifference, 'Jobs and Cancel should share a top edge').toBeLessThanOrEqual(1);
 });
 
+test('Aurora Glass uses updated shared glass on VDR cards', async ({ page, request }) => {
+  await selectTheme(request, 'aurora-glass-1');
+  await openPage(page, '/channels?day=2026-10-17');
+  const card = page.locator('.epg-item').first();
+  await expect(card).toHaveCSS('background-color', 'rgba(7, 15, 50, 0.55)');
+  await expect(card).toHaveCSS('backdrop-filter', 'blur(18px) saturate(1.35)');
+  const gloss = await card.evaluate(element => getComputedStyle(element, '::before').backgroundImage);
+  expect(gloss).toContain('radial-gradient');
+  expect(gloss).not.toContain('panel-gloss.svg');
+  await openPage(page, '/configurations');
+  await expect(page.locator('.config-panel').first()).toHaveCSS('background-color', 'rgba(7, 15, 50, 0.55)');
+});
+
+for (const theme of ['leather-style-black-1', 'leather-style-red-1']) {
+  test(`${theme} channel headings have readable contrast`, async ({ page, request }) => {
+    await selectTheme(request, theme);
+    const readiness = await request.get('/__test/ready');
+    expect(readiness.ok()).toBeTruthy();
+    const { urls } = await readiness.json();
+    for (const url of [urls.channels, urls.playing]) {
+      await openPage(page, url);
+      const ratio = await page.locator('.channels-day').first().evaluate(element => {
+        const style = getComputedStyle(element);
+        const luminance = color => {
+          const channels = color.match(/\d+/g).slice(0, 3).map(Number);
+          const linear = channels.map(value => {
+            const channel = value / 255;
+            return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+          });
+          return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+        };
+        const foreground = luminance(style.color);
+        const background = luminance(style.backgroundColor);
+        return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+      });
+      expect(ratio).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+}
+
 test('explicit theme wins over browser preference and legacy cookie', async ({ page, context }) => {
   await context.addCookies([{ name: 'theme', value: 'light', url: 'http://127.0.0.1:18763' }]);
   await page.emulateMedia({ colorScheme: 'dark' });
@@ -53,7 +93,9 @@ test('explicit theme wins over browser preference and legacy cookie', async ({ p
 test('theme options and enhanced selects are available', async ({ page }) => {
   await openPage(page, '/configurations');
   const themeSelect = page.locator('select[name="ui_theme"]');
-  await expect(themeSelect.locator('option')).toHaveCount(38);
+  await expect(themeSelect.locator('option')).toHaveCount(40);
+  await expect(themeSelect.locator('option[value="leather-style-black-1"]')).toHaveText('Leather Style Black 1');
+  await expect(themeSelect.locator('option[value="leather-style-red-1"]')).toHaveText('Leather Style Red 1');
   await expect(themeSelect).toHaveValue('metal-1');
   const trigger = themeSelect.locator('..').locator('.custom-select-trigger');
   await trigger.click();
