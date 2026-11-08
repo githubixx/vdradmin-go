@@ -97,6 +97,22 @@ for (const theme of themes) {
       await screenshot(page, `${theme}-${size}-channels`);
       await openPage(page, '/timers?day=2026-10-17');
       await expect(page.locator('.timer-item').first()).toBeVisible();
+      if (theme === 'mantle-1' && size === 'mobile') {
+        const day = page.locator('#day').locator('..').locator('.custom-select-trigger');
+        await expect(day).toBeVisible();
+        await expect(day).toContainText(/\b\d{4}-\d{2}-\d{2}\b/);
+        await expect(day).toHaveCSS('border-radius', '999px');
+        await expect(day).toHaveCSS('box-shadow', /inset/);
+        await expect(page.getByLabel('Menu', { exact: true })).toBeVisible();
+        const icon = page.locator('.nav-burger-button .burger-icon');
+        await expect(icon).toHaveCSS('width', '18px');
+        await expect(icon).toHaveCSS('height', '12px');
+        await expect(icon).toHaveCSS('background-image', /linear-gradient/);
+        await expect(page.locator('.timer-item.recording').first()).toHaveCSS('border-left-color', 'rgb(88, 182, 148)');
+        await expect(page.locator('.timer-item.collision').first()).toHaveCSS('border-left-color', 'rgb(204, 155, 99)');
+        await expect(page.locator('.timer-item.conflict').first()).toHaveCSS('border-left-color', 'rgb(182, 98, 123)');
+        await expect(page.locator('.timeline-block.critical').first()).toBeVisible();
+      }
       await screenshot(page, `${theme}-${size}-timers`);
     });
   }

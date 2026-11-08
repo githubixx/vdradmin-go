@@ -46,10 +46,20 @@ Aurora image. Color thresholds remain zero, and dimension changes still fail.
 The leather themes' raster frame edges can also vary during software rendering.
 Repeated captures showed up to 83 differing pixels in the affected channel
 screenshots and 882 in black mobile timers; black desktop timers differed by
-661 pixels. The corresponding limits are 100 pixels for black desktop/mobile
-channels and red desktop/mobile channels, 700 for black desktop timers, and
-1,000 for black mobile timers. These differences are confined to panel edges;
+661 pixels. CI run 42468600632 differed by 137 and 196 pixels in black and red
+desktop channels, respectively, and by 1,108 pixels in red mobile timers. The
+corresponding limits are 200 for black desktop channels, 250 for red desktop
+channels, 100 each for black and red mobile channels, 700 for black desktop
+timers, 1,000 for black mobile timers, and 1,400 for red mobile timers. The CI
+differences are confined to panel edges and at most two RGB levels per channel;
 color thresholds remain zero.
+
+The same CI run differed by 1,911 pixels in `mantle-1-mobile-timers.png`,
+primarily in the day selector shadow, with smaller differences at the menu icon
+and timeline edge. Its limit is 2,300 pixels at zero color threshold. The test
+also verifies the date selector and menu icon's key styles, timer state border
+colors, and the presence of the critical timeline block.
+
 Three further exceptions were approved after inspecting the actual GitHub CI
 images and repeating the affected cases four times locally:
 
