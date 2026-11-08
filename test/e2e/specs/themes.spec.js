@@ -13,11 +13,12 @@ for (const theme of representatives) {
       await page.setViewportSize(viewport);
       await openPage(page, guideURL);
       await assertGuideLayout(page);
-      if (theme === 'light' && size === 'mobile') {
+      if ((theme === 'light' || theme === 'dark') && size === 'mobile') {
         const record = page.locator('.playing-group:visible').getByRole('button', { name: 'Record', exact: true }).first();
         await expect(record).toBeVisible();
         await expect(record).toBeEnabled();
-        await expect(record).toHaveCSS('background-color', 'rgb(124, 58, 237)');
+        await expect(record).toHaveCSS('background-color',
+          theme === 'light' ? 'rgb(124, 58, 237)' : 'rgb(167, 139, 250)');
         await expect(record).toHaveCSS('color', 'rgb(255, 255, 255)');
         await expect(record).toHaveCSS('border-radius', '999px');
       }
@@ -45,6 +46,14 @@ for (const theme of matrixThemes) {
       await page.setViewportSize(viewport);
       await openPage(page, '/channels?day=2026-10-17');
       await expect(page.locator('.epg-item').first()).toBeVisible();
+      if (theme === 'retro-arcade' && size === 'mobile') {
+        const channel = page.locator('#channel').locator('..').locator('.custom-select-trigger');
+        const day = page.locator('#day').locator('..').locator('.custom-select-trigger');
+        await expect(channel).toBeVisible();
+        await expect(channel).toContainText('Das Erste HD');
+        await expect(day).toBeVisible();
+        await expect(day).toContainText(/\b\d{4}-\d{2}-\d{2}\b/);
+      }
       if (theme === 'spaceship-blue-light' && size === 'mobile') {
         const cards = page.locator('.epg-item');
         await expect(cards).toHaveCount(3);
@@ -97,6 +106,15 @@ for (const theme of matrixThemes) {
       await screenshot(page, `${theme}-${size}-channels`);
       await openPage(page, '/timers?day=2026-10-17');
       await expect(page.locator('.timer-item').first()).toBeVisible();
+      if (theme === 'leather-style-red-1' && size === 'desktop') {
+        for (const [state, color] of [
+          ['recording', 'rgb(74, 222, 128)'],
+          ['collision', 'rgb(251, 191, 36)'],
+          ['conflict', 'rgb(255, 82, 100)'],
+        ]) {
+          await expect(page.locator(`.timer-item.${state}`).first()).toHaveCSS('border-left-color', color);
+        }
+      }
       if (theme === 'mantle-1' && size === 'mobile') {
         const day = page.locator('#day').locator('..').locator('.custom-select-trigger');
         await expect(day).toBeVisible();
@@ -129,7 +147,15 @@ for (const theme of representatives) {
         ['watch', '/watch?interval=0'],
       ]) {
         await openPage(page, url);
-        if (name === 'watch') await assertWatchLayout(page);
+        if (name === 'watch') {
+          await assertWatchLayout(page);
+          if (theme === 'spaceship-blue-light' && size === 'desktop') {
+            const sizeControl = page.locator('#watchtv-size').locator('..').locator('.custom-select-trigger');
+            await expect(sizeControl).toBeVisible();
+            await expect(sizeControl).toContainText('1:2');
+            await expect(sizeControl).toHaveCSS('border-radius', '10.4px');
+          }
+        }
         if (theme === 'crt-starfield-1' && size === 'mobile' && name === 'configurations') {
           const geometry = await page.getByRole('link', { name: 'Manage ffmpeg profiles', exact: true }).evaluate(button => {
             const box = button.getBoundingClientRect();

@@ -54,6 +54,11 @@ timers, 1,000 for black mobile timers, and 1,400 for red mobile timers. The CI
 differences are confined to panel edges and at most two RGB levels per channel;
 color thresholds remain zero.
 
+CI run 42481407296 showed 762 differing pixels along red desktop timer frame
+edges, with at most two RGB levels per channel. That image permits 950 pixels
+at zero color threshold and independently checks the recording, collision and
+conflict border colors.
+
 The same CI run differed by 1,911 pixels in `mantle-1-mobile-timers.png`,
 primarily in the day selector shadow, with smaller differences at the menu icon
 and timeline edge. Its limit is 2,300 pixels at zero color threshold. The test
@@ -100,6 +105,20 @@ concentrated in Information-button glow and a few burger-menu pixels. Its
 original reference is retained. Independent assertions check all three
 Information links, text/border/glow colors, rounded corners, action alignment
 and containment, plus the burger icon's line dimensions and colors.
+
+CI run 42481407296 exposed three additional small control-edge differences:
+
+- `dark-mobile-playing-guide.png`: consecutive captures differed by 25-58
+  pixels around the Record button. The limit is 70 pixels; the case also
+  checks the button's label, enabled state, colors and rounded corners.
+- `retro-arcade-mobile-channels.png`: 11 pixels differed at the channel and day
+  selector edges. The limit is 20 pixels; both selected labels must be visible.
+- `spaceship-blue-light-desktop-watch.png`: consecutive captures alternated by
+  9 pixels at the Size selector edge, with the final image matching the
+  baseline. The limit is 15 pixels; Watch layout and the selected, rounded
+  Size control are checked separately.
+
+These three retain zero color threshold and their existing baselines.
 
 Dimension changes still fail.
 Every other screenshot retains zero color threshold and zero
