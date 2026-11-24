@@ -355,7 +355,7 @@ See `configs/config.example.yaml` for full configuration options.
 
 ## MCP
 
-`vdradmin-go-mcp` offers read-only advanced EPG search to MCP clients. It reuses the configured VDR connection and wanted-channel filtering. Direct execution uses stdio; the optional HTTP listener is intended for local systemd use and is loopback-only by default. See [docs/MCP.md](docs/MCP.md) for setup in VS Code, Claude Code, and Codex.
+`vdradmin-go-mcp` offers read-only EPG search, current programmes, recording search, and timer listing to MCP clients. It reuses the configured VDR connection and wanted-channel filtering. Direct execution uses stdio; the optional HTTP listener is intended for local systemd use and is loopback-only by default. See [docs/MCP.md](docs/MCP.md) for setup in VS Code, Claude Code, and Codex.
 
 ## Themes
 

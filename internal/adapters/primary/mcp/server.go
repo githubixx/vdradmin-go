@@ -18,6 +18,7 @@ const (
 	searchEPGToolName        = "search_epg"
 	searchRecordingsToolName = "search_recordings"
 	listTimersToolName       = "list_timers"
+	currentProgramsToolName  = "get_current_programs"
 	defaultResultLimit       = 50
 	maxResultLimit           = 200
 	minRecordingPatternRunes = 3
@@ -53,6 +54,17 @@ type epgEventOutput struct {
 	StartsAt      string `json:"startsAt"`
 	EndsAt        string `json:"endsAt"`
 	DurationSecs  int64  `json:"durationSeconds"`
+}
+
+type currentProgramsInput struct {
+	ChannelIDs  []string `json:"channelIds,omitempty" jsonschema:"Optional VDR channel IDs to include."`
+	ResultLimit int      `json:"resultLimit,omitempty" jsonschema:"Maximum number of results, from 1 to 200; defaults to 50."`
+}
+
+type currentProgramsOutput struct {
+	Events    []epgEventOutput `json:"events" jsonschema:"Current EPG events in channel order."`
+	Total     int              `json:"total" jsonschema:"Number of matches before the result limit."`
+	Truncated bool             `json:"truncated" jsonschema:"Whether additional matches were omitted because of the result limit."`
 }
 
 type searchRecordingsInput struct {
@@ -115,7 +127,7 @@ type timerOutput struct {
 // NewServer constructs the MCP server and registers all vdradmin-go tools.
 func NewServer(epgService *services.EPGService, recordingService *services.RecordingService, timerService *services.TimerService, version string) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{Name: "vdradmin-go-mcp", Version: version}, &mcp.ServerOptions{
-		Instructions: "Search the configured VDR electronic program guide and recordings, and list scheduled timers. Use search_epg for read-only TV show and programme searches, search_recordings for read-only completed recording searches, and list_timers for read-only scheduled timer queries.",
+		Instructions: "Search the configured VDR electronic program guide and recordings, list scheduled timers, and retrieve current programs. Use search_epg for programme searches, get_current_programs for what is playing now, search_recordings for completed recordings, and list_timers for scheduled timers. All tools are read-only.",
 	})
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        searchEPGToolName,
@@ -144,6 +156,15 @@ func NewServer(epgService *services.EPGService, recordingService *services.Recor
 			IdempotentHint: true,
 		},
 	}, listTimersHandler(timerService))
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        currentProgramsToolName,
+		Title:       "Get current programs",
+		Description: "Get currently playing VDR programs, with optional channel and result-limit filters.",
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint:   true,
+			IdempotentHint: true,
+		},
+	}, currentProgramsHandler(epgService))
 	return server
 }
 
@@ -164,24 +185,60 @@ func searchEPGHandler(epgService *services.EPGService) mcp.ToolHandlerFor[search
 			Truncated: result.Truncated,
 		}
 		for _, event := range result.Events {
-			duration := event.Duration
-			if duration == 0 && !event.Start.IsZero() && !event.Stop.IsZero() {
-				duration = event.Stop.Sub(event.Start)
-			}
-			output.Events = append(output.Events, epgEventOutput{
-				EventID:       event.EventID,
-				ChannelID:     event.ChannelID,
-				ChannelNumber: event.ChannelNumber,
-				ChannelName:   event.ChannelName,
-				Title:         event.Title,
-				Subtitle:      event.Subtitle,
-				Description:   event.Description,
-				StartsAt:      formatEPGTime(event.Start),
-				EndsAt:        formatEPGTime(event.Stop),
-				DurationSecs:  int64(duration / time.Second),
-			})
+			output.Events = append(output.Events, epgEventToOutput(event))
 		}
 		return nil, output, nil
+	}
+}
+
+func currentProgramsHandler(epgService *services.EPGService) mcp.ToolHandlerFor[currentProgramsInput, currentProgramsOutput] {
+	return func(ctx context.Context, _ *mcp.CallToolRequest, input currentProgramsInput) (*mcp.CallToolResult, currentProgramsOutput, error) {
+		limit, err := normalizedResultLimit(input.ResultLimit)
+		if err != nil {
+			return nil, currentProgramsOutput{}, err
+		}
+		events, err := epgService.GetCurrentPrograms(ctx)
+		if err != nil {
+			return nil, currentProgramsOutput{}, err
+		}
+
+		channelIDs := make(map[string]struct{}, len(input.ChannelIDs))
+		for _, id := range input.ChannelIDs {
+			channelIDs[strings.TrimSpace(id)] = struct{}{}
+		}
+		output := currentProgramsOutput{Events: make([]epgEventOutput, 0)}
+		for _, event := range events {
+			if len(channelIDs) > 0 {
+				if _, ok := channelIDs[event.ChannelID]; !ok {
+					continue
+				}
+			}
+			output.Total++
+			if len(output.Events) < limit {
+				output.Events = append(output.Events, epgEventToOutput(event))
+			}
+		}
+		output.Truncated = output.Total > limit
+		return nil, output, nil
+	}
+}
+
+func epgEventToOutput(event domain.EPGEvent) epgEventOutput {
+	duration := event.Duration
+	if duration == 0 && !event.Start.IsZero() && !event.Stop.IsZero() {
+		duration = event.Stop.Sub(event.Start)
+	}
+	return epgEventOutput{
+		EventID:       event.EventID,
+		ChannelID:     event.ChannelID,
+		ChannelNumber: event.ChannelNumber,
+		ChannelName:   event.ChannelName,
+		Title:         event.Title,
+		Subtitle:      event.Subtitle,
+		Description:   event.Description,
+		StartsAt:      formatEPGTime(event.Start),
+		EndsAt:        formatEPGTime(event.Stop),
+		DurationSecs:  int64(duration / time.Second),
 	}
 }
 
