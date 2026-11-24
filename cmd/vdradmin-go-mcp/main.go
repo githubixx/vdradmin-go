@@ -61,7 +61,8 @@ func main() {
 	epgService := services.NewEPGService(vdrClient, cfg.Cache.EPGExpiry)
 	epgService.SetWantedChannels(cfg.VDR.WantedChannels)
 	recordingService := services.NewRecordingService(vdrClient, cfg.Cache.RecordingExpiry)
-	server := mcpAdapter.NewServer(epgService, recordingService, version)
+	timerService := services.NewTimerService(vdrClient)
+	server := mcpAdapter.NewServer(epgService, recordingService, timerService, version)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
