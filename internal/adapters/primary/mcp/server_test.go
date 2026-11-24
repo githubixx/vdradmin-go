@@ -3,6 +3,8 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -40,7 +42,7 @@ func TestServer_SearchEPG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListTools: %v", err)
 	}
-	if len(tools.Tools) != 3 {
+	if len(tools.Tools) != 4 {
 		t.Fatalf("unexpected tools: %+v", tools.Tools)
 	}
 	seen := map[string]bool{}
@@ -50,7 +52,7 @@ func TestServer_SearchEPG(t *testing.T) {
 			t.Fatalf("expected read-only annotations for %s: %+v", tool.Name, tool.Annotations)
 		}
 	}
-	if !seen[searchEPGToolName] || !seen[searchRecordingsToolName] || !seen[listTimersToolName] {
+	if !seen[searchEPGToolName] || !seen[searchRecordingsToolName] || !seen[listTimersToolName] || !seen[currentProgramsToolName] {
 		t.Fatalf("unexpected tools: %+v", tools.Tools)
 	}
 
@@ -66,6 +68,97 @@ func TestServer_SearchEPG(t *testing.T) {
 	}
 	if result.StructuredContent == nil {
 		t.Fatal("expected structured tool output")
+	}
+}
+
+func TestServer_GetCurrentPrograms(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	start, stop := now.Add(-time.Hour), now.Add(time.Hour)
+	mock := ports.NewMockVDRClient().
+		WithChannels([]domain.Channel{
+			{ID: "one", Number: 1, Name: "One"},
+			{ID: "two", Number: 2, Name: "Two"},
+			{ID: "hidden", Number: 3, Name: "Hidden"},
+		}).
+		WithEPGEvents([]domain.EPGEvent{
+			{EventID: 2, ChannelID: "two", Title: "Second", Start: start, Stop: stop},
+			{EventID: 1, ChannelID: "one", Title: "First", Subtitle: "Episode", Description: "Details", Start: start, Stop: stop},
+			{EventID: 3, ChannelID: "hidden", Title: "Hidden", Start: start, Stop: stop},
+			{EventID: 4, ChannelID: "one", Title: "Earlier", Start: start.Add(-time.Hour), Stop: stop},
+			{EventID: 5, ChannelID: "one", Title: "Past", Start: start.Add(-time.Hour), Stop: start},
+			{EventID: 6, ChannelID: "two", Title: "Future", Start: stop, Stop: stop.Add(time.Hour)},
+		})
+	epg := services.NewEPGService(mock, 0)
+	epg.SetWantedChannels([]string{"one", "two"})
+	session := connectTestSession(t, NewServer(epg, services.NewRecordingService(mock, 0), services.NewTimerService(mock), "test"))
+
+	call := func(args map[string]any) currentProgramsOutput {
+		t.Helper()
+		result, err := session.CallTool(context.Background(), &modelcontextprotocol.CallToolParams{Name: currentProgramsToolName, Arguments: args})
+		if err != nil || result.IsError {
+			t.Fatalf("CallTool: result=%+v err=%v", result, err)
+		}
+		return decodeStructuredContent[currentProgramsOutput](t, result.StructuredContent)
+	}
+
+	output := call(map[string]any{"resultLimit": 1})
+	if output.Total != 2 || !output.Truncated || len(output.Events) != 1 {
+		t.Fatalf("unexpected result metadata: %+v", output)
+	}
+	event := output.Events[0]
+	if event.EventID != 1 || event.ChannelID != "one" || event.ChannelNumber != 1 || event.ChannelName != "One" ||
+		event.Title != "First" || event.Subtitle != "Episode" || event.Description != "Details" ||
+		event.StartsAt != start.Format(time.RFC3339) || event.EndsAt != stop.Format(time.RFC3339) || event.DurationSecs != 7200 {
+		t.Fatalf("unexpected event: %+v", event)
+	}
+
+	filtered := call(map[string]any{"channelIds": []string{" two ", "hidden"}})
+	if filtered.Total != 1 || filtered.Truncated || len(filtered.Events) != 1 || filtered.Events[0].EventID != 2 {
+		t.Fatalf("unexpected filtered result: %+v", filtered)
+	}
+	empty := call(map[string]any{"channelIds": []string{"missing"}})
+	if empty.Total != 0 || empty.Truncated || empty.Events == nil || len(empty.Events) != 0 {
+		t.Fatalf("unexpected empty result: %+v", empty)
+	}
+
+	for _, limit := range []int{-1, 201} {
+		result, err := session.CallTool(context.Background(), &modelcontextprotocol.CallToolParams{
+			Name: currentProgramsToolName, Arguments: map[string]any{"resultLimit": limit},
+		})
+		if err != nil || !result.IsError {
+			t.Fatalf("expected tool error for limit %d: result=%+v err=%v", limit, result, err)
+		}
+	}
+}
+
+func TestServer_GetCurrentProgramsDefaultLimitAndBackendError(t *testing.T) {
+	now := time.Now()
+	events := make([]domain.EPGEvent, 51)
+	channels := make([]domain.Channel, len(events))
+	for i := range events {
+		id := fmt.Sprintf("channel-%d", i)
+		channels[i] = domain.Channel{ID: id, Number: i + 1}
+		events[i] = domain.EPGEvent{ChannelID: id, Start: now.Add(-time.Hour), Stop: now.Add(time.Hour)}
+	}
+	mock := ports.NewMockVDRClient().WithChannels(channels).WithEPGEvents(events)
+	session := connectTestSession(t, NewServer(services.NewEPGService(mock, 0), services.NewRecordingService(mock, 0), services.NewTimerService(mock), "test"))
+	result, err := session.CallTool(context.Background(), &modelcontextprotocol.CallToolParams{Name: currentProgramsToolName, Arguments: map[string]any{}})
+	if err != nil || result.IsError {
+		t.Fatalf("CallTool: result=%+v err=%v", result, err)
+	}
+	output := decodeStructuredContent[currentProgramsOutput](t, result.StructuredContent)
+	if output.Total != 51 || !output.Truncated || len(output.Events) != 50 {
+		t.Fatalf("unexpected default limit result: %+v", output)
+	}
+
+	failing := ports.NewMockVDRClient()
+	failing.GetEPGFunc = func(context.Context, string, time.Time) ([]domain.EPGEvent, error) {
+		return nil, errors.New("VDR unavailable")
+	}
+	failedSession := connectTestSession(t, NewServer(services.NewEPGService(failing, 0), services.NewRecordingService(failing, 0), services.NewTimerService(failing), "test"))
+	result, err = failedSession.CallTool(context.Background(), &modelcontextprotocol.CallToolParams{Name: currentProgramsToolName, Arguments: map[string]any{}})
+	if err != nil || !result.IsError {
+		t.Fatalf("expected backend tool error: result=%+v err=%v", result, err)
 	}
 }
 

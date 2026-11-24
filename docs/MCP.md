@@ -1,8 +1,8 @@
 # MCP Server
 
-`vdradmin-go-mcp` exposes read-only VDR electronic program guide (EPG), recording search, and timer listing through the [Model Context Protocol](https://modelcontextprotocol.io/). It uses the same VDR connection and caches as the web application. EPG search also honors `vdr.wanted_channels` filtering.
+`vdradmin-go-mcp` exposes read-only VDR electronic program guide (EPG), recording search, and timer listing through the [Model Context Protocol](https://modelcontextprotocol.io/). It uses the same VDR connection and caching mechanisms as the web application. EPG tools honor `vdr.wanted_channels` filtering.
 
-The server provides three tools: `search_epg` for VDR EPG data, `search_recordings` for completed recordings, and `list_timers` for scheduled timers. Neither search tool uses an external show catalogue or requires `vdr-plugin-epgsearch`.
+The server provides four tools: `search_epg` for VDR EPG data, `get_current_programs` for programmes on now, `search_recordings` for completed recordings, and `list_timers` for scheduled timers. Neither search tool uses an external show catalogue or requires `vdr-plugin-epgsearch`.
 
 ## Build
 
@@ -35,6 +35,15 @@ Use `build/vdradmin-go-mcp --version` to print build metadata.
 - `resultLimit`: optional result count from `1` to `200`; the default is `50`.
 
 Results are ordered by event start time and channel. Each result contains the VDR event and channel IDs, channel metadata, title/subtitle/description, RFC3339 start and end times, and duration. The structured response also includes `total` and `truncated` so clients can recognize a bounded result set.
+
+## Current Programmes Tool
+
+`get_current_programs` accepts:
+
+- `channelIds`: optional list of VDR channel IDs.
+- `resultLimit`: optional result count from `1` to `200`; the default is `50`.
+
+The tool returns at most one currently playing event per channel in channel order, using the same event fields as `search_epg`. Channels without current EPG data are omitted. The configured `vdr.wanted_channels` filter still applies, even when `channelIds` is supplied. The current-programme summary is cached for 15 seconds, so it may briefly show a previous programme after a transition. The structured response contains `events`, `total`, and `truncated`.
 
 ## Recording Search Tool
 
@@ -132,17 +141,19 @@ VS Code asks you to trust newly configured local servers. Use `MCP: List Servers
 In the VS Code chat window you can then ask `How to use the vdradmin-go-mcp server?` e.g. Then you get something like this:
 
 ```plain
-vdradmin-go-mcp provides read-only VDR search tools: search_epg and search_recordings.
+vdradmin-go-mcp provides read-only VDR tools: search_epg, get_current_programs, search_recordings, and list_timers.
 
 Ask for programme information in plain language, for example:
 
 - What is on ARD tonight?
+- What is playing now?
 - Find upcoming Formula 1 broadcasts.
 - When is the next episode of Tatort?
 - Search for films airing this weekend.
 - What children’s programmes are on tomorrow morning?
 - Find recordings of Planet Earth.
 - Search my recordings for anything from ARD.
+- List my scheduled timers.
 
 I’ll translate the request into an EPG or recording search and return matching programme or recording details. It cannot change recordings, timers, or VDR configuration.
 ```
