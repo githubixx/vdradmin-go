@@ -19,6 +19,7 @@ const (
 	searchRecordingsToolName = "search_recordings"
 	listTimersToolName       = "list_timers"
 	currentProgramsToolName  = "get_current_programs"
+	scheduleToolName         = "get_schedule"
 	defaultResultLimit       = 50
 	maxResultLimit           = 200
 	minRecordingPatternRunes = 3
@@ -63,6 +64,19 @@ type currentProgramsInput struct {
 
 type currentProgramsOutput struct {
 	Events    []epgEventOutput `json:"events" jsonschema:"Current EPG events in channel order."`
+	Total     int              `json:"total" jsonschema:"Number of matches before the result limit."`
+	Truncated bool             `json:"truncated" jsonschema:"Whether additional matches were omitted because of the result limit."`
+}
+
+type scheduleInput struct {
+	ChannelIDs  []string `json:"channelIds,omitempty" jsonschema:"Optional VDR channel IDs to include."`
+	StartsAt    string   `json:"startsAt,omitempty" jsonschema:"Optional RFC3339 lower time bound; programs overlapping it are included."`
+	EndsAt      string   `json:"endsAt,omitempty" jsonschema:"Optional RFC3339 upper time bound; programs overlapping it are included."`
+	ResultLimit int      `json:"resultLimit,omitempty" jsonschema:"Maximum number of results, from 1 to 200; defaults to 50."`
+}
+
+type scheduleOutput struct {
+	Events    []epgEventOutput `json:"events" jsonschema:"EPG events ordered by start time."`
 	Total     int              `json:"total" jsonschema:"Number of matches before the result limit."`
 	Truncated bool             `json:"truncated" jsonschema:"Whether additional matches were omitted because of the result limit."`
 }
@@ -127,7 +141,7 @@ type timerOutput struct {
 // NewServer constructs the MCP server and registers all vdradmin-go tools.
 func NewServer(epgService *services.EPGService, recordingService *services.RecordingService, timerService *services.TimerService, version string) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{Name: "vdradmin-go-mcp", Version: version}, &mcp.ServerOptions{
-		Instructions: "Search the configured VDR electronic program guide and recordings, list scheduled timers, and retrieve current programs. Use search_epg for programme searches, get_current_programs for what is playing now, search_recordings for completed recordings, and list_timers for scheduled timers. All tools are read-only.",
+		Instructions: "Search the configured VDR electronic program guide and recordings, browse schedules, list scheduled timers, and retrieve current programs. Use search_epg for programme searches, get_schedule to browse programmes by channel or time, get_current_programs for what is playing now, search_recordings for completed recordings, and list_timers for scheduled timers. All tools are read-only.",
 	})
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        searchEPGToolName,
@@ -165,7 +179,45 @@ func NewServer(epgService *services.EPGService, recordingService *services.Recor
 			IdempotentHint: true,
 		},
 	}, currentProgramsHandler(epgService))
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        scheduleToolName,
+		Title:       "Get TV schedule",
+		Description: "Browse VDR EPG programs without a text search, with optional channel, time-window, and result-limit filters.",
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint:   true,
+			IdempotentHint: true,
+		},
+	}, scheduleHandler(epgService))
 	return server
+}
+
+func scheduleHandler(epgService *services.EPGService) mcp.ToolHandlerFor[scheduleInput, scheduleOutput] {
+	return func(ctx context.Context, _ *mcp.CallToolRequest, input scheduleInput) (*mcp.CallToolResult, scheduleOutput, error) {
+		startsAt, err := parseRFC3339Time("startsAt", input.StartsAt)
+		if err != nil {
+			return nil, scheduleOutput{}, err
+		}
+		endsAt, err := parseRFC3339Time("endsAt", input.EndsAt)
+		if err != nil {
+			return nil, scheduleOutput{}, err
+		}
+		limit, err := normalizedResultLimit(input.ResultLimit)
+		if err != nil {
+			return nil, scheduleOutput{}, err
+		}
+		events, err := epgService.GetSchedule(ctx, input.ChannelIDs, startsAt, endsAt)
+		if err != nil {
+			return nil, scheduleOutput{}, err
+		}
+		output := scheduleOutput{Events: make([]epgEventOutput, 0), Total: len(events), Truncated: len(events) > limit}
+		if output.Truncated {
+			events = events[:limit]
+		}
+		for _, event := range events {
+			output.Events = append(output.Events, epgEventToOutput(event))
+		}
+		return nil, output, nil
+	}
 }
 
 func searchEPGHandler(epgService *services.EPGService) mcp.ToolHandlerFor[searchEPGInput, searchEPGOutput] {

@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -34,6 +35,43 @@ type EPGSearchResult struct {
 	Events    []domain.EPGEvent
 	Total     int
 	Truncated bool
+}
+
+// GetSchedule returns EPG events overlapping the optional time window, ordered by start time.
+func (s *EPGService) GetSchedule(ctx context.Context, channelIDs []string, startsAt, endsAt *time.Time) ([]domain.EPGEvent, error) {
+	if startsAt != nil && endsAt != nil && startsAt.After(*endsAt) {
+		return nil, fmt.Errorf("endsAt must not be before startsAt")
+	}
+	events, err := s.GetEPG(ctx, "", time.Time{})
+	if err != nil {
+		return nil, err
+	}
+
+	selected := make(map[string]struct{}, len(channelIDs))
+	for _, id := range channelIDs {
+		selected[strings.TrimSpace(id)] = struct{}{}
+	}
+	matches := make([]domain.EPGEvent, 0)
+	for _, event := range events {
+		if len(selected) > 0 {
+			if _, ok := selected[event.ChannelID]; !ok {
+				continue
+			}
+		}
+		if epgEventOverlapsWindow(event, startsAt, endsAt) {
+			matches = append(matches, event)
+		}
+	}
+	sort.SliceStable(matches, func(i, j int) bool {
+		if !matches[i].Start.Equal(matches[j].Start) {
+			return matches[i].Start.Before(matches[j].Start)
+		}
+		if matches[i].ChannelID != matches[j].ChannelID {
+			return matches[i].ChannelID < matches[j].ChannelID
+		}
+		return matches[i].EventID < matches[j].EventID
+	})
+	return matches, nil
 }
 
 // SearchEPGWithCriteria searches cached VDR EPG data using the supplied criteria.

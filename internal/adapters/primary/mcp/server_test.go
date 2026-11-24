@@ -42,7 +42,7 @@ func TestServer_SearchEPG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListTools: %v", err)
 	}
-	if len(tools.Tools) != 4 {
+	if len(tools.Tools) != 5 {
 		t.Fatalf("unexpected tools: %+v", tools.Tools)
 	}
 	seen := map[string]bool{}
@@ -52,7 +52,7 @@ func TestServer_SearchEPG(t *testing.T) {
 			t.Fatalf("expected read-only annotations for %s: %+v", tool.Name, tool.Annotations)
 		}
 	}
-	if !seen[searchEPGToolName] || !seen[searchRecordingsToolName] || !seen[listTimersToolName] || !seen[currentProgramsToolName] {
+	if !seen[searchEPGToolName] || !seen[searchRecordingsToolName] || !seen[listTimersToolName] || !seen[currentProgramsToolName] || !seen[scheduleToolName] {
 		t.Fatalf("unexpected tools: %+v", tools.Tools)
 	}
 
@@ -68,6 +68,110 @@ func TestServer_SearchEPG(t *testing.T) {
 	}
 	if result.StructuredContent == nil {
 		t.Fatal("expected structured tool output")
+	}
+}
+
+func TestServer_GetSchedule(t *testing.T) {
+	start := time.Date(2026, time.November, 25, 18, 0, 0, 0, time.UTC)
+	mock := ports.NewMockVDRClient().WithEPGEvents([]domain.EPGEvent{
+		{EventID: 4, ChannelID: "one", Title: "At upper bound", Start: start.Add(2 * time.Hour), Stop: start.Add(3 * time.Hour)},
+		{EventID: 3, ChannelID: "two", Title: "Second", Start: start.Add(time.Hour), Stop: start.Add(2 * time.Hour)},
+		{EventID: 2, ChannelID: "one", ChannelNumber: 1, ChannelName: "One", Title: "First", Subtitle: "Episode", Description: "Details", Start: start.Add(time.Hour), Stop: start.Add(2 * time.Hour)},
+		{EventID: 1, ChannelID: "one", Title: "At lower bound", Start: start, Stop: start.Add(time.Hour)},
+		{EventID: 5, ChannelID: "hidden", Title: "Hidden", Start: start.Add(time.Hour), Stop: start.Add(2 * time.Hour)},
+	})
+	epg := services.NewEPGService(mock, time.Minute)
+	epg.SetWantedChannels([]string{"one", "two"})
+	session := connectTestSession(t, NewServer(epg, services.NewRecordingService(mock, 0), services.NewTimerService(mock), "test"))
+	call := func(args map[string]any) scheduleOutput {
+		t.Helper()
+		result, err := session.CallTool(context.Background(), &modelcontextprotocol.CallToolParams{Name: scheduleToolName, Arguments: args})
+		if err != nil || result.IsError {
+			t.Fatalf("CallTool: result=%+v err=%v", result, err)
+		}
+		return decodeStructuredContent[scheduleOutput](t, result.StructuredContent)
+	}
+
+	args := map[string]any{"startsAt": start.Add(time.Hour).Format(time.RFC3339), "endsAt": start.Add(2 * time.Hour).Format(time.RFC3339)}
+	output := call(args)
+	if output.Total != 2 || output.Truncated || len(output.Events) != 2 || output.Events[0].EventID != 2 || output.Events[1].EventID != 3 {
+		t.Fatalf("unexpected schedule: %+v", output)
+	}
+	event := output.Events[0]
+	if event.ChannelID != "one" || event.ChannelNumber != 1 || event.ChannelName != "One" || event.Title != "First" ||
+		event.Subtitle != "Episode" || event.Description != "Details" || event.StartsAt != args["startsAt"] ||
+		event.EndsAt != args["endsAt"] || event.DurationSecs != 3600 {
+		t.Fatalf("unexpected event: %+v", event)
+	}
+	overlapping := call(map[string]any{
+		"startsAt": start.Add(75 * time.Minute).Format(time.RFC3339),
+		"endsAt":   start.Add(90 * time.Minute).Format(time.RFC3339),
+	})
+	if overlapping.Total != 2 || len(overlapping.Events) != 2 {
+		t.Fatalf("expected events spanning the window: %+v", overlapping)
+	}
+	filtered := call(map[string]any{"channelIds": []string{" two ", "hidden"}, "resultLimit": 1})
+	if filtered.Total != 1 || filtered.Truncated || len(filtered.Events) != 1 || filtered.Events[0].EventID != 3 {
+		t.Fatalf("unexpected filtered schedule: %+v", filtered)
+	}
+	limited := call(map[string]any{"resultLimit": 1})
+	if limited.Total != 4 || !limited.Truncated || len(limited.Events) != 1 || limited.Events[0].EventID != 1 {
+		t.Fatalf("unexpected limited schedule: %+v", limited)
+	}
+	empty := call(map[string]any{"channelIds": []string{"missing"}})
+	if empty.Total != 0 || empty.Truncated || empty.Events == nil || len(empty.Events) != 0 {
+		t.Fatalf("unexpected empty schedule: %+v", empty)
+	}
+
+	for name, input := range map[string]map[string]any{
+		"invalid start": {"startsAt": "tomorrow"},
+		"invalid end":   {"endsAt": "tomorrow"},
+		"reversed":      {"startsAt": start.Add(time.Hour).Format(time.RFC3339), "endsAt": start.Format(time.RFC3339)},
+		"negative":      {"resultLimit": -1},
+		"too large":     {"resultLimit": 201},
+	} {
+		t.Run(name, func(t *testing.T) {
+			result, err := session.CallTool(context.Background(), &modelcontextprotocol.CallToolParams{Name: scheduleToolName, Arguments: input})
+			if err != nil || !result.IsError {
+				t.Fatalf("expected tool error: result=%+v err=%v", result, err)
+			}
+		})
+	}
+}
+
+func TestServer_GetScheduleDefaultLimitAndBackendError(t *testing.T) {
+	start := time.Date(2026, time.November, 25, 18, 0, 0, 0, time.UTC)
+	events := make([]domain.EPGEvent, 51)
+	for i := range events {
+		events[i] = domain.EPGEvent{EventID: i + 1, ChannelID: "one", Start: start.Add(time.Duration(i) * time.Hour), Stop: start.Add(time.Duration(i+1) * time.Hour)}
+	}
+	mock := ports.NewMockVDRClient().WithEPGEvents(events)
+	session := connectTestSession(t, NewServer(services.NewEPGService(mock, 0), services.NewRecordingService(mock, 0), services.NewTimerService(mock), "test"))
+	result, err := session.CallTool(context.Background(), &modelcontextprotocol.CallToolParams{Name: scheduleToolName, Arguments: map[string]any{}})
+	if err != nil || result.IsError {
+		t.Fatalf("CallTool: result=%+v err=%v", result, err)
+	}
+	output := decodeStructuredContent[scheduleOutput](t, result.StructuredContent)
+	if output.Total != 51 || !output.Truncated || len(output.Events) != 50 {
+		t.Fatalf("unexpected default limit result: %+v", output)
+	}
+	result, err = session.CallTool(context.Background(), &modelcontextprotocol.CallToolParams{Name: scheduleToolName, Arguments: map[string]any{"resultLimit": 200}})
+	if err != nil || result.IsError {
+		t.Fatalf("CallTool: result=%+v err=%v", result, err)
+	}
+	output = decodeStructuredContent[scheduleOutput](t, result.StructuredContent)
+	if output.Total != 51 || output.Truncated || len(output.Events) != 51 {
+		t.Fatalf("unexpected maximum limit result: %+v", output)
+	}
+
+	failing := ports.NewMockVDRClient()
+	failing.GetEPGFunc = func(context.Context, string, time.Time) ([]domain.EPGEvent, error) {
+		return nil, errors.New("VDR unavailable")
+	}
+	failedSession := connectTestSession(t, NewServer(services.NewEPGService(failing, 0), services.NewRecordingService(failing, 0), services.NewTimerService(failing), "test"))
+	result, err = failedSession.CallTool(context.Background(), &modelcontextprotocol.CallToolParams{Name: scheduleToolName, Arguments: map[string]any{}})
+	if err != nil || !result.IsError {
+		t.Fatalf("expected backend tool error: result=%+v err=%v", result, err)
 	}
 }
 
