@@ -1,8 +1,8 @@
 # MCP Server
 
-`vdradmin-go-mcp` exposes read-only VDR electronic program guide (EPG) and recording search through the [Model Context Protocol](https://modelcontextprotocol.io/). It uses the same VDR connection and caches as the web application. EPG search also honors `vdr.wanted_channels` filtering.
+`vdradmin-go-mcp` exposes read-only VDR electronic program guide (EPG), recording search, and timer listing through the [Model Context Protocol](https://modelcontextprotocol.io/). It uses the same VDR connection and caches as the web application. EPG search also honors `vdr.wanted_channels` filtering.
 
-The server provides two tools: `search_epg` for VDR EPG data and `search_recordings` for completed recordings. Neither tool uses an external show catalogue or requires `vdr-plugin-epgsearch`.
+The server provides three tools: `search_epg` for VDR EPG data, `search_recordings` for completed recordings, and `list_timers` for scheduled timers. Neither search tool uses an external show catalogue or requires `vdr-plugin-epgsearch`.
 
 ## Build
 
@@ -51,6 +51,17 @@ Results are ordered by event start time and channel. Each result contains the VD
 Recording searches are phrase-only and case-insensitive. Titles are always searched; optional fields are searched only when their flags are enabled. Empty or too-short patterns return a tool error instead of an unfiltered recording list.
 
 Results contain the recording path, title, optional subtitle/description/channel, RFC3339 recording date, length in seconds, size in bytes, and folder flag. The structured response also includes `total` and `truncated` so clients can recognize a bounded result set. Local filesystem paths are not exposed.
+
+## Timer Listing Tool
+
+`list_timers` accepts:
+
+- `active`: optional active-state filter.
+- `channelId`: optional VDR channel ID filter.
+- `startsAt`, `endsAt`: optional RFC3339 time bounds. Timers overlapping the requested window are included.
+- `resultLimit`: optional result count from `1` to `200`; the default is `50`.
+
+Results are ordered by start time and include the timer ID, active state, channel ID, title, start and stop times, priority, lifetime, and event ID when available. `daySpec` and the raw start/stop minutes are included to preserve recurring-timer details. For recurring timers, the returned start and stop timestamps represent the occurrence projected by VDR. The structured response also includes `total` and `truncated`.
 
 ## Streamable HTTP
 

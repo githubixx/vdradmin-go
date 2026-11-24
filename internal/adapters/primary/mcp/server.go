@@ -4,6 +4,7 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -16,6 +17,7 @@ import (
 const (
 	searchEPGToolName        = "search_epg"
 	searchRecordingsToolName = "search_recordings"
+	listTimersToolName       = "list_timers"
 	defaultResultLimit       = 50
 	maxResultLimit           = 200
 	minRecordingPatternRunes = 3
@@ -81,10 +83,39 @@ type recordingOutput struct {
 	IsFolder      bool   `json:"isFolder"`
 }
 
+type listTimersInput struct {
+	Active      *bool  `json:"active,omitempty" jsonschema:"Optional active-state filter."`
+	ChannelID   string `json:"channelId,omitempty" jsonschema:"Optional VDR channel ID filter."`
+	StartsAt    string `json:"startsAt,omitempty" jsonschema:"Optional RFC3339 lower time bound; timers overlapping it are included."`
+	EndsAt      string `json:"endsAt,omitempty" jsonschema:"Optional RFC3339 upper time bound; timers overlapping it are included."`
+	ResultLimit int    `json:"resultLimit,omitempty" jsonschema:"Maximum number of results, from 1 to 200; defaults to 50."`
+}
+
+type listTimersOutput struct {
+	Timers    []timerOutput `json:"timers" jsonschema:"The matching timers ordered by start time."`
+	Total     int           `json:"total" jsonschema:"Number of matches before the result limit."`
+	Truncated bool          `json:"truncated" jsonschema:"Whether additional matches were omitted because of the result limit."`
+}
+
+type timerOutput struct {
+	ID           int    `json:"id"`
+	Active       bool   `json:"active"`
+	ChannelID    string `json:"channelId"`
+	DaySpec      string `json:"daySpec"`
+	Title        string `json:"title"`
+	StartsAt     string `json:"startsAt"`
+	EndsAt       string `json:"endsAt"`
+	StartMinutes int    `json:"startMinutes"`
+	StopMinutes  int    `json:"stopMinutes"`
+	Priority     int    `json:"priority"`
+	Lifetime     int    `json:"lifetime"`
+	EventID      int    `json:"eventId,omitempty"`
+}
+
 // NewServer constructs the MCP server and registers all vdradmin-go tools.
-func NewServer(epgService *services.EPGService, recordingService *services.RecordingService, version string) *mcp.Server {
+func NewServer(epgService *services.EPGService, recordingService *services.RecordingService, timerService *services.TimerService, version string) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{Name: "vdradmin-go-mcp", Version: version}, &mcp.ServerOptions{
-		Instructions: "Search the configured VDR electronic program guide and recordings. Use search_epg for read-only TV show and programme searches, and search_recordings for read-only completed recording searches.",
+		Instructions: "Search the configured VDR electronic program guide and recordings, and list scheduled timers. Use search_epg for read-only TV show and programme searches, search_recordings for read-only completed recording searches, and list_timers for read-only scheduled timer queries.",
 	})
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        searchEPGToolName,
@@ -104,6 +135,15 @@ func NewServer(epgService *services.EPGService, recordingService *services.Recor
 			IdempotentHint: true,
 		},
 	}, searchRecordingsHandler(recordingService))
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        listTimersToolName,
+		Title:       "List timers",
+		Description: "List scheduled VDR timers, with optional active-state, channel, time-window, and result-limit filters.",
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint:   true,
+			IdempotentHint: true,
+		},
+	}, listTimersHandler(timerService))
 	return server
 }
 
@@ -204,6 +244,101 @@ func searchRecordingsHandler(recordingService *services.RecordingService) mcp.To
 			output.Recordings = append(output.Recordings, recordingToOutput(recording))
 		}
 		return nil, output, nil
+	}
+}
+
+func listTimersHandler(timerService *services.TimerService) mcp.ToolHandlerFor[listTimersInput, listTimersOutput] {
+	return func(ctx context.Context, _ *mcp.CallToolRequest, input listTimersInput) (*mcp.CallToolResult, listTimersOutput, error) {
+		startsAt, err := parseRFC3339Time("startsAt", input.StartsAt)
+		if err != nil {
+			return nil, listTimersOutput{}, err
+		}
+		endsAt, err := parseRFC3339Time("endsAt", input.EndsAt)
+		if err != nil {
+			return nil, listTimersOutput{}, err
+		}
+		if startsAt != nil && endsAt != nil && endsAt.Before(*startsAt) {
+			return nil, listTimersOutput{}, fmt.Errorf("endsAt must not be before startsAt")
+		}
+		limit, err := normalizedResultLimit(input.ResultLimit)
+		if err != nil {
+			return nil, listTimersOutput{}, err
+		}
+
+		timers, err := timerService.GetAllTimers(ctx)
+		if err != nil {
+			return nil, listTimersOutput{}, err
+		}
+		matches := filterTimers(timers, input, startsAt, endsAt)
+		sortTimers(matches)
+
+		total := len(matches)
+		truncated := total > limit
+		if truncated {
+			matches = matches[:limit]
+		}
+
+		output := listTimersOutput{
+			Timers:    make([]timerOutput, 0, len(matches)),
+			Total:     total,
+			Truncated: truncated,
+		}
+		for _, timer := range matches {
+			output.Timers = append(output.Timers, timerToOutput(timer))
+		}
+		return nil, output, nil
+	}
+}
+
+func filterTimers(timers []domain.Timer, input listTimersInput, startsAt, endsAt *time.Time) []domain.Timer {
+	matches := make([]domain.Timer, 0, len(timers))
+	for _, timer := range timers {
+		if input.Active != nil && timer.Active != *input.Active {
+			continue
+		}
+		if input.ChannelID != "" && timer.ChannelID != input.ChannelID {
+			continue
+		}
+		if startsAt != nil && !timer.Stop.IsZero() && !timer.Stop.After(*startsAt) {
+			continue
+		}
+		if endsAt != nil && !timer.Start.IsZero() && !timer.Start.Before(*endsAt) {
+			continue
+		}
+		matches = append(matches, timer)
+	}
+	return matches
+}
+
+func sortTimers(timers []domain.Timer) {
+	sort.SliceStable(timers, func(i, j int) bool {
+		if timers[i].Start.Equal(timers[j].Start) {
+			return timers[i].ID < timers[j].ID
+		}
+		if timers[i].Start.IsZero() {
+			return false
+		}
+		if timers[j].Start.IsZero() {
+			return true
+		}
+		return timers[i].Start.Before(timers[j].Start)
+	})
+}
+
+func timerToOutput(timer domain.Timer) timerOutput {
+	return timerOutput{
+		ID:           timer.ID,
+		Active:       timer.Active,
+		ChannelID:    timer.ChannelID,
+		DaySpec:      timer.DaySpec,
+		Title:        timer.Title,
+		StartsAt:     formatEPGTime(timer.Start),
+		EndsAt:       formatEPGTime(timer.Stop),
+		StartMinutes: timer.StartMinutes,
+		StopMinutes:  timer.StopMinutes,
+		Priority:     timer.Priority,
+		Lifetime:     timer.Lifetime,
+		EventID:      timer.EventID,
 	}
 }
 

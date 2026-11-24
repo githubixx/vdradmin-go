@@ -14,13 +14,15 @@ import (
 
 func TestServer_SearchEPG(t *testing.T) {
 	start := time.Date(2026, time.August, 27, 18, 0, 0, 0, time.UTC)
-	epgService := services.NewEPGService(ports.NewMockVDRClient().
+	mock := ports.NewMockVDRClient().
 		WithChannels([]domain.Channel{{ID: "one", Number: 1, Name: "One"}}).
 		WithEPGEvents([]domain.EPGEvent{{
 			EventID: 1, ChannelID: "one", ChannelNumber: 1, ChannelName: "One", Title: "Science Fiction", Start: start, Stop: start.Add(time.Hour),
-		}}), time.Minute)
-	recordingService := services.NewRecordingService(ports.NewMockVDRClient(), 0)
-	server := NewServer(epgService, recordingService, "test")
+		}})
+	epgService := services.NewEPGService(mock, time.Minute)
+	recordingService := services.NewRecordingService(mock, 0)
+	timerService := services.NewTimerService(mock)
+	server := NewServer(epgService, recordingService, timerService, "test")
 	serverTransport, clientTransport := modelcontextprotocol.NewInMemoryTransports()
 	ctx := context.Background()
 	if _, err := server.Connect(ctx, serverTransport, nil); err != nil {
@@ -38,7 +40,7 @@ func TestServer_SearchEPG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListTools: %v", err)
 	}
-	if len(tools.Tools) != 2 {
+	if len(tools.Tools) != 3 {
 		t.Fatalf("unexpected tools: %+v", tools.Tools)
 	}
 	seen := map[string]bool{}
@@ -48,7 +50,7 @@ func TestServer_SearchEPG(t *testing.T) {
 			t.Fatalf("expected read-only annotations for %s: %+v", tool.Name, tool.Annotations)
 		}
 	}
-	if !seen[searchEPGToolName] || !seen[searchRecordingsToolName] {
+	if !seen[searchEPGToolName] || !seen[searchRecordingsToolName] || !seen[listTimersToolName] {
 		t.Fatalf("unexpected tools: %+v", tools.Tools)
 	}
 
@@ -79,7 +81,8 @@ func TestServer_SearchRecordings(t *testing.T) {
 		})
 	epgService := services.NewEPGService(mock, 0)
 	recordingService := services.NewRecordingService(mock, 0)
-	server := NewServer(epgService, recordingService, "test")
+	timerService := services.NewTimerService(mock)
+	server := NewServer(epgService, recordingService, timerService, "test")
 	session := connectTestSession(t, server)
 
 	result, err := session.CallTool(context.Background(), &modelcontextprotocol.CallToolParams{
@@ -135,6 +138,103 @@ func TestServer_SearchRecordings(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			result, err := session.CallTool(context.Background(), &modelcontextprotocol.CallToolParams{Name: searchRecordingsToolName, Arguments: args})
+			if err != nil {
+				t.Fatalf("CallTool: %v", err)
+			}
+			if !result.IsError {
+				t.Fatalf("expected error tool result")
+			}
+		})
+	}
+}
+
+func TestServer_ListTimers(t *testing.T) {
+	firstStart := time.Date(2026, time.November, 18, 10, 0, 0, 0, time.UTC)
+	secondStart := firstStart.Add(2 * time.Hour)
+	mock := ports.NewMockVDRClient().WithTimers([]domain.Timer{
+		{
+			ID: 3, Active: true, ChannelID: "two", DaySpec: "2026-11-18", Title: "Later show",
+			Start: secondStart.Add(time.Hour), Stop: secondStart.Add(2 * time.Hour),
+			StartMinutes: 780, StopMinutes: 840, Priority: 50, Lifetime: 99,
+		},
+		{
+			ID: 2, Active: true, ChannelID: "one", DaySpec: "MTWTFSS", Title: "Recurring show",
+			Start: secondStart, Stop: secondStart.Add(time.Hour),
+			StartMinutes: 720, StopMinutes: 780, Priority: 40, Lifetime: 30, EventID: 42,
+		},
+		{
+			ID: 1, Active: false, ChannelID: "one", DaySpec: "2026-11-18", Title: "Inactive show",
+			Start: firstStart, Stop: firstStart.Add(time.Hour),
+			StartMinutes: 600, StopMinutes: 660, Priority: 20, Lifetime: 10,
+		},
+	})
+	server := NewServer(
+		services.NewEPGService(mock, 0),
+		services.NewRecordingService(mock, 0),
+		services.NewTimerService(mock),
+		"test",
+	)
+	session := connectTestSession(t, server)
+
+	unfilteredResult, err := session.CallTool(context.Background(), &modelcontextprotocol.CallToolParams{
+		Name:      listTimersToolName,
+		Arguments: map[string]any{"resultLimit": 2},
+	})
+	if err != nil {
+		t.Fatalf("CallTool: %v", err)
+	}
+	if unfilteredResult.IsError {
+		t.Fatalf("tool result was an error: %+v", unfilteredResult.Content)
+	}
+	unfilteredOutput := decodeStructuredContent[listTimersOutput](t, unfilteredResult.StructuredContent)
+	if unfilteredOutput.Total != 3 || !unfilteredOutput.Truncated || len(unfilteredOutput.Timers) != 2 {
+		t.Fatalf("unexpected unfiltered result metadata: %+v", unfilteredOutput)
+	}
+	if unfilteredOutput.Timers[0].ID != 1 || unfilteredOutput.Timers[1].ID != 2 {
+		t.Fatalf("expected timers ordered by start time, got %+v", unfilteredOutput.Timers)
+	}
+
+	result, err := session.CallTool(context.Background(), &modelcontextprotocol.CallToolParams{
+		Name: listTimersToolName,
+		Arguments: map[string]any{
+			"active":      true,
+			"channelId":   "one",
+			"startsAt":    secondStart.Add(-30 * time.Minute).Format(time.RFC3339),
+			"endsAt":      secondStart.Add(30 * time.Minute).Format(time.RFC3339),
+			"resultLimit": 1,
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("tool result was an error: %+v", result.Content)
+	}
+	output := decodeStructuredContent[listTimersOutput](t, result.StructuredContent)
+	if output.Total != 1 || output.Truncated || len(output.Timers) != 1 {
+		t.Fatalf("unexpected output metadata: %+v", output)
+	}
+	timer := output.Timers[0]
+	if timer.ID != 2 || !timer.Active || timer.ChannelID != "one" || timer.Title != "Recurring show" {
+		t.Fatalf("unexpected timer fields: %+v", timer)
+	}
+	if timer.DaySpec != "MTWTFSS" || timer.StartsAt != secondStart.Format(time.RFC3339) || timer.EndsAt != secondStart.Add(time.Hour).Format(time.RFC3339) {
+		t.Fatalf("unexpected timer schedule: %+v", timer)
+	}
+	if timer.StartMinutes != 720 || timer.StopMinutes != 780 || timer.Priority != 40 || timer.Lifetime != 30 || timer.EventID != 42 {
+		t.Fatalf("unexpected timer metadata: %+v", timer)
+	}
+
+	for name, args := range map[string]map[string]any{
+		"invalid start": {"startsAt": "not-a-time"},
+		"reversed range": {
+			"startsAt": secondStart.Format(time.RFC3339),
+			"endsAt":   firstStart.Format(time.RFC3339),
+		},
+		"invalid limit": {"resultLimit": 201},
+	} {
+		t.Run(name, func(t *testing.T) {
+			result, err := session.CallTool(context.Background(), &modelcontextprotocol.CallToolParams{Name: listTimersToolName, Arguments: args})
 			if err != nil {
 				t.Fatalf("CallTool: %v", err)
 			}
